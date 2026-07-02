@@ -128,6 +128,7 @@ En una fase posterior, con autorizacion, estos recursos deben organizarse en `ap
 ## Reglas Tecnicas Base
 
 - Las imagenes no se guardan en D1; se guardan en R2 y en D1 solo queda la ruta o key.
+- El API espera un binding de R2 llamado `BUCKET`. El bucket real se configura en Cloudflare/Wrangler y no debe inventarse ni guardarse con credenciales reales en el repositorio.
 - El stock pertenece a variantes, no a productos.
 - El QR es por variante de producto, no por unidad fisica.
 - Las ventas no se eliminan; se anulan.

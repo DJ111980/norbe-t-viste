@@ -10,5 +10,10 @@ database_name = "norbe-t-viste"
 database_id = "local-norbe-t-viste"
 migrations_dir = "../../db/migrations"
 
-# Las vinculaciones reales de R2 se agregaran cuando existan los recursos en Cloudflare.
-# No se incluyen buckets ni secretos inventados en esta fase inicial.
+# Binding esperado para Cloudflare R2:
+# [[r2_buckets]]
+# binding = "BUCKET"
+# bucket_name = "NOMBRE_REAL_DEL_BUCKET"
+#
+# El bucket real se define al crear el recurso en Cloudflare. No se incluye un
+# nombre inventado para evitar subir configuracion falsa al repositorio.
