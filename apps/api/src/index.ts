@@ -1,12 +1,19 @@
 import type { ApiEnv } from './config/env';
 import { handleAuthRoutes } from './modules/auth/auth.routes';
 import { handleClientRoutes } from './modules/clients/clients.routes';
+import { handleProviderRoutes } from './modules/providers/providers.routes';
 import { handleUserRoutes } from './modules/users/users.routes';
 import { ApiError, normalizeApiError } from './shared/errors';
 import { errorResponse } from './shared/responses';
 import { handleHealthRoutes } from './routes/health.routes';
 
 async function handleRequest(request: Request, env: ApiEnv): Promise<Response> {
+  const providerResponse = await handleProviderRoutes(request, env);
+
+  if (providerResponse) {
+    return providerResponse;
+  }
+
   const clientResponse = await handleClientRoutes(request, env);
 
   if (clientResponse) {
