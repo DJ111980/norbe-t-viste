@@ -1,0 +1,14 @@
+name = "norbe-t-viste-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Vinculacion local para desarrollo con D1. El database_id es un marcador local;
+# cuando se cree la base remota en Cloudflare debe reemplazarse por el ID real.
+[[d1_databases]]
+binding = "DB"
+database_name = "norbe-t-viste"
+database_id = "local-norbe-t-viste"
+migrations_dir = "../../db/migrations"
+
+# Las vinculaciones reales de R2 se agregaran cuando existan los recursos en Cloudflare.
+# No se incluyen buckets ni secretos inventados en esta fase inicial.

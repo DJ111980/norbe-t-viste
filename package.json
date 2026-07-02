@@ -1,0 +1,43 @@
+{
+  "name": "norbe-t-viste",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma web PWA para la gestion comercial de NORBE T VISTE.",
+  "author": "Danilo Jose Castillejo Ponton",
+  "license": "UNLICENSED",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev:web",
+    "dev:web": "npm --workspace apps/web run dev",
+    "dev:api": "npm --workspace apps/api run dev",
+    "build": "npm run build --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
+    "db:migrate": "wrangler d1 migrations apply DB --local --config ./apps/api/wrangler.toml",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config ./apps/api/wrangler.toml",
+    "db:seed": "wrangler d1 execute DB --local --config ./apps/api/wrangler.toml --file=./db/seeds/dev.sql",
+    "db:schema": "wrangler d1 execute DB --local --config ./apps/api/wrangler.toml --command \"SELECT name, type FROM sqlite_master WHERE type IN ('table', 'index') ORDER BY type, name;\"",
+    "admin:create": "tsx apps/api/scripts/create-admin.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "eslint": "^9.18.0",
+    "prettier": "^3.4.2",
+    "prettier-plugin-tailwindcss": "^0.6.10",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0",
+    "wrangler": "^4.106.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

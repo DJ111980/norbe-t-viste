@@ -1,0 +1,10 @@
+PAQUETE ACTUALIZADO - CORTE EXACTO AL BORDE ROJO
+
+Este paquete fue recortado para que el logo termine justo en el borde exterior del círculo rojo.
+
+RECOMENDACIÓN DE USO:
+- Para página web (logo general): NORBE_T_VISTE_web_512_transparente.png
+- Para una versión de mayor calidad en web: NORBE_T_VISTE_web_1024_transparente.png
+- Para favicon / icono del navegador: NORBE_T_VISTE_favicon_32_transparente.png o 64
+- Para etiquetas pequeñas: NORBE_T_VISTE_etiqueta_128_transparente.png o 256
+- Archivo maestro transparente: NORBE_T_VISTE_circular_borde_rojo_transparente_HD.png

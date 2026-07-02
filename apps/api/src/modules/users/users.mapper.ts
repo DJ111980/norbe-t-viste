@@ -1,0 +1,18 @@
+import type { PublicUser, UserRecord } from './users.types';
+
+export function toPublicUser(user: UserRecord): PublicUser {
+  // Este mapper es la barrera para que contrasena_hash nunca salga por la API.
+  return {
+    idUsuario: user.id_usuario,
+    nombreCompleto: user.nombre_completo,
+    correo: user.correo,
+    rol: user.rol,
+    estado: user.estado,
+    ultimoAcceso: user.ultimo_acceso,
+    creadoEn: user.creado_en,
+    actualizadoEn: user.actualizado_en,
+    debeCambiarContrasena: user.debe_cambiar_contrasena === 1,
+    contrasenaActualizadaEn: user.contrasena_actualizada_en,
+    creadoPor: user.creado_por,
+  };
+}

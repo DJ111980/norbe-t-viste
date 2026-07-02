@@ -1,0 +1,15 @@
+{
+  "name": "@norbe-t-viste/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vitest": "^4.1.9"
+  }
+}
