@@ -2,8 +2,10 @@ import type { ApiEnv } from '../../config/env';
 import type {
   InventoryMovementRecord,
   InventoryVariantRecord,
+  InitialInventoryMovementInput,
   ListInventoryMovementsFilters,
   ListInventoryVariantsFilters,
+  ManualInventoryAdjustmentMovementInput,
 } from './inventory.types';
 
 const INVENTORY_VARIANT_COLUMNS = `
@@ -200,4 +202,171 @@ export async function listInventoryMovements(
     .all<InventoryMovementRecord>();
 
   return result.results ?? [];
+}
+
+export async function countMovementsByVariant(env: ApiEnv, idVariante: string): Promise<number> {
+  const row = await env.DB.prepare(
+    `
+      SELECT COUNT(*) AS total
+      FROM movimientos_inventario
+      WHERE id_variante = ?
+    `,
+  )
+    .bind(idVariante)
+    .first<{ total: number }>();
+
+  return row?.total ?? 0;
+}
+
+export async function registerInitialInventory(
+  env: ApiEnv,
+  userId: string,
+  movements: InitialInventoryMovementInput[],
+): Promise<void> {
+  const statements: D1PreparedStatement[] = [];
+
+  for (const movement of movements) {
+    statements.push(
+      env.DB.prepare(
+        `
+          UPDATE variantes_producto
+          SET stock_actual = ?,
+              actualizado_en = datetime('now')
+          WHERE id_variante = ?
+            AND stock_actual = 0
+            AND NOT EXISTS (
+              SELECT 1
+              FROM movimientos_inventario
+              WHERE id_variante = ?
+            )
+        `,
+      ).bind(movement.stockDespues, movement.idVariante, movement.idVariante),
+    );
+
+    statements.push(
+      env.DB.prepare(
+        `
+          INSERT INTO movimientos_inventario (
+            id_movimiento,
+            id_variante,
+            creado_por,
+            tipo_movimiento,
+            cantidad,
+            stock_antes,
+            stock_despues,
+            motivo,
+            referencia_tipo,
+            referencia_id,
+            creado_en
+          )
+          SELECT ?, ?, ?, 'INVENTARIO_INICIAL', ?, ?, ?, ?, 'INVENTARIO_INICIAL', ?, datetime('now')
+          WHERE EXISTS (
+            SELECT 1
+            FROM variantes_producto
+            WHERE id_variante = ?
+              AND stock_actual = ?
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM movimientos_inventario
+            WHERE id_variante = ?
+          )
+        `,
+      ).bind(
+        movement.idMovimiento,
+        movement.idVariante,
+        userId,
+        movement.cantidad,
+        movement.stockAntes,
+        movement.stockDespues,
+        movement.motivo,
+        movement.idMovimiento,
+        movement.idVariante,
+        movement.stockDespues,
+        movement.idVariante,
+      ),
+    );
+  }
+
+  // Batch agrupa stock y movimientos. Cada sentencia tambien valida stock=0 y
+  // ausencia de historial para reducir el riesgo de inventario inicial duplicado.
+  await env.DB.batch(statements);
+}
+
+export async function registerManualInventoryAdjustment(
+  env: ApiEnv,
+  userId: string,
+  movement: ManualInventoryAdjustmentMovementInput,
+): Promise<void> {
+  const operator = movement.tipoAjuste === 'AJUSTE_POSITIVO' ? '+' : '-';
+  const stockGuard = movement.tipoAjuste === 'AJUSTE_NEGATIVO' ? 'AND stock_actual >= ?' : '';
+  const stockGuardValues = movement.tipoAjuste === 'AJUSTE_NEGATIVO' ? [movement.cantidad] : [];
+
+  const statements = [
+    env.DB.prepare(
+      `
+        UPDATE variantes_producto
+        SET stock_actual = stock_actual ${operator} ?,
+            actualizado_en = datetime('now')
+        WHERE id_variante = ?
+          AND stock_actual = ?
+          ${stockGuard}
+      `,
+    ).bind(movement.cantidad, movement.idVariante, movement.stockAntes, ...stockGuardValues),
+    env.DB.prepare(
+      `
+        INSERT INTO movimientos_inventario (
+          id_movimiento,
+          id_variante,
+          creado_por,
+          tipo_movimiento,
+          cantidad,
+          stock_antes,
+          stock_despues,
+          motivo,
+          referencia_tipo,
+          referencia_id,
+          creado_en
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'AJUSTE_INVENTARIO', ?, datetime('now')
+        WHERE EXISTS (
+          SELECT 1
+          FROM variantes_producto
+          WHERE id_variante = ?
+            AND stock_actual = ?
+        )
+      `,
+    ).bind(
+      movement.idMovimiento,
+      movement.idVariante,
+      userId,
+      movement.tipoAjuste,
+      movement.cantidad,
+      movement.stockAntes,
+      movement.stockDespues,
+      movement.motivo,
+      movement.idMovimiento,
+      movement.idVariante,
+      movement.stockDespues,
+    ),
+  ];
+
+  // Ajustes son operaciones controladas: stock y movimiento viajan juntos en
+  // batch. El negativo ademas exige stock suficiente para evitar valores menores a cero.
+  await env.DB.batch(statements);
+}
+
+export async function movementExists(env: ApiEnv, idMovimiento: string): Promise<boolean> {
+  const row = await env.DB.prepare(
+    `
+      SELECT 1 AS existe
+      FROM movimientos_inventario
+      WHERE id_movimiento = ?
+      LIMIT 1
+    `,
+  )
+    .bind(idMovimiento)
+    .first<{ existe: number }>();
+
+  return Boolean(row?.existe);
 }

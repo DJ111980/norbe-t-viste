@@ -4,6 +4,9 @@ import type {
   InventoryReferenceType,
   ListInventoryMovementsFilters,
   ListInventoryVariantsFilters,
+  ManualInventoryAdjustmentInput,
+  ManualInventoryAdjustmentType,
+  RegisterInitialInventoryInput,
 } from './inventory.types';
 
 const VARIANT_STATUSES = ['ACTIVA', 'INACTIVA'] as const;
@@ -23,6 +26,10 @@ const REFERENCE_TYPES: InventoryReferenceType[] = [
   'VENTA',
   'ANULACION_VENTA',
   'DEVOLUCION',
+];
+const MANUAL_ADJUSTMENT_TYPES: ManualInventoryAdjustmentType[] = [
+  'AJUSTE_POSITIVO',
+  'AJUSTE_NEGATIVO',
 ];
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -57,6 +64,26 @@ function parseDateParam(value: string | null, code: string): string | undefined 
     throw new ApiError(code, 'La fecha enviada no es valida.', 400);
   }
   return normalizedValue;
+}
+
+function normalizeBodyText(value: unknown, code: string, message: string): string {
+  const normalizedValue = typeof value === 'string' ? value.trim() : '';
+
+  if (!normalizedValue) {
+    throw new ApiError(code, message, 400);
+  }
+
+  return normalizedValue;
+}
+
+function parsePositiveInteger(value: unknown, code: string, message: string): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new ApiError(code, message, 400);
+  }
+
+  return parsed;
 }
 
 export function validateListInventoryVariantsFilters(
@@ -108,5 +135,120 @@ export function validateListInventoryMovementsFilters(
     fechaHasta: parseDateParam(searchParams.get('fecha_hasta'), 'INVALID_TO_DATE'),
     limit: parseNumberParam(searchParams.get('limit'), DEFAULT_LIMIT, MAX_LIMIT),
     offset: parseNumberParam(searchParams.get('offset'), 0),
+  };
+}
+
+export function validateRegisterInitialInventoryInput(
+  body: unknown,
+): RegisterInitialInventoryInput {
+  const rawBody = body as { items?: unknown };
+
+  if (!rawBody || typeof rawBody !== 'object' || !Array.isArray(rawBody.items)) {
+    throw new ApiError(
+      'INITIAL_INVENTORY_ITEMS_REQUIRED',
+      'Debes enviar items de inventario inicial.',
+      400,
+    );
+  }
+
+  if (rawBody.items.length === 0) {
+    throw new ApiError('EMPTY_INITIAL_INVENTORY', 'Debes enviar al menos un item.', 400);
+  }
+
+  const seenVariants = new Set<string>();
+
+  return {
+    items: rawBody.items.map((rawItem, index) => {
+      if (!rawItem || typeof rawItem !== 'object') {
+        throw new ApiError(
+          'INVALID_INITIAL_INVENTORY_ITEM',
+          'Cada item debe ser un objeto valido.',
+          400,
+        );
+      }
+
+      const item = rawItem as {
+        id_variante?: unknown;
+        cantidad_inicial?: unknown;
+        motivo?: unknown;
+      };
+      const idVariante = normalizeBodyText(
+        item.id_variante,
+        'INITIAL_INVENTORY_VARIANT_REQUIRED',
+        `La variante del item ${index + 1} es obligatoria.`,
+      );
+
+      if (seenVariants.has(idVariante)) {
+        throw new ApiError(
+          'DUPLICATED_INITIAL_INVENTORY_VARIANT',
+          'No se puede repetir la misma variante en el inventario inicial.',
+          400,
+        );
+      }
+
+      seenVariants.add(idVariante);
+
+      return {
+        idVariante,
+        cantidadInicial: parsePositiveInteger(
+          item.cantidad_inicial,
+          'INVALID_INITIAL_INVENTORY_QUANTITY',
+          'La cantidad inicial debe ser mayor que 0.',
+        ),
+        motivo: normalizeBodyText(
+          item.motivo,
+          'INITIAL_INVENTORY_REASON_REQUIRED',
+          'El motivo del inventario inicial es obligatorio.',
+        ),
+      };
+    }),
+  };
+}
+
+export function validateManualInventoryAdjustmentInput(
+  body: unknown,
+): ManualInventoryAdjustmentInput {
+  const rawBody = body as {
+    id_variante?: unknown;
+    tipo_ajuste?: unknown;
+    cantidad?: unknown;
+    motivo?: unknown;
+  };
+
+  if (!rawBody || typeof rawBody !== 'object') {
+    throw new ApiError(
+      'INVALID_INVENTORY_ADJUSTMENT',
+      'El ajuste de inventario no es valido.',
+      400,
+    );
+  }
+
+  const tipoAjuste = normalizeBodyText(
+    rawBody.tipo_ajuste,
+    'INVENTORY_ADJUSTMENT_TYPE_REQUIRED',
+    'El tipo de ajuste es obligatorio.',
+  );
+
+  if (!MANUAL_ADJUSTMENT_TYPES.includes(tipoAjuste as ManualInventoryAdjustmentType)) {
+    throw new ApiError('INVALID_INVENTORY_ADJUSTMENT_TYPE', 'El tipo de ajuste no es valido.', 400);
+  }
+
+  return {
+    idVariante: normalizeBodyText(
+      rawBody.id_variante,
+      'INVENTORY_ADJUSTMENT_VARIANT_REQUIRED',
+      'La variante del ajuste es obligatoria.',
+    ),
+    tipoAjuste: tipoAjuste as ManualInventoryAdjustmentType,
+    cantidad: parsePositiveInteger(
+      rawBody.cantidad,
+      'INVALID_INVENTORY_ADJUSTMENT_QUANTITY',
+      'La cantidad del ajuste debe ser mayor que 0.',
+    ),
+    motivo: normalizeBodyText(
+      rawBody.motivo,
+      'INVENTORY_ADJUSTMENT_REASON_REQUIRED',
+      'El motivo del ajuste es obligatorio.',
+    ),
   };
 }

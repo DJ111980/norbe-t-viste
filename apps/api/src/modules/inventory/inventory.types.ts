@@ -82,6 +82,59 @@ export interface ListInventoryMovementsFilters {
   offset: number;
 }
 
+export interface InitialInventoryItemInput {
+  idVariante: string;
+  cantidadInicial: number;
+  motivo: string;
+}
+
+export interface RegisterInitialInventoryInput {
+  items: InitialInventoryItemInput[];
+}
+
+export interface InitialInventoryMovementInput {
+  idMovimiento: string;
+  idVariante: string;
+  cantidad: number;
+  stockAntes: number;
+  stockDespues: number;
+  motivo: string;
+}
+
+export interface RegisterInitialInventoryResult {
+  items_procesados: number;
+  movimientos_creados: number;
+  total_unidades_ingresadas: number;
+}
+
+export type ManualInventoryAdjustmentType = 'AJUSTE_POSITIVO' | 'AJUSTE_NEGATIVO';
+
+export interface ManualInventoryAdjustmentInput {
+  idVariante: string;
+  tipoAjuste: ManualInventoryAdjustmentType;
+  cantidad: number;
+  motivo: string;
+}
+
+export interface ManualInventoryAdjustmentMovementInput {
+  idMovimiento: string;
+  idVariante: string;
+  tipoAjuste: ManualInventoryAdjustmentType;
+  cantidad: number;
+  stockAntes: number;
+  stockDespues: number;
+  motivo: string;
+}
+
+export interface ManualInventoryAdjustmentResult {
+  id_variante: string;
+  tipo_ajuste: ManualInventoryAdjustmentType;
+  cantidad: number;
+  stock_antes: number;
+  stock_despues: number;
+  movimiento_creado: boolean;
+}
+
 export interface InventoryMapperOptions {
   role: UserRole;
 }

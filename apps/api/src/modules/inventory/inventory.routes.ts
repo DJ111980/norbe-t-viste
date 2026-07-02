@@ -2,15 +2,19 @@ import type { ApiEnv } from '../../config/env';
 import { requireAuth, requireRole } from '../../middleware/auth.middleware';
 import { ApiError } from '../../shared/errors';
 import { successResponse } from '../../shared/responses';
-import { ensureMethod } from '../../shared/validation';
+import { ensureMethod, readJsonBody } from '../../shared/validation';
 import {
   getInventoryVariant,
   listInventoryMovements,
   listInventoryVariants,
+  registerInitialInventory,
+  registerManualInventoryAdjustment,
 } from './inventory.service';
 import {
   validateListInventoryMovementsFilters,
   validateListInventoryVariantsFilters,
+  validateManualInventoryAdjustmentInput,
+  validateRegisterInitialInventoryInput,
 } from './inventory.validation';
 
 function matchInventoryVariantPath(
@@ -63,6 +67,42 @@ export async function handleInventoryRoutes(
     }
 
     ensureMethod(request, 'GET');
+  }
+
+  if (url.pathname === '/inventario/inicial') {
+    const auth = await requireAuth(request, env);
+    requireRole(auth, ['ADMINISTRADOR']);
+
+    if (request.method === 'POST') {
+      const input = validateRegisterInitialInventoryInput(await readJsonBody(request));
+
+      return successResponse(
+        {
+          inventarioInicial: await registerInitialInventory(env, auth, input),
+        },
+        201,
+      );
+    }
+
+    ensureMethod(request, 'POST');
+  }
+
+  if (url.pathname === '/inventario/ajustes') {
+    const auth = await requireAuth(request, env);
+    requireRole(auth, ['ADMINISTRADOR']);
+
+    if (request.method === 'POST') {
+      const input = validateManualInventoryAdjustmentInput(await readJsonBody(request));
+
+      return successResponse(
+        {
+          ajuste: await registerManualInventoryAdjustment(env, auth, input),
+        },
+        201,
+      );
+    }
+
+    ensureMethod(request, 'POST');
   }
 
   const variantPath = matchInventoryVariantPath(url.pathname);

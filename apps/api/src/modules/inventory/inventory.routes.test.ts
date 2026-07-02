@@ -36,6 +36,19 @@ vi.mock('./inventory.service', () => ({
   listInventoryVariants: vi.fn(async () => []),
   getInventoryVariant: vi.fn(async () => ({ idVariante: 'var_1' })),
   listInventoryMovements: vi.fn(async () => []),
+  registerInitialInventory: vi.fn(async () => ({
+    items_procesados: 1,
+    movimientos_creados: 1,
+    total_unidades_ingresadas: 5,
+  })),
+  registerManualInventoryAdjustment: vi.fn(async () => ({
+    id_variante: 'var_1',
+    tipo_ajuste: 'AJUSTE_POSITIVO',
+    cantidad: 2,
+    stock_antes: 10,
+    stock_despues: 12,
+    movimiento_creado: true,
+  })),
 }));
 
 describe('inventory routes', () => {
@@ -104,6 +117,111 @@ describe('inventory routes', () => {
 
     await expect(
       handleInventoryRoutes(new Request('http://localhost/inventario/variantes'), {} as ApiEnv),
+    ).rejects.toMatchObject({ code: 'AUTH_REQUIRED', status: 401 });
+  });
+
+  it('ADMINISTRADOR puede registrar inventario inicial', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'ADMINISTRADOR';
+
+    const response = await handleInventoryRoutes(
+      new Request('http://localhost/inventario/inicial', {
+        method: 'POST',
+        body: JSON.stringify({
+          items: [{ id_variante: 'var_1', cantidad_inicial: 5, motivo: 'Carga inicial' }],
+        }),
+      }),
+      {} as ApiEnv,
+    );
+
+    expect(response?.status).toBe(201);
+  });
+
+  it('VENDEDOR y usuario sin token no pueden registrar inventario inicial', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'VENDEDOR';
+
+    await expect(
+      handleInventoryRoutes(
+        new Request('http://localhost/inventario/inicial', {
+          method: 'POST',
+          body: JSON.stringify({
+            items: [{ id_variante: 'var_1', cantidad_inicial: 5, motivo: 'Carga inicial' }],
+          }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+
+    mocks.authenticated = false;
+
+    await expect(
+      handleInventoryRoutes(
+        new Request('http://localhost/inventario/inicial', {
+          method: 'POST',
+          body: JSON.stringify({
+            items: [{ id_variante: 'var_1', cantidad_inicial: 5, motivo: 'Carga inicial' }],
+          }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'AUTH_REQUIRED', status: 401 });
+  });
+
+  it('ADMINISTRADOR puede registrar ajuste de inventario', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'ADMINISTRADOR';
+
+    const response = await handleInventoryRoutes(
+      new Request('http://localhost/inventario/ajustes', {
+        method: 'POST',
+        body: JSON.stringify({
+          id_variante: 'var_1',
+          tipo_ajuste: 'AJUSTE_POSITIVO',
+          cantidad: 2,
+          motivo: 'Correccion por conteo',
+        }),
+      }),
+      {} as ApiEnv,
+    );
+
+    expect(response?.status).toBe(201);
+  });
+
+  it('VENDEDOR y usuario sin token no pueden registrar ajustes', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'VENDEDOR';
+
+    await expect(
+      handleInventoryRoutes(
+        new Request('http://localhost/inventario/ajustes', {
+          method: 'POST',
+          body: JSON.stringify({
+            id_variante: 'var_1',
+            tipo_ajuste: 'AJUSTE_POSITIVO',
+            cantidad: 2,
+            motivo: 'Correccion',
+          }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+
+    mocks.authenticated = false;
+
+    await expect(
+      handleInventoryRoutes(
+        new Request('http://localhost/inventario/ajustes', {
+          method: 'POST',
+          body: JSON.stringify({
+            id_variante: 'var_1',
+            tipo_ajuste: 'AJUSTE_POSITIVO',
+            cantidad: 2,
+            motivo: 'Correccion',
+          }),
+        }),
+        {} as ApiEnv,
+      ),
     ).rejects.toMatchObject({ code: 'AUTH_REQUIRED', status: 401 });
   });
 });
