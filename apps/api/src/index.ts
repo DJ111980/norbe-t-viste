@@ -8,6 +8,7 @@ import { handleImageRoutes } from './modules/images/images.routes';
 import { handleInventoryRoutes } from './modules/inventory/inventory.routes';
 import { handleProductRoutes } from './modules/products/products.routes';
 import { handleProviderRoutes } from './modules/providers/providers.routes';
+import { handleSaleRoutes } from './modules/sales/sales.routes';
 import { handleUserRoutes } from './modules/users/users.routes';
 import { handleVariantRoutes } from './modules/variants/variants.routes';
 import { ApiError, normalizeApiError } from './shared/errors';
@@ -37,6 +38,12 @@ async function handleRequest(request: Request, env: ApiEnv): Promise<Response> {
 
   if (inventoryResponse) {
     return inventoryResponse;
+  }
+
+  const saleResponse = await handleSaleRoutes(request, env);
+
+  if (saleResponse) {
+    return saleResponse;
   }
 
   const variantResponse = await handleVariantRoutes(request, env);
