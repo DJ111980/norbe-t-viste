@@ -1,4 +1,5 @@
 import type { PrintableVariantLabel } from './labels.types';
+import { NORBE_LABEL_LOGO_DATA_URI } from './labels.logo';
 
 function escapeHtml(value: string): string {
   return value
@@ -22,7 +23,10 @@ function renderVariantLabelMarkup(label: PrintableVariantLabel): string {
   return `<main class="label" aria-label="Etiqueta QR de variante">
     <section class="brand">
       <div class="title">NORBE T VISTE</div>
-      <div class="logo" aria-label="Logo">LOGO</div>
+      <div class="logo" aria-label="Logo">
+        <span class="logo-fallback">LOGO</span>
+        <img class="logo-image" src="${NORBE_LABEL_LOGO_DATA_URI}" alt="NORBE T VISTE" onerror="this.remove()">
+      </div>
     </section>
     <section class="qr" aria-label="Codigo QR">${label.qrSvg}</section>
     <section class="details">
@@ -112,12 +116,28 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
       min-width: 14mm;
       height: 7mm;
       border: 0.2mm solid #111111;
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
       font-size: 6pt;
       font-weight: 700;
       letter-spacing: 0;
+    }
+
+    .logo-image {
+      position: absolute;
+      inset: 0.4mm;
+      width: calc(100% - 0.8mm);
+      height: calc(100% - 0.8mm);
+      object-fit: contain;
+      background: #ffffff;
+    }
+
+    .logo-fallback {
+      position: relative;
+      z-index: 0;
     }
 
     .qr {

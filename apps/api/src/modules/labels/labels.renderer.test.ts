@@ -23,6 +23,8 @@ describe('labels html', () => {
     expect(html).toContain('@media print');
     expect(html).toContain('NORBE T VISTE');
     expect(html).toContain('LOGO');
+    expect(html).toContain('<img class="logo-image"');
+    expect(html).toContain('src="data:image/png;base64,');
     expect(html).toContain('<svg viewBox="0 0 21 21">');
     expect(html).toContain('NTV-VAR-000001');
     expect(html).toContain('TALLA M');
@@ -78,6 +80,8 @@ describe('labels html', () => {
     expect(html).toContain('<title>NORBE T VISTE - Etiquetas QR</title>');
     expect(html).toContain('class="labels-grid"');
     expect(html.match(/class="label"/g)).toHaveLength(2);
+    expect(html.match(/class="logo-image"/g)).toHaveLength(2);
+    expect(html).toContain('src="data:image/png;base64,');
     expect(html.match(/<svg/g)).toHaveLength(2);
     expect(html).toContain('NTV-VAR-000001');
     expect(html).toContain('NTV-VAR-000002');
