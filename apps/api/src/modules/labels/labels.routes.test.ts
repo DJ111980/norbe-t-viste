@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   authenticated: true,
   requestedVariant: '',
   requestedBatchSize: 0,
+  requestedEntryLot: '',
 }));
 
 vi.mock('../../middleware/auth.middleware', () => ({
@@ -41,6 +42,10 @@ vi.mock('./labels.service', () => ({
   }),
   getBatchVariantLabelPreviewHtml: vi.fn(async (_env: ApiEnv, items: unknown[]) => {
     mocks.requestedBatchSize = items.length;
+    return '<!doctype html><html><body><main class="label">NTV-VAR-000001</main></body></html>';
+  }),
+  getEntryLotLabelPreviewHtml: vi.fn(async (_env: ApiEnv, idLote: string) => {
+    mocks.requestedEntryLot = idLote;
     return '<!doctype html><html><body><main class="label">NTV-VAR-000001</main></body></html>';
   }),
 }));
@@ -106,6 +111,33 @@ describe('labels routes', () => {
     expect(response?.status).toBe(200);
   });
 
+  it('ADMINISTRADOR puede generar etiquetas desde lote de entrada', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'ADMINISTRADOR';
+
+    const response = await handleLabelRoutes(
+      new Request('http://localhost/etiquetas/lotes-entrada/lot_1/preview'),
+      {} as ApiEnv,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(response?.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    expect(await response?.text()).toContain('class="label"');
+    expect(mocks.requestedEntryLot).toBe('lot_1');
+  });
+
+  it('VENDEDOR puede generar etiquetas desde lote de entrada', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'VENDEDOR';
+
+    const response = await handleLabelRoutes(
+      new Request('http://localhost/etiquetas/lotes-entrada/lot_1/preview'),
+      {} as ApiEnv,
+    );
+
+    expect(response?.status).toBe(200);
+  });
+
   it('rechaza usuarios sin autenticacion', async () => {
     mocks.authenticated = false;
     mocks.role = 'VENDEDOR';
@@ -140,6 +172,18 @@ describe('labels routes', () => {
           method: 'POST',
           body: JSON.stringify({ items: [{ id_variante: 'var_1', cantidad: 1 }] }),
         }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'AUTH_REQUIRED', status: 401 });
+  });
+
+  it('rechaza etiquetas desde lote sin autenticacion', async () => {
+    mocks.authenticated = false;
+    mocks.role = 'VENDEDOR';
+
+    await expect(
+      handleLabelRoutes(
+        new Request('http://localhost/etiquetas/lotes-entrada/lot_1/preview'),
         {} as ApiEnv,
       ),
     ).rejects.toMatchObject({ code: 'AUTH_REQUIRED', status: 401 });

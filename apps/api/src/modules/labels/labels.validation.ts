@@ -13,6 +13,16 @@ export function validateVariantLabelPreviewId(value: string): string {
   return idVariante;
 }
 
+export function validateEntryLotLabelPreviewId(value: string): string {
+  const idLote = value.trim();
+
+  if (!idLote) {
+    throw new ApiError('ENTRY_LOT_LABEL_ID_REQUIRED', 'Debes indicar el lote de entrada.', 400);
+  }
+
+  return idLote;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

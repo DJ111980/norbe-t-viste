@@ -1,8 +1,16 @@
 import type { ApiEnv } from '../../config/env';
 import { requireAuth, requireRole } from '../../middleware/auth.middleware';
 import { ensureMethod, readJsonBody } from '../../shared/validation';
-import { getBatchVariantLabelPreviewHtml, getVariantLabelPreviewHtml } from './labels.service';
-import { validateBatchLabelPreviewInput, validateVariantLabelPreviewId } from './labels.validation';
+import {
+  getBatchVariantLabelPreviewHtml,
+  getEntryLotLabelPreviewHtml,
+  getVariantLabelPreviewHtml,
+} from './labels.service';
+import {
+  validateBatchLabelPreviewInput,
+  validateEntryLotLabelPreviewId,
+  validateVariantLabelPreviewId,
+} from './labels.validation';
 
 function matchVariantLabelPreviewPath(pathname: string): { idVariante: string } | null {
   const match = pathname.match(/^\/etiquetas\/variantes\/([^/]+)\/preview$/);
@@ -16,8 +24,35 @@ function matchVariantLabelPreviewPath(pathname: string): { idVariante: string } 
   };
 }
 
+function matchEntryLotLabelPreviewPath(pathname: string): { idLote: string } | null {
+  const match = pathname.match(/^\/etiquetas\/lotes-entrada\/([^/]+)\/preview$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    idLote: validateEntryLotLabelPreviewId(decodeURIComponent(match[1])),
+  };
+}
+
 export async function handleLabelRoutes(request: Request, env: ApiEnv): Promise<Response | null> {
   const url = new URL(request.url);
+
+  const entryLotPreviewPath = matchEntryLotLabelPreviewPath(url.pathname);
+
+  if (entryLotPreviewPath) {
+    const auth = await requireAuth(request, env);
+    requireRole(auth, ['ADMINISTRADOR', 'VENDEDOR']);
+    ensureMethod(request, 'GET');
+
+    return new Response(await getEntryLotLabelPreviewHtml(env, entryLotPreviewPath.idLote), {
+      status: 200,
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+      },
+    });
+  }
 
   if (url.pathname === '/etiquetas/variantes/preview-lote') {
     const auth = await requireAuth(request, env);

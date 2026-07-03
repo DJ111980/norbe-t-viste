@@ -82,10 +82,15 @@ describe('labels html', () => {
         qrSvg: '<svg data-code="NTV-VAR-000002"></svg>',
       },
     ]);
+    const style = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
 
     expect(html).toContain('<!doctype html>');
     expect(html).toContain('<title>NORBE T VISTE - Etiquetas QR</title>');
-    expect(html).toContain('class="labels-grid"');
+    expect(html).toContain('class="labels-pages"');
+    expect(html).not.toContain('class="labels-grid"');
+    expect(style).not.toContain('flex-wrap');
+    expect(style).not.toMatch(/size:\s*A4\b/i);
+    expect(style).not.toMatch(/size:\s*letter\b/i);
     expect(html.match(/class="label"/g)).toHaveLength(2);
     expect(html.match(/class="visuals"/g)).toHaveLength(2);
     expect(html.match(/class="details"/g)).toHaveLength(2);
@@ -99,6 +104,8 @@ describe('labels html', () => {
     expect(html).toContain('size: 60mm 40mm');
     expect(html).toContain('width: 60mm');
     expect(html).toContain('height: 40mm');
+    expect(html).toContain('break-after: page');
+    expect(html).toContain('page-break-after: always');
     expect(html).toContain('@media print');
     expect(html).not.toContain('Escanea para consultar la variante');
     expect(html.toLowerCase()).not.toContain('precio');

@@ -73,11 +73,8 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
       ${bodyDisplay}
     }
 
-    .labels-grid {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-start;
-      gap: 0;
+    .labels-pages {
+      display: block;
     }
 
     .label {
@@ -92,6 +89,8 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
       border: 0.2mm solid #111111;
       break-inside: avoid;
       page-break-inside: avoid;
+      break-after: page;
+      page-break-after: always;
     }
 
     .title {
@@ -189,7 +188,7 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
         padding: 0;
       }
 
-      .labels-grid {
+      .labels-pages {
         display: block;
       }
 
@@ -228,7 +227,7 @@ export function renderLabelsPageHtml(labels: PrintableVariantLabel[]): string {
   </style>
 </head>
 <body>
-  <section class="labels-grid" aria-label="Etiquetas QR de variantes">
+  <section class="labels-pages" aria-label="Etiquetas QR de variantes">
     ${labels.map(renderVariantLabelMarkup).join('\n    ')}
   </section>
 </body>
