@@ -1,15 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiEnv } from '../../config/env';
-import { getVariantLabelPreviewHtml } from './labels.service';
+import { getBatchVariantLabelPreviewHtml, getVariantLabelPreviewHtml } from './labels.service';
 import type { LabelVariantRecord } from './labels.types';
 
 const mocks = vi.hoisted(() => ({
   variant: null as LabelVariantRecord | null,
+  variants: new Map<string, LabelVariantRecord>(),
   qrCalls: [] as string[],
 }));
 
 vi.mock('./labels.repository', () => ({
-  findLabelVariantById: vi.fn(async () => mocks.variant),
+  findLabelVariantById: vi.fn(async (_env: ApiEnv, idVariante: string) =>
+    mocks.variants.size > 0 ? (mocks.variants.get(idVariante) ?? null) : mocks.variant,
+  ),
 }));
 
 vi.mock('./labels.qr', () => ({
@@ -33,6 +36,7 @@ function buildVariant(overrides: Partial<LabelVariantRecord> = {}): LabelVariant
 describe('labels service', () => {
   beforeEach(() => {
     mocks.variant = buildVariant();
+    mocks.variants = new Map();
     mocks.qrCalls = [];
   });
 
@@ -86,5 +90,68 @@ describe('labels service', () => {
     expect(mocks.qrCalls).toEqual(['NTV-VAR-000777']);
     expect(mocks.qrCalls[0]).not.toContain('precio');
     expect(mocks.qrCalls[0]).not.toContain('stock');
+  });
+
+  it('genera varias etiquetas respetando cantidad por variante', async () => {
+    mocks.variants = new Map([
+      ['var_1', buildVariant({ id_variante: 'var_1', codigo_qr: 'NTV-VAR-000001', talla: 'm' })],
+      ['var_2', buildVariant({ id_variante: 'var_2', codigo_qr: 'NTV-VAR-000002', talla: 'l' })],
+    ]);
+
+    const html = await getBatchVariantLabelPreviewHtml({} as ApiEnv, [
+      { idVariante: 'var_1', cantidad: 2 },
+      { idVariante: 'var_2', cantidad: 1 },
+    ]);
+
+    expect(html.match(/class="label"/g)).toHaveLength(3);
+    expect(html.match(/NTV-VAR-000001/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(html).toContain('NTV-VAR-000002');
+    expect(html).toContain('TALLA M');
+    expect(html).toContain('TALLA L');
+    expect(mocks.qrCalls).toEqual(['NTV-VAR-000001', 'NTV-VAR-000002']);
+  });
+
+  it('permite variante y producto inactivos en lote', async () => {
+    mocks.variants = new Map([
+      [
+        'var_inactiva',
+        buildVariant({
+          id_variante: 'var_inactiva',
+          codigo_qr: 'NTV-VAR-000099',
+          talla: null,
+          estado: 'INACTIVA',
+          estado_producto: 'INACTIVO',
+        }),
+      ],
+    ]);
+
+    const html = await getBatchVariantLabelPreviewHtml({} as ApiEnv, [
+      { idVariante: 'var_inactiva', cantidad: 1 },
+    ]);
+
+    expect(html).toContain('NTV-VAR-000099');
+    expect(html).toContain('TALLA UNICA');
+  });
+
+  it('falla en lote si una variante no existe', async () => {
+    mocks.variants = new Map([['var_1', buildVariant({ id_variante: 'var_1' })]]);
+
+    await expect(
+      getBatchVariantLabelPreviewHtml({} as ApiEnv, [{ idVariante: 'var_missing', cantidad: 1 }]),
+    ).rejects.toMatchObject({
+      code: 'VARIANT_NOT_FOUND',
+      status: 404,
+    });
+  });
+
+  it('falla en lote si una variante no tiene codigo QR', async () => {
+    mocks.variants = new Map([['var_1', buildVariant({ id_variante: 'var_1', codigo_qr: null })]]);
+
+    await expect(
+      getBatchVariantLabelPreviewHtml({} as ApiEnv, [{ idVariante: 'var_1', cantidad: 1 }]),
+    ).rejects.toMatchObject({
+      code: 'VARIANT_QR_CODE_REQUIRED',
+      status: 409,
+    });
   });
 });

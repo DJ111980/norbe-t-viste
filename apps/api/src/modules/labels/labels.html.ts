@@ -15,17 +15,39 @@ export function normalizeLabelSize(talla: string | null): string {
   return normalizedSize ? `TALLA ${normalizedSize.toUpperCase()}` : 'TALLA UNICA';
 }
 
-export function renderVariantLabelHtml(label: PrintableVariantLabel): string {
+function renderVariantLabelMarkup(label: PrintableVariantLabel): string {
   const visibleCode = escapeHtml(label.codigoQr);
   const visibleSize = escapeHtml(label.talla);
 
-  return `<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <title>NORBE T VISTE - Etiqueta QR</title>
-  <style>
-    @page {
+  return `<main class="label" aria-label="Etiqueta QR de variante">
+    <section class="brand">
+      <div class="title">NORBE T VISTE</div>
+      <div class="logo" aria-label="Logo">LOGO</div>
+    </section>
+    <section class="qr" aria-label="Codigo QR">${label.qrSvg}</section>
+    <section class="details">
+      <div class="code">${visibleCode}</div>
+      <div class="size">${visibleSize}</div>
+    </section>
+    <div class="footer">Escanea para consultar la variante</div>
+  </main>`;
+}
+
+function renderLabelStyles(pageMode: 'single' | 'batch'): string {
+  const bodySize =
+    pageMode === 'single'
+      ? `width: 60mm;
+      height: 40mm;`
+      : `min-width: 60mm;
+      min-height: 40mm;`;
+  const bodyDisplay =
+    pageMode === 'single'
+      ? `display: flex;
+      align-items: center;
+      justify-content: center;`
+      : '';
+
+  return `@page {
       size: 60mm 40mm;
       margin: 0;
     }
@@ -36,8 +58,7 @@ export function renderVariantLabelHtml(label: PrintableVariantLabel): string {
 
     html,
     body {
-      width: 60mm;
-      height: 40mm;
+      ${bodySize}
       margin: 0;
       padding: 0;
       background: #ffffff;
@@ -46,9 +67,14 @@ export function renderVariantLabelHtml(label: PrintableVariantLabel): string {
     }
 
     body {
+      ${bodyDisplay}
+    }
+
+    .labels-grid {
       display: flex;
-      align-items: center;
-      justify-content: center;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 0;
     }
 
     .label {
@@ -61,6 +87,8 @@ export function renderVariantLabelHtml(label: PrintableVariantLabel): string {
       gap: 1.8mm 3mm;
       overflow: hidden;
       border: 0.2mm solid #111111;
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
 
     .brand {
@@ -142,25 +170,48 @@ export function renderVariantLabelHtml(label: PrintableVariantLabel): string {
         padding: 0;
       }
 
+      .labels-grid {
+        display: block;
+      }
+
       .label {
         border-color: #111111;
+        break-after: page;
+        page-break-after: always;
       }
-    }
+    }`;
+}
+
+export function renderVariantLabelHtml(label: PrintableVariantLabel): string {
+  return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>NORBE T VISTE - Etiqueta QR</title>
+  <style>
+    ${renderLabelStyles('single')}
   </style>
 </head>
 <body>
-  <main class="label" aria-label="Etiqueta QR de variante">
-    <section class="brand">
-      <div class="title">NORBE T VISTE</div>
-      <div class="logo" aria-label="Logo">LOGO</div>
-    </section>
-    <section class="qr" aria-label="Codigo QR">${label.qrSvg}</section>
-    <section class="details">
-      <div class="code">${visibleCode}</div>
-      <div class="size">${visibleSize}</div>
-    </section>
-    <div class="footer">Escanea para consultar la variante</div>
-  </main>
+  ${renderVariantLabelMarkup(label)}
+</body>
+</html>`;
+}
+
+export function renderLabelsPageHtml(labels: PrintableVariantLabel[]): string {
+  return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>NORBE T VISTE - Etiquetas QR</title>
+  <style>
+    ${renderLabelStyles('batch')}
+  </style>
+</head>
+<body>
+  <section class="labels-grid" aria-label="Etiquetas QR de variantes">
+    ${labels.map(renderVariantLabelMarkup).join('\n    ')}
+  </section>
 </body>
 </html>`;
 }

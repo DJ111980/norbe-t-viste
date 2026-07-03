@@ -11,3 +11,8 @@ export interface PrintableVariantLabel {
   talla: string;
   qrSvg: string;
 }
+
+export interface BatchLabelItemInput {
+  idVariante: string;
+  cantidad: number;
+}

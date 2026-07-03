@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   role: 'VENDEDOR' as 'ADMINISTRADOR' | 'VENDEDOR' | 'BODEGA',
   authenticated: true,
   requestedVariant: '',
+  requestedBatchSize: 0,
 }));
 
 vi.mock('../../middleware/auth.middleware', () => ({
@@ -38,6 +39,10 @@ vi.mock('./labels.service', () => ({
     mocks.requestedVariant = idVariante;
     return '<!doctype html><html><body>NTV-VAR-000001</body></html>';
   }),
+  getBatchVariantLabelPreviewHtml: vi.fn(async (_env: ApiEnv, items: unknown[]) => {
+    mocks.requestedBatchSize = items.length;
+    return '<!doctype html><html><body><main class="label">NTV-VAR-000001</main></body></html>';
+  }),
 }));
 
 describe('labels routes', () => {
@@ -68,6 +73,39 @@ describe('labels routes', () => {
     expect(response?.status).toBe(200);
   });
 
+  it('ADMINISTRADOR puede generar preview HTML por lote', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'ADMINISTRADOR';
+
+    const response = await handleLabelRoutes(
+      new Request('http://localhost/etiquetas/variantes/preview-lote', {
+        method: 'POST',
+        body: JSON.stringify({ items: [{ id_variante: 'var_1', cantidad: 2 }] }),
+      }),
+      {} as ApiEnv,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(response?.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    expect(await response?.text()).toContain('class="label"');
+    expect(mocks.requestedBatchSize).toBe(1);
+  });
+
+  it('VENDEDOR puede generar preview HTML por lote', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'VENDEDOR';
+
+    const response = await handleLabelRoutes(
+      new Request('http://localhost/etiquetas/variantes/preview-lote', {
+        method: 'POST',
+        body: JSON.stringify({ items: [{ id_variante: 'var_1', cantidad: 1 }] }),
+      }),
+      {} as ApiEnv,
+    );
+
+    expect(response?.status).toBe(200);
+  });
+
   it('rechaza usuarios sin autenticacion', async () => {
     mocks.authenticated = false;
     mocks.role = 'VENDEDOR';
@@ -90,6 +128,36 @@ describe('labels routes', () => {
         {} as ApiEnv,
       ),
     ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+  });
+
+  it('rechaza lote sin autenticacion', async () => {
+    mocks.authenticated = false;
+    mocks.role = 'VENDEDOR';
+
+    await expect(
+      handleLabelRoutes(
+        new Request('http://localhost/etiquetas/variantes/preview-lote', {
+          method: 'POST',
+          body: JSON.stringify({ items: [{ id_variante: 'var_1', cantidad: 1 }] }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'AUTH_REQUIRED', status: 401 });
+  });
+
+  it('rechaza lote con body invalido', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'VENDEDOR';
+
+    await expect(
+      handleLabelRoutes(
+        new Request('http://localhost/etiquetas/variantes/preview-lote', {
+          method: 'POST',
+          body: JSON.stringify({ items: [] }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'LABEL_BATCH_ITEMS_REQUIRED', status: 400 });
   });
 
   it('devuelve null para rutas ajenas', async () => {
