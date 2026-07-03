@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeLabelSize, renderLabelsPageHtml, renderVariantLabelHtml } from './labels.html';
+import {
+  normalizeLabelSize,
+  renderLabelsPageHtml,
+  renderVariantLabelHtml,
+} from './labels.renderer';
 
 describe('labels html', () => {
   it('renderiza una etiqueta HTML imprimible de 60mm por 40mm', () => {

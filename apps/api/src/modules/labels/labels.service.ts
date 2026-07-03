@@ -1,6 +1,10 @@
 import type { ApiEnv } from '../../config/env';
 import { ApiError } from '../../shared/errors';
-import { renderLabelsPageHtml, renderVariantLabelHtml, normalizeLabelSize } from './labels.html';
+import {
+  renderLabelsPageHtml,
+  renderVariantLabelHtml,
+  normalizeLabelSize,
+} from './labels.renderer';
 import { createQrSvg } from './labels.qr';
 import * as labelsRepository from './labels.repository';
 import type {
