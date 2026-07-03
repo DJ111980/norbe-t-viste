@@ -140,6 +140,10 @@ export interface CreateCreditAdjustmentInput {
   motivo: string;
 }
 
+export interface CancelCreditPaymentInput {
+  motivoAnulacion: string;
+}
+
 export interface CreateCreditPaymentRepositoryInput extends CreateCreditPaymentInput {
   idAbono: string;
   idCredito: string;
@@ -162,6 +166,19 @@ export interface CreateCreditAdjustmentRepositoryInput {
   estadoCredito: Extract<CreditStatus, 'PENDIENTE' | 'PARCIAL' | 'PAGADO'>;
 }
 
+export interface CancelCreditPaymentRepositoryInput {
+  idCredito: string;
+  idAbono: string;
+  idUsuario: string;
+  valorAbono: number;
+  saldoAntes: number;
+  saldoDespues: number;
+  montoAbonadoAntes: number;
+  montoAbonadoDespues: number;
+  estadoCredito: Extract<CreditStatus, 'PENDIENTE' | 'PARCIAL' | 'PAGADO'>;
+  motivoAnulacion: string;
+}
+
 export interface CreditPaymentPersistenceStatus {
   creditSaldoPendiente: number | null;
   creditMontoAbonado: number | null;
@@ -174,6 +191,16 @@ export interface CreditAdjustmentPersistenceStatus {
   creditMontoAbonado: number | null;
   creditEstado: CreditStatus | null;
   adjustmentExists: boolean;
+}
+
+export interface CreditPaymentCancellationPersistenceStatus {
+  creditSaldoPendiente: number | null;
+  creditMontoAbonado: number | null;
+  creditEstado: CreditStatus | null;
+  paymentCancelled: boolean;
+  paymentCancelledBy: string | null;
+  paymentCancelledAt: string | null;
+  paymentCancellationReason: string | null;
 }
 
 export interface PublicCreditSummary {
@@ -241,5 +268,17 @@ export interface CreateCreditAdjustmentResult {
   valor_ajuste: number;
   saldo_antes: number;
   saldo_despues: number;
+  estado_credito: Extract<CreditStatus, 'PENDIENTE' | 'PARCIAL' | 'PAGADO'>;
+}
+
+export interface CancelCreditPaymentResult {
+  id_credito: string;
+  id_abono: string;
+  estado_abono: 'ANULADO';
+  valor_abono_anulado: number;
+  saldo_anterior: number;
+  saldo_nuevo: number;
+  monto_abonado_anterior: number;
+  monto_abonado_nuevo: number;
   estado_credito: Extract<CreditStatus, 'PENDIENTE' | 'PARCIAL' | 'PAGADO'>;
 }

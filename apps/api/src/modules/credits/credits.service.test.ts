@@ -63,6 +63,26 @@ function buildCredit(overrides: Partial<CreditRecord> = {}): CreditRecord {
   };
 }
 
+function buildPayment(overrides: Partial<CreditPaymentRecord> = {}): CreditPaymentRecord {
+  return {
+    id_abono: 'abo_1',
+    id_credito: 'cre_1',
+    id_cliente: 'cli_1',
+    id_usuario: 'usr_admin',
+    valor_abono: 50000,
+    metodo_pago: 'EFECTIVO',
+    referencia_pago: null,
+    fecha_abono: '2026-07-02',
+    observaciones: 'Abono',
+    creado_en: '2026-07-02',
+    estado_abono: 'ACTIVO',
+    anulado_en: null,
+    motivo_anulacion: null,
+    usuario_nombre: 'Admin',
+    ...overrides,
+  };
+}
+
 vi.mock('./credits.repository', () => ({
   findClientForCredit: vi.fn(async (_env: ApiEnv, idCliente: string) => {
     return mocks.clients.find((client) => client.id_cliente === idCliente) ?? null;
@@ -157,6 +177,54 @@ vi.mock('./credits.repository', () => ({
       };
     },
   ),
+  findCreditPaymentById: vi.fn(async (_env: ApiEnv, idAbono: string) => {
+    const payment = mocks.payments.find((item) => item.id_abono === idAbono);
+    return payment ? { ...payment } : null;
+  }),
+  cancelCreditPayment: vi.fn(async (_env: ApiEnv, input) => {
+    const credit = mocks.credits.find((item) => item.id_credito === input.idCredito);
+    const payment = mocks.payments.find(
+      (item) =>
+        item.id_abono === input.idAbono &&
+        item.id_credito === input.idCredito &&
+        item.estado_abono === 'ACTIVO',
+    );
+
+    if (!credit || !payment) return;
+    if (
+      credit.estado_credito === 'ANULADO' ||
+      credit.monto_abonado !== input.montoAbonadoAntes ||
+      credit.saldo_pendiente !== input.saldoAntes ||
+      credit.monto_abonado < input.valorAbono
+    ) {
+      return;
+    }
+
+    credit.monto_abonado = input.montoAbonadoDespues;
+    credit.saldo_pendiente = input.saldoDespues;
+    credit.estado_credito = input.estadoCredito;
+    credit.actualizado_por = input.idUsuario;
+
+    payment.estado_abono = 'ANULADO';
+    payment.anulado_en = '2026-07-03 10:00:00';
+    payment.motivo_anulacion = input.motivoAnulacion;
+  }),
+  getCreditPaymentCancellationPersistenceStatus: vi.fn(
+    async (_env: ApiEnv, idCredito: string, idAbono: string) => {
+      const credit = mocks.credits.find((item) => item.id_credito === idCredito);
+      const payment = mocks.payments.find((item) => item.id_abono === idAbono);
+
+      return {
+        creditSaldoPendiente: credit?.saldo_pendiente ?? null,
+        creditMontoAbonado: credit?.monto_abonado ?? null,
+        creditEstado: credit?.estado_credito ?? null,
+        paymentCancelled: payment?.estado_abono === 'ANULADO',
+        paymentCancelledBy: payment?.estado_abono === 'ANULADO' ? 'usr_admin' : null,
+        paymentCancelledAt: payment?.anulado_en ?? null,
+        paymentCancellationReason: payment?.motivo_anulacion ?? null,
+      };
+    },
+  ),
   createCreditAdjustment: vi.fn(async (_env: ApiEnv, input) => {
     const credit = mocks.credits.find((item) => item.id_credito === input.idCredito);
     if (!credit) return;
@@ -194,6 +262,7 @@ vi.mock('./credits.repository', () => ({
 }));
 
 const {
+  cancelCreditPayment,
   createCreditAdjustment,
   createCreditPayment,
   createOldDebt,
@@ -436,6 +505,151 @@ describe('credits service', () => {
       saldoPendiente: 100000,
       estadoCredito: 'PARCIAL',
     });
+  });
+
+  it('ADMINISTRADOR anula abono activo y recalcula credito a PENDIENTE', async () => {
+    mocks.credits[0] = buildCredit({
+      monto_abonado: 50000,
+      saldo_pendiente: 100000,
+      estado_credito: 'PARCIAL',
+    });
+    mocks.payments = [buildPayment()];
+
+    const result = await cancelCreditPayment(env, adminAuth, 'cre_1', 'abo_1', {
+      motivoAnulacion: 'Abono registrado por error',
+    });
+
+    expect(result).toMatchObject({
+      id_credito: 'cre_1',
+      id_abono: 'abo_1',
+      estado_abono: 'ANULADO',
+      valor_abono_anulado: 50000,
+      saldo_anterior: 100000,
+      saldo_nuevo: 150000,
+      monto_abonado_anterior: 50000,
+      monto_abonado_nuevo: 0,
+      estado_credito: 'PENDIENTE',
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      monto_abonado: 0,
+      saldo_pendiente: 150000,
+      estado_credito: 'PENDIENTE',
+      actualizado_por: 'usr_admin',
+    });
+    expect(mocks.payments[0]).toMatchObject({
+      estado_abono: 'ANULADO',
+      motivo_anulacion: 'Abono registrado por error',
+    });
+    expect(mocks.adjustments).toHaveLength(0);
+    expect(mocks.sales).toHaveLength(0);
+    expect(mocks.inventoryMovements).toHaveLength(0);
+  });
+
+  it('anular abono recalcula credito a PARCIAL y puede reabrir credito PAGADO', async () => {
+    mocks.credits[0] = buildCredit({
+      monto_abonado: 100000,
+      saldo_pendiente: 50000,
+      estado_credito: 'PARCIAL',
+    });
+    mocks.payments = [buildPayment()];
+
+    expect(
+      await cancelCreditPayment(env, adminAuth, 'cre_1', 'abo_1', {
+        motivoAnulacion: 'Abono duplicado',
+      }),
+    ).toMatchObject({
+      monto_abonado_nuevo: 50000,
+      saldo_nuevo: 100000,
+      estado_credito: 'PARCIAL',
+    });
+
+    mocks.credits[0] = buildCredit({
+      monto_abonado: 150000,
+      saldo_pendiente: 0,
+      estado_credito: 'PAGADO',
+    });
+    mocks.payments = [buildPayment({ id_abono: 'abo_2', valor_abono: 150000 })];
+
+    expect(
+      await cancelCreditPayment(env, adminAuth, 'cre_1', 'abo_2', {
+        motivoAnulacion: 'Pago total equivocado',
+      }),
+    ).toMatchObject({
+      monto_abonado_nuevo: 0,
+      saldo_nuevo: 150000,
+      estado_credito: 'PENDIENTE',
+    });
+  });
+
+  it('GET credito refleja abono anulado y saldo actualizado', async () => {
+    mocks.credits[0] = buildCredit({
+      monto_abonado: 50000,
+      saldo_pendiente: 100000,
+      estado_credito: 'PARCIAL',
+    });
+    mocks.payments = [buildPayment()];
+
+    await cancelCreditPayment(env, adminAuth, 'cre_1', 'abo_1', {
+      motivoAnulacion: 'Abono registrado por error',
+    });
+
+    const detail = await getCreditById(env, 'cre_1');
+    const list = await listClientCredits(env, 'cli_1', { limit: 50, offset: 0 });
+
+    expect(detail.resumen).toMatchObject({
+      montoAbonado: 0,
+      saldoPendiente: 150000,
+      estadoCredito: 'PENDIENTE',
+    });
+    expect(detail.abonos[0]).toMatchObject({
+      estado_abono: 'ANULADO',
+      motivo_anulacion: 'Abono registrado por error',
+    });
+    expect(list[0]).toMatchObject({
+      montoAbonado: 0,
+      saldoPendiente: 150000,
+      estadoCredito: 'PENDIENTE',
+    });
+  });
+
+  it('rechaza anulacion de abono con credito o abono invalido', async () => {
+    await expect(
+      cancelCreditPayment(env, adminAuth, 'missing', 'abo_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDIT_NOT_FOUND' });
+
+    mocks.credits[0] = buildCredit({ estado_credito: 'ANULADO' });
+    await expect(
+      cancelCreditPayment(env, adminAuth, 'cre_1', 'abo_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDIT_CANCELLED' });
+
+    mocks.credits[0] = buildCredit();
+    await expect(
+      cancelCreditPayment(env, adminAuth, 'cre_1', 'missing', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDIT_PAYMENT_NOT_FOUND' });
+
+    mocks.payments = [buildPayment({ id_credito: 'cre_2' })];
+    await expect(
+      cancelCreditPayment(env, adminAuth, 'cre_1', 'abo_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDIT_PAYMENT_DOES_NOT_BELONG_TO_CREDIT' });
+
+    mocks.payments = [buildPayment({ estado_abono: 'ANULADO' })];
+    await expect(
+      cancelCreditPayment(env, adminAuth, 'cre_1', 'abo_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDIT_PAYMENT_ALREADY_CANCELLED' });
+  });
+
+  it('rechaza anulacion si monto_abonado actual es menor que el valor del abono', async () => {
+    mocks.credits[0] = buildCredit({
+      monto_abonado: 20000,
+      saldo_pendiente: 130000,
+      estado_credito: 'PARCIAL',
+    });
+    mocks.payments = [buildPayment({ valor_abono: 50000 })];
+
+    await expect(
+      cancelCreditPayment(env, adminAuth, 'cre_1', 'abo_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDIT_PAYMENT_CANCELLATION_INVALID_BALANCE' });
+    expect(mocks.payments[0]?.estado_abono).toBe('ACTIVO');
   });
 
   it('ADMINISTRADOR registra ajuste AUMENTO sin modificar monto abonado ni mover inventario', async () => {

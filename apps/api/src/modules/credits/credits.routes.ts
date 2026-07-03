@@ -4,6 +4,7 @@ import { ApiError } from '../../shared/errors';
 import { successResponse } from '../../shared/responses';
 import { ensureMethod, readJsonBody } from '../../shared/validation';
 import {
+  cancelCreditPayment,
   createCreditAdjustment,
   createCreditPayment,
   createOldDebt,
@@ -12,6 +13,7 @@ import {
   listCredits,
 } from './credits.service';
 import {
+  validateCancelCreditPaymentInput,
   validateCreateCreditAdjustmentInput,
   validateCreateCreditPaymentInput,
   validateCreateOldDebtInput,
@@ -35,14 +37,29 @@ function matchClientCreditsPath(pathname: string): { idCliente: string } | null 
   return { idCliente: decodeURIComponent(match[1]) };
 }
 
+function matchCreditPaymentCancellationPath(
+  pathname: string,
+): { idCredito: string; idAbono: string } | null {
+  const match = pathname.match(/^\/creditos\/([^/]+)\/abonos\/([^/]+)\/anular$/);
+
+  if (!match) return null;
+
+  return {
+    idCredito: decodeURIComponent(match[1]),
+    idAbono: decodeURIComponent(match[2]),
+  };
+}
+
 export async function handleCreditRoutes(request: Request, env: ApiEnv): Promise<Response | null> {
   const url = new URL(request.url);
   const clientCreditsPath = matchClientCreditsPath(url.pathname);
+  const creditPaymentCancellationPath = matchCreditPaymentCancellationPath(url.pathname);
   const creditPath = matchCreditPath(url.pathname);
 
   if (
     url.pathname !== '/creditos' &&
     url.pathname !== '/creditos/deuda-antigua' &&
+    !creditPaymentCancellationPath &&
     !creditPath &&
     !clientCreditsPath
   ) {
@@ -50,6 +67,24 @@ export async function handleCreditRoutes(request: Request, env: ApiEnv): Promise
   }
 
   const auth = await requireAuth(request, env);
+
+  if (creditPaymentCancellationPath) {
+    requireRole(auth, ['ADMINISTRADOR']);
+
+    if (request.method === 'POST') {
+      return successResponse({
+        anulacion: await cancelCreditPayment(
+          env,
+          auth,
+          creditPaymentCancellationPath.idCredito,
+          creditPaymentCancellationPath.idAbono,
+          validateCancelCreditPaymentInput(await readJsonBody(request)),
+        ),
+      });
+    }
+
+    ensureMethod(request, 'POST');
+  }
 
   if (url.pathname === '/creditos') {
     requireRole(auth, ['ADMINISTRADOR']);

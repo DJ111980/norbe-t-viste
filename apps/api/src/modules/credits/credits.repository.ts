@@ -1,5 +1,6 @@
 import type { ApiEnv } from '../../config/env';
 import type {
+  CancelCreditPaymentRepositoryInput,
   CreateCreditAdjustmentRepositoryInput,
   CreateCreditPaymentRepositoryInput,
   CreateOldDebtInput,
@@ -9,6 +10,7 @@ import type {
   CreditDetailRecord,
   CreditDetailViewRecord,
   CreditPaymentPersistenceStatus,
+  CreditPaymentCancellationPersistenceStatus,
   CreditPaymentRecord,
   CreditRecord,
   CreditSaleRecord,
@@ -238,6 +240,37 @@ export async function listCreditPayments(
   return result.results ?? [];
 }
 
+export async function findCreditPaymentById(
+  env: ApiEnv,
+  idAbono: string,
+): Promise<CreditPaymentRecord | null> {
+  return env.DB.prepare(
+    `
+      SELECT
+        a.id_abono,
+        a.id_credito,
+        a.id_cliente,
+        a.id_usuario,
+        a.valor_abono,
+        a.metodo_pago,
+        a.referencia_pago,
+        a.fecha_abono,
+        a.observaciones,
+        a.creado_en,
+        a.estado_abono,
+        a.anulado_en,
+        a.motivo_anulacion,
+        u.nombre_completo AS usuario_nombre
+      FROM abonos_creditos a
+      INNER JOIN usuarios u ON u.id_usuario = a.id_usuario
+      WHERE a.id_abono = ?
+      LIMIT 1
+    `,
+  )
+    .bind(idAbono)
+    .first<CreditPaymentRecord>();
+}
+
 export async function listCreditAdjustments(
   env: ApiEnv,
   idCredito: string,
@@ -440,6 +473,143 @@ export async function getCreditPaymentPersistenceStatus(
     creditMontoAbonado: status?.creditMontoAbonado ?? null,
     creditEstado: status?.creditEstado ?? null,
     paymentExists: Boolean(status?.paymentExists),
+  };
+}
+
+export async function cancelCreditPayment(
+  env: ApiEnv,
+  input: CancelCreditPaymentRepositoryInput,
+): Promise<void> {
+  // Anular un abono revierte cartera, no inventario ni ventas. Ambas escrituras
+  // usan guardas para impedir doble anulacion y montos abonados negativos.
+  await env.DB.batch([
+    env.DB.prepare(
+      `
+        UPDATE creditos_clientes
+        SET
+          monto_abonado = ?,
+          saldo_pendiente = ?,
+          estado_credito = ?,
+          actualizado_por = ?,
+          actualizado_en = datetime('now')
+        WHERE id_credito = ?
+          AND estado_credito != 'ANULADO'
+          AND monto_abonado = ?
+          AND saldo_pendiente = ?
+          AND monto_abonado >= ?
+          AND EXISTS (
+            SELECT 1
+            FROM abonos_creditos
+            WHERE id_abono = ?
+              AND id_credito = ?
+              AND estado_abono = 'ACTIVO'
+          )
+      `,
+    ).bind(
+      input.montoAbonadoDespues,
+      input.saldoDespues,
+      input.estadoCredito,
+      input.idUsuario,
+      input.idCredito,
+      input.montoAbonadoAntes,
+      input.saldoAntes,
+      input.valorAbono,
+      input.idAbono,
+      input.idCredito,
+    ),
+    env.DB.prepare(
+      `
+        UPDATE abonos_creditos
+        SET
+          estado_abono = 'ANULADO',
+          anulado_por = ?,
+          anulado_en = datetime('now'),
+          motivo_anulacion = ?
+        WHERE id_abono = ?
+          AND id_credito = ?
+          AND estado_abono = 'ACTIVO'
+          AND EXISTS (
+            SELECT 1
+            FROM creditos_clientes
+            WHERE id_credito = ?
+              AND monto_abonado = ?
+              AND saldo_pendiente = ?
+              AND estado_credito = ?
+          )
+      `,
+    ).bind(
+      input.idUsuario,
+      input.motivoAnulacion,
+      input.idAbono,
+      input.idCredito,
+      input.idCredito,
+      input.montoAbonadoDespues,
+      input.saldoDespues,
+      input.estadoCredito,
+    ),
+  ]);
+}
+
+export async function getCreditPaymentCancellationPersistenceStatus(
+  env: ApiEnv,
+  idCredito: string,
+  idAbono: string,
+): Promise<CreditPaymentCancellationPersistenceStatus> {
+  const status = await env.DB.prepare(
+    `
+      SELECT
+        cr.saldo_pendiente AS creditSaldoPendiente,
+        cr.monto_abonado AS creditMontoAbonado,
+        cr.estado_credito AS creditEstado,
+        EXISTS (
+          SELECT 1
+          FROM abonos_creditos a
+          WHERE a.id_abono = ?
+            AND a.id_credito = cr.id_credito
+            AND a.estado_abono = 'ANULADO'
+        ) AS paymentCancelled,
+        (
+          SELECT a.anulado_por
+          FROM abonos_creditos a
+          WHERE a.id_abono = ?
+            AND a.id_credito = cr.id_credito
+        ) AS paymentCancelledBy,
+        (
+          SELECT a.anulado_en
+          FROM abonos_creditos a
+          WHERE a.id_abono = ?
+            AND a.id_credito = cr.id_credito
+        ) AS paymentCancelledAt,
+        (
+          SELECT a.motivo_anulacion
+          FROM abonos_creditos a
+          WHERE a.id_abono = ?
+            AND a.id_credito = cr.id_credito
+        ) AS paymentCancellationReason
+      FROM creditos_clientes cr
+      WHERE cr.id_credito = ?
+      LIMIT 1
+    `,
+  )
+    .bind(idAbono, idAbono, idAbono, idAbono, idCredito)
+    .first<{
+      creditSaldoPendiente: number | null;
+      creditMontoAbonado: number | null;
+      creditEstado: CreditPaymentCancellationPersistenceStatus['creditEstado'];
+      paymentCancelled: number;
+      paymentCancelledBy: string | null;
+      paymentCancelledAt: string | null;
+      paymentCancellationReason: string | null;
+    }>();
+
+  return {
+    creditSaldoPendiente: status?.creditSaldoPendiente ?? null,
+    creditMontoAbonado: status?.creditMontoAbonado ?? null,
+    creditEstado: status?.creditEstado ?? null,
+    paymentCancelled: Boolean(status?.paymentCancelled),
+    paymentCancelledBy: status?.paymentCancelledBy ?? null,
+    paymentCancelledAt: status?.paymentCancelledAt ?? null,
+    paymentCancellationReason: status?.paymentCancellationReason ?? null,
   };
 }
 

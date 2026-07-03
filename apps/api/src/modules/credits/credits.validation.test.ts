@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  validateCancelCreditPaymentInput,
   validateCreateCreditAdjustmentInput,
   validateCreateCreditPaymentInput,
   validateCreateOldDebtInput,
@@ -159,6 +160,26 @@ describe('credits validation', () => {
     expect(() =>
       validateCreateCreditPaymentInput({ valor_abono: 1000, metodo_pago: 'CHEQUE' }),
     ).toThrowError(expect.objectContaining({ code: 'INVALID_PAYMENT_METHOD' }));
+  });
+
+  it('valida anulacion de abono de credito', () => {
+    const input = validateCancelCreditPaymentInput({
+      motivo_anulacion: ' Abono registrado por error ',
+    });
+
+    expect(input).toEqual({
+      motivoAnulacion: 'Abono registrado por error',
+    });
+  });
+
+  it('rechaza anulacion de abono invalida', () => {
+    expect(() => validateCancelCreditPaymentInput(null)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_CREDIT_PAYMENT_CANCELLATION' }),
+    );
+
+    expect(() => validateCancelCreditPaymentInput({ motivo_anulacion: ' ' })).toThrowError(
+      expect.objectContaining({ code: 'CREDIT_PAYMENT_CANCELLATION_REASON_REQUIRED' }),
+    );
   });
 
   it('valida ajuste AUMENTO y DESCUENTO', () => {

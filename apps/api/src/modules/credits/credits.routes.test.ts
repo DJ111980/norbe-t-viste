@@ -50,6 +50,17 @@ vi.mock('./credits.service', () => ({
     saldo_nuevo: 100000,
     estado_credito: 'PARCIAL',
   })),
+  cancelCreditPayment: vi.fn(async () => ({
+    id_credito: 'cre_1',
+    id_abono: 'abo_1',
+    estado_abono: 'ANULADO',
+    valor_abono_anulado: 50000,
+    saldo_anterior: 100000,
+    saldo_nuevo: 150000,
+    monto_abonado_anterior: 50000,
+    monto_abonado_nuevo: 0,
+    estado_credito: 'PENDIENTE',
+  })),
   createCreditAdjustment: vi.fn(async () => ({
     id_credito: 'cre_1',
     id_ajuste: 'aju_1',
@@ -230,6 +241,54 @@ describe('credits routes', () => {
           body: JSON.stringify({
             valor_abono: 50000,
             metodo_pago: 'EFECTIVO',
+          }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'AUTH_REQUIRED', status: 401 });
+  });
+
+  it('solo ADMINISTRADOR puede anular abonos de credito', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'ADMINISTRADOR';
+
+    const response = await handleCreditRoutes(
+      new Request('http://localhost/creditos/cre_1/abonos/abo_1/anular', {
+        method: 'POST',
+        body: JSON.stringify({
+          motivo_anulacion: 'Abono registrado por error',
+        }),
+      }),
+      {} as ApiEnv,
+    );
+
+    expect(response?.status).toBe(200);
+
+    mocks.role = 'VENDEDOR';
+
+    await expect(
+      handleCreditRoutes(
+        new Request('http://localhost/creditos/cre_1/abonos/abo_1/anular', {
+          method: 'POST',
+          body: JSON.stringify({
+            motivo_anulacion: 'Abono registrado por error',
+          }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+  });
+
+  it('usuario sin token no puede anular abonos', async () => {
+    mocks.authenticated = false;
+    mocks.role = 'ADMINISTRADOR';
+
+    await expect(
+      handleCreditRoutes(
+        new Request('http://localhost/creditos/cre_1/abonos/abo_1/anular', {
+          method: 'POST',
+          body: JSON.stringify({
+            motivo_anulacion: 'Abono registrado por error',
           }),
         }),
         {} as ApiEnv,

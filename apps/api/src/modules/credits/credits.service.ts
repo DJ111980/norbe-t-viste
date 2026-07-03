@@ -4,6 +4,8 @@ import { ApiError } from '../../shared/errors';
 import { toOldDebtResult, toPublicCreditDetail, toPublicCreditSummary } from './credits.mapper';
 import * as creditsRepository from './credits.repository';
 import type {
+  CancelCreditPaymentInput,
+  CancelCreditPaymentResult,
   CreateCreditAdjustmentInput,
   CreateCreditAdjustmentResult,
   CreateCreditPaymentInput,
@@ -165,6 +167,103 @@ export async function createCreditPayment(
     valor_abono: input.valorAbono,
     saldo_anterior: credit.saldo_pendiente,
     saldo_nuevo: saldoNuevo,
+    estado_credito: estadoCredito,
+  };
+}
+
+export async function cancelCreditPayment(
+  env: ApiEnv,
+  auth: AuthContext,
+  idCredito: string,
+  idAbono: string,
+  input: CancelCreditPaymentInput,
+): Promise<CancelCreditPaymentResult> {
+  const credit = await creditsRepository.findCreditById(env, idCredito);
+
+  if (!credit) {
+    throw new ApiError('CREDIT_NOT_FOUND', 'El credito no existe.', 404);
+  }
+
+  if (credit.estado_credito === 'ANULADO') {
+    throw new ApiError('CREDIT_CANCELLED', 'No se puede anular abonos de un credito anulado.', 400);
+  }
+
+  const payment = await creditsRepository.findCreditPaymentById(env, idAbono);
+
+  if (!payment) {
+    throw new ApiError('CREDIT_PAYMENT_NOT_FOUND', 'El abono no existe.', 404);
+  }
+
+  if (payment.id_credito !== idCredito) {
+    throw new ApiError(
+      'CREDIT_PAYMENT_DOES_NOT_BELONG_TO_CREDIT',
+      'El abono no pertenece al credito indicado.',
+      400,
+    );
+  }
+
+  if (payment.estado_abono === 'ANULADO') {
+    throw new ApiError('CREDIT_PAYMENT_ALREADY_CANCELLED', 'El abono ya esta anulado.', 400);
+  }
+
+  if (credit.monto_abonado < payment.valor_abono) {
+    throw new ApiError(
+      'CREDIT_PAYMENT_CANCELLATION_INVALID_BALANCE',
+      'El monto abonado actual no alcanza para anular este abono.',
+      409,
+    );
+  }
+
+  const montoAbonadoNuevo = credit.monto_abonado - payment.valor_abono;
+  const saldoNuevo = credit.saldo_pendiente + payment.valor_abono;
+  const estadoCredito = resolveCreditStatusAfterBalance(saldoNuevo, montoAbonadoNuevo);
+
+  // Anular un abono no crea ajustes: se revierte directamente el efecto del
+  // dinero recibido y se conserva el abono marcado como ANULADO para auditoria.
+  await creditsRepository.cancelCreditPayment(env, {
+    idCredito,
+    idAbono,
+    idUsuario: auth.user.id_usuario,
+    valorAbono: payment.valor_abono,
+    saldoAntes: credit.saldo_pendiente,
+    saldoDespues: saldoNuevo,
+    montoAbonadoAntes: credit.monto_abonado,
+    montoAbonadoDespues: montoAbonadoNuevo,
+    estadoCredito,
+    motivoAnulacion: input.motivoAnulacion,
+  });
+
+  const persistence = await creditsRepository.getCreditPaymentCancellationPersistenceStatus(
+    env,
+    idCredito,
+    idAbono,
+  );
+
+  if (
+    !persistence.paymentCancelled ||
+    persistence.paymentCancelledBy !== auth.user.id_usuario ||
+    !persistence.paymentCancelledAt ||
+    persistence.paymentCancellationReason !== input.motivoAnulacion ||
+    persistence.creditSaldoPendiente !== saldoNuevo ||
+    persistence.creditMontoAbonado !== montoAbonadoNuevo ||
+    persistence.creditEstado !== estadoCredito
+  ) {
+    throw new ApiError(
+      'CREDIT_PAYMENT_CANCELLATION_NOT_APPLIED',
+      'No se pudo anular el abono del credito.',
+      409,
+    );
+  }
+
+  return {
+    id_credito: idCredito,
+    id_abono: idAbono,
+    estado_abono: 'ANULADO',
+    valor_abono_anulado: payment.valor_abono,
+    saldo_anterior: credit.saldo_pendiente,
+    saldo_nuevo: saldoNuevo,
+    monto_abonado_anterior: credit.monto_abonado,
+    monto_abonado_nuevo: montoAbonadoNuevo,
     estado_credito: estadoCredito,
   };
 }
