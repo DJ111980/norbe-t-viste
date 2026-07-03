@@ -1,8 +1,8 @@
 import type { ApiEnv } from '../../config/env';
 import type {
   CashSalePersistenceStatus,
-  CancelCashSaleRepositoryInput,
   CancelSalePersistenceStatus,
+  CancelSaleRepositoryInput,
   CreateCashSaleRepositoryInput,
   CreateCreditSaleRepositoryInput,
   CreateMixedSaleRepositoryInput,
@@ -10,6 +10,7 @@ import type {
   ListSalesFilters,
   MixedSalePersistenceStatus,
   SaleClientRecord,
+  SaleCreditRecord,
   SaleDetailRecord,
   SaleDetailViewRecord,
   SaleListRecord,
@@ -33,6 +34,9 @@ const SALE_LIST_COLUMNS = `
   v.observaciones,
   v.creado_en,
   v.actualizado_en,
+  v.anulado_por,
+  v.anulado_en,
+  v.motivo_anulacion,
   c.nombre_completo AS cliente_nombre,
   u.nombre_completo AS vendedor_nombre,
   u.correo AS vendedor_correo,
@@ -1047,10 +1051,63 @@ export async function getSaleDetailView(
   };
 }
 
-export async function cancelCashSale(
-  env: ApiEnv,
-  input: CancelCashSaleRepositoryInput,
-): Promise<void> {
+export async function listSaleCredits(env: ApiEnv, idVenta: string): Promise<SaleCreditRecord[]> {
+  const result = await env.DB.prepare(
+    `
+      SELECT
+        id_credito,
+        id_cliente,
+        id_venta,
+        origen_credito,
+        monto_inicial,
+        monto_abonado,
+        saldo_pendiente,
+        estado_credito
+      FROM creditos_clientes
+      WHERE id_venta = ?
+        AND origen_credito = 'VENTA'
+      ORDER BY creado_en ASC
+    `,
+  )
+    .bind(idVenta)
+    .all<SaleCreditRecord>();
+
+  return result.results ?? [];
+}
+
+export async function creditHasPayments(env: ApiEnv, idCredito: string): Promise<boolean> {
+  const row = await env.DB.prepare(
+    `
+      SELECT EXISTS(
+        SELECT 1
+        FROM abonos_creditos
+        WHERE id_credito = ?
+      ) AS existsRecord
+    `,
+  )
+    .bind(idCredito)
+    .first<{ existsRecord: number }>();
+
+  return Boolean(row?.existsRecord);
+}
+
+export async function creditHasAdjustments(env: ApiEnv, idCredito: string): Promise<boolean> {
+  const row = await env.DB.prepare(
+    `
+      SELECT EXISTS(
+        SELECT 1
+        FROM ajustes_creditos
+        WHERE id_credito = ?
+      ) AS existsRecord
+    `,
+  )
+    .bind(idCredito)
+    .first<{ existsRecord: number }>();
+
+  return Boolean(row?.existsRecord);
+}
+
+export async function cancelSale(env: ApiEnv, input: CancelSaleRepositoryInput): Promise<void> {
   const statements: D1PreparedStatement[] = [
     env.DB.prepare(
       `
@@ -1062,22 +1119,81 @@ export async function cancelCashSale(
             actualizado_por = ?,
             actualizado_en = datetime('now')
         WHERE id_venta = ?
-          AND tipo_venta = 'CONTADO'
+          AND tipo_venta = ?
           AND estado_venta = 'COMPLETADA'
       `,
-    ).bind(input.idUsuario, input.motivoAnulacion, input.idUsuario, input.idVenta),
-    env.DB.prepare(
-      `
-        UPDATE pagos_ventas
-        SET estado_pago = 'ANULADO',
-            anulado_por = ?,
-            anulado_en = datetime('now'),
-            motivo_anulacion = ?
-        WHERE id_venta = ?
-          AND estado_pago = 'ACTIVO'
-      `,
-    ).bind(input.idUsuario, input.motivoAnulacion, input.idVenta),
+    ).bind(input.idUsuario, input.motivoAnulacion, input.idUsuario, input.idVenta, input.tipoVenta),
   ];
+
+  if (input.tipoVenta === 'CONTADO' || input.tipoVenta === 'MIXTA') {
+    statements.push(
+      env.DB.prepare(
+        `
+          UPDATE pagos_ventas
+          SET estado_pago = 'ANULADO',
+              anulado_por = ?,
+              anulado_en = datetime('now'),
+              motivo_anulacion = ?
+          WHERE id_venta = ?
+            AND estado_pago = 'ACTIVO'
+            AND EXISTS (
+              SELECT 1
+              FROM ventas
+              WHERE id_venta = ?
+                AND estado_venta = 'ANULADA'
+            )
+        `,
+      ).bind(input.idUsuario, input.motivoAnulacion, input.idVenta, input.idVenta),
+    );
+  }
+
+  if (input.idCredito) {
+    statements.push(
+      env.DB.prepare(
+        `
+          UPDATE creditos_clientes
+          SET estado_credito = 'ANULADO',
+              saldo_pendiente = 0,
+              anulado_por = ?,
+              anulado_en = datetime('now'),
+              motivo_anulacion = ?,
+              actualizado_por = ?,
+              actualizado_en = datetime('now')
+          WHERE id_credito = ?
+            AND id_venta = ?
+            AND origen_credito = 'VENTA'
+            AND estado_credito = 'PENDIENTE'
+            AND monto_abonado = 0
+            AND saldo_pendiente = monto_inicial
+            AND NOT EXISTS (
+              SELECT 1
+              FROM abonos_creditos
+              WHERE id_credito = ?
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM ajustes_creditos
+              WHERE id_credito = ?
+            )
+            AND EXISTS (
+              SELECT 1
+              FROM ventas
+              WHERE id_venta = ?
+                AND estado_venta = 'ANULADA'
+            )
+        `,
+      ).bind(
+        input.idUsuario,
+        input.motivoAnulacion,
+        input.idUsuario,
+        input.idCredito,
+        input.idVenta,
+        input.idCredito,
+        input.idCredito,
+        input.idVenta,
+      ),
+    );
+  }
 
   for (const movement of input.movimientos) {
     statements.push(
@@ -1138,14 +1254,18 @@ export async function cancelCashSale(
     );
   }
 
-  // Las ventas y pagos no se borran: se marcan como anulados para conservar
-  // auditoria. Cada devolucion de stock crea movimiento ANULACION_VENTA.
+  // Las ventas, pagos y creditos no se borran: se marcan como anulados para
+  // conservar auditoria. Cada devolucion de stock crea movimiento ANULACION_VENTA
+  // porque el stock real vive en variantes_producto y debe quedar explicado.
   await env.DB.batch(statements);
 }
 
 export async function getCancellationPersistenceStatus(
   env: ApiEnv,
   idVenta: string,
+  tipoVenta: SaleListRecord['tipo_venta'],
+  expectedStocks: Array<{ idVariante: string; stockDespues: number }>,
+  idCredito?: string,
 ): Promise<CancelSalePersistenceStatus> {
   const row = await env.DB.prepare(
     `
@@ -1153,21 +1273,60 @@ export async function getCancellationPersistenceStatus(
         EXISTS(SELECT 1 FROM ventas WHERE id_venta = ? AND estado_venta = 'ANULADA') AS saleCancelled,
         (SELECT COUNT(*) FROM pagos_ventas WHERE id_venta = ? AND estado_pago = 'ACTIVO') AS activePaymentsCount,
         (SELECT COUNT(*) FROM pagos_ventas WHERE id_venta = ? AND estado_pago = 'ANULADO') AS cancelledPaymentsCount,
+        EXISTS(SELECT 1 FROM creditos_clientes WHERE id_credito = ? AND estado_credito = 'ANULADO') AS creditCancelled,
+        (SELECT saldo_pendiente FROM creditos_clientes WHERE id_credito = ?) AS creditBalance,
+        EXISTS(SELECT 1 FROM abonos_creditos WHERE id_credito = ?) AS creditPaymentExists,
+        EXISTS(SELECT 1 FROM ajustes_creditos WHERE id_credito = ?) AS creditAdjustmentExists,
         (SELECT COUNT(*) FROM movimientos_inventario WHERE referencia_tipo = 'ANULACION_VENTA' AND referencia_id = ?) AS cancellationMovementCount
     `,
   )
-    .bind(idVenta, idVenta, idVenta, idVenta)
+    .bind(
+      idVenta,
+      idVenta,
+      idVenta,
+      idCredito ?? null,
+      idCredito ?? null,
+      idCredito ?? null,
+      idCredito ?? null,
+      idVenta,
+    )
     .first<{
       saleCancelled: number;
       activePaymentsCount: number;
       cancelledPaymentsCount: number;
+      creditCancelled: number;
+      creditBalance: number | null;
+      creditPaymentExists: number;
+      creditAdjustmentExists: number;
       cancellationMovementCount: number;
     }>();
+
+  const stockMatchesCount = await Promise.all(
+    expectedStocks.map((stock) =>
+      env.DB.prepare(
+        `
+          SELECT EXISTS(
+            SELECT 1
+            FROM variantes_producto
+            WHERE id_variante = ?
+              AND stock_actual = ?
+          ) AS stockMatches
+        `,
+      )
+        .bind(stock.idVariante, stock.stockDespues)
+        .first<{ stockMatches: number }>(),
+    ),
+  );
 
   return {
     saleCancelled: Boolean(row?.saleCancelled),
     activePaymentsCount: row?.activePaymentsCount ?? 0,
     cancelledPaymentsCount: row?.cancelledPaymentsCount ?? 0,
+    creditCancelled: tipoVenta === 'CONTADO' ? true : Boolean(row?.creditCancelled),
+    creditBalance: row?.creditBalance ?? null,
+    creditPaymentExists: Boolean(row?.creditPaymentExists),
+    creditAdjustmentExists: Boolean(row?.creditAdjustmentExists),
     cancellationMovementCount: row?.cancellationMovementCount ?? 0,
+    stockMatchesCount: stockMatchesCount.filter((item) => Boolean(item?.stockMatches)).length,
   };
 }

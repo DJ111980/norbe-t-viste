@@ -187,6 +187,8 @@ export interface PublicCreditSummary {
   fechaCredito: string;
   fechaVencimiento: string | null;
   estadoCredito: CreditStatus;
+  anuladoEn: string | null;
+  motivoAnulacion: string | null;
   cliente: {
     idCliente: string;
     nombreCompleto: string;

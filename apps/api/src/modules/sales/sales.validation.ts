@@ -1,6 +1,6 @@
 import { ApiError } from '../../shared/errors';
 import type {
-  CancelCashSaleInput,
+  CancelSaleInput,
   CreateCashSaleInput,
   CreateSaleInput,
   ListSalesFilters,
@@ -225,7 +225,7 @@ export const validateCreateCashSaleInput = validateCreateSaleInput as (
   body: unknown,
 ) => CreateCashSaleInput;
 
-export function validateCancelCashSaleInput(body: unknown): CancelCashSaleInput {
+export function validateCancelSaleInput(body: unknown): CancelSaleInput {
   const rawBody = body as { motivo_anulacion?: unknown };
 
   if (!rawBody || typeof rawBody !== 'object') {

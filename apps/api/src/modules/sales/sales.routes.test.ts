@@ -33,7 +33,7 @@ vi.mock('../../middleware/auth.middleware', () => ({
 }));
 
 vi.mock('./sales.service', () => ({
-  cancelCashSale: vi.fn(async () => ({
+  cancelSale: vi.fn(async () => ({
     id_venta: 'ven_1',
     estado_venta: 'ANULADA',
     items_revertidos: 1,

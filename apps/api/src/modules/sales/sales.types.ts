@@ -35,7 +35,7 @@ export interface CreateMixedSaleInput {
 
 export type CreateSaleInput = CreateCashSaleInput | CreateCreditSaleInput | CreateMixedSaleInput;
 
-export interface CancelCashSaleInput {
+export interface CancelSaleInput {
   motivoAnulacion: string;
 }
 
@@ -78,6 +78,9 @@ export interface SaleRecord {
   observaciones: string | null;
   creado_en: string;
   actualizado_en: string;
+  anulado_por: string | null;
+  anulado_en: string | null;
+  motivo_anulacion: string | null;
 }
 
 export interface SaleListRecord extends SaleRecord {
@@ -161,6 +164,8 @@ export interface PublicSaleDetail extends PublicSaleSummary {
   descuento: number;
   valorPagadoInicial: number;
   observaciones: string | null;
+  anuladoEn: string | null;
+  motivoAnulacion: string | null;
   actualizadoEn: string;
   detalles: PublicSaleLine[];
   pagos: PublicSalePayment[];
@@ -261,6 +266,17 @@ export interface CreateMixedSaleRepositoryInput {
   detalles: SaleDetailToCreate[];
 }
 
+export interface SaleCreditRecord {
+  id_credito: string;
+  id_cliente: string;
+  id_venta: string;
+  origen_credito: 'VENTA' | 'DEUDA_ANTIGUA' | 'AJUSTE_MANUAL';
+  monto_inicial: number;
+  monto_abonado: number;
+  saldo_pendiente: number;
+  estado_credito: 'PENDIENTE' | 'PARCIAL' | 'PAGADO' | 'VENCIDO' | 'ANULADO';
+}
+
 export interface CashSalePersistenceStatus {
   saleExists: boolean;
   paymentExists: boolean;
@@ -304,18 +320,25 @@ export interface CancelSaleMovementInput {
   stockDespues: number;
 }
 
-export interface CancelCashSaleRepositoryInput {
+export interface CancelSaleRepositoryInput {
   idVenta: string;
+  tipoVenta: SaleType;
   idUsuario: string;
   motivoAnulacion: string;
   movimientos: CancelSaleMovementInput[];
+  idCredito?: string;
 }
 
 export interface CancelSalePersistenceStatus {
   saleCancelled: boolean;
   activePaymentsCount: number;
   cancelledPaymentsCount: number;
+  creditCancelled: boolean;
+  creditBalance: number | null;
+  creditPaymentExists: boolean;
+  creditAdjustmentExists: boolean;
   cancellationMovementCount: number;
+  stockMatchesCount: number;
 }
 
 export interface CreateCashSaleResult {
@@ -364,11 +387,13 @@ export interface CreateMixedSaleResult {
 export type CreateSaleResult =
   CreateCashSaleResult | CreateCreditSaleResult | CreateMixedSaleResult;
 
-export interface CancelCashSaleResult {
+export interface CancelSaleResult {
   id_venta: string;
   estado_venta: 'ANULADA';
   items_revertidos: number;
   movimientos_creados: number;
   pagos_anulados: number;
+  id_credito?: string;
+  credito_anulado?: boolean;
   total_unidades_devuelto: number;
 }

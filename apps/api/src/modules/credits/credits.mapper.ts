@@ -18,6 +18,8 @@ export function toPublicCreditSummary(record: CreditRecord): PublicCreditSummary
     fechaCredito: record.fecha_credito,
     fechaVencimiento: record.fecha_vencimiento,
     estadoCredito: record.estado_credito,
+    anuladoEn: record.anulado_en,
+    motivoAnulacion: record.motivo_anulacion,
     cliente: {
       idCliente: record.id_cliente,
       nombreCompleto: record.cliente_nombre,

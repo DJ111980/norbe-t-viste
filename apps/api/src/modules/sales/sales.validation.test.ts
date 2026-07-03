@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  validateCancelCashSaleInput,
+  validateCancelSaleInput,
   validateCreateCashSaleInput,
   validateCreateSaleInput,
   validateListSalesFilters,
@@ -206,11 +206,11 @@ describe('sales validation', () => {
   });
 
   it('valida y rechaza motivo de anulacion vacio', () => {
-    expect(validateCancelCashSaleInput({ motivo_anulacion: ' Cliente cancelo ' })).toMatchObject({
+    expect(validateCancelSaleInput({ motivo_anulacion: ' Cliente cancelo ' })).toMatchObject({
       motivoAnulacion: 'Cliente cancelo',
     });
 
-    expect(() => validateCancelCashSaleInput({ motivo_anulacion: '   ' })).toThrowError(
+    expect(() => validateCancelSaleInput({ motivo_anulacion: '   ' })).toThrowError(
       expect.objectContaining({ code: 'SALE_CANCELLATION_REASON_REQUIRED' }),
     );
   });

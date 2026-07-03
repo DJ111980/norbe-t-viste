@@ -350,18 +350,46 @@ vi.mock('./sales.repository', () => ({
       pagos: mocks.payments.filter((payment) => payment.id_venta === idVenta),
     };
   }),
-  cancelCashSale: vi.fn(async (_env: ApiEnv, input) => {
+  listSaleCredits: vi.fn(async (_env: ApiEnv, idVenta: string) => {
+    return mocks.credits.filter((credit) => credit.id_venta === idVenta);
+  }),
+  creditHasPayments: vi.fn(async () => {
+    return mocks.installments.length > 0;
+  }),
+  creditHasAdjustments: vi.fn(async () => {
+    return mocks.adjustments.length > 0;
+  }),
+  cancelSale: vi.fn(async (_env: ApiEnv, input) => {
     const sale = mocks.sales.find((item) => item.id_venta === input.idVenta);
-    if (sale?.estado_venta === 'COMPLETADA' && sale.tipo_venta === 'CONTADO') {
+    if (sale?.estado_venta === 'COMPLETADA' && sale.tipo_venta === input.tipoVenta) {
       sale.estado_venta = 'ANULADA';
+      sale.anulado_en = '2026-07-02 11:00:00';
+      sale.motivo_anulacion = input.motivoAnulacion;
     }
 
     for (const payment of mocks.payments.filter(
-      (item) => item.id_venta === input.idVenta && item.estado_pago === 'ACTIVO',
+      (item) =>
+        item.id_venta === input.idVenta &&
+        item.estado_pago === 'ACTIVO' &&
+        (input.tipoVenta === 'CONTADO' || input.tipoVenta === 'MIXTA'),
     )) {
       payment.estado_pago = 'ANULADO';
       payment.anulado_en = '2026-07-02 11:00:00';
       payment.motivo_anulacion = input.motivoAnulacion;
+    }
+
+    const credit = mocks.credits.find((item) => item.id_credito === input.idCredito);
+    if (
+      credit &&
+      input.idCredito &&
+      credit.estado_credito === 'PENDIENTE' &&
+      credit.monto_abonado === 0 &&
+      credit.saldo_pendiente === credit.monto_inicial &&
+      mocks.installments.length === 0 &&
+      mocks.adjustments.length === 0
+    ) {
+      credit.estado_credito = 'ANULADO';
+      credit.saldo_pendiente = 0;
     }
 
     for (const movement of input.movimientos) {
@@ -378,23 +406,44 @@ vi.mock('./sales.repository', () => ({
       });
     }
   }),
-  getCancellationPersistenceStatus: vi.fn(async (_env: ApiEnv, idVenta: string) => ({
-    saleCancelled:
-      mocks.sales.find((sale) => sale.id_venta === idVenta)?.estado_venta === 'ANULADA',
-    activePaymentsCount: mocks.payments.filter(
-      (payment) => payment.id_venta === idVenta && payment.estado_pago === 'ACTIVO',
-    ).length,
-    cancelledPaymentsCount: mocks.payments.filter(
-      (payment) => payment.id_venta === idVenta && payment.estado_pago === 'ANULADO',
-    ).length,
-    cancellationMovementCount: mocks.movements.filter(
-      (movement) =>
-        movement.referencia_id === idVenta && movement.referencia_tipo === 'ANULACION_VENTA',
-    ).length,
-  })),
+  getCancellationPersistenceStatus: vi.fn(
+    async (
+      _env: ApiEnv,
+      idVenta: string,
+      tipoVenta: string,
+      expectedStocks: Array<{ idVariante: string; stockDespues: number }>,
+      idCredito?: string,
+    ) => {
+      const credit = mocks.credits.find((item) => item.id_credito === idCredito);
+
+      return {
+        saleCancelled:
+          mocks.sales.find((sale) => sale.id_venta === idVenta)?.estado_venta === 'ANULADA',
+        activePaymentsCount: mocks.payments.filter(
+          (payment) => payment.id_venta === idVenta && payment.estado_pago === 'ACTIVO',
+        ).length,
+        cancelledPaymentsCount: mocks.payments.filter(
+          (payment) => payment.id_venta === idVenta && payment.estado_pago === 'ANULADO',
+        ).length,
+        creditCancelled: tipoVenta === 'CONTADO' || credit?.estado_credito === 'ANULADO',
+        creditBalance: credit?.saldo_pendiente ?? null,
+        creditPaymentExists: mocks.installments.length > 0,
+        creditAdjustmentExists: mocks.adjustments.length > 0,
+        cancellationMovementCount: mocks.movements.filter(
+          (movement) =>
+            movement.referencia_id === idVenta && movement.referencia_tipo === 'ANULACION_VENTA',
+        ).length,
+        stockMatchesCount: expectedStocks.filter(
+          (stock) =>
+            mocks.variants.find((variant) => variant.id_variante === stock.idVariante)
+              ?.stock_actual === stock.stockDespues,
+        ).length,
+      };
+    },
+  ),
 }));
 
-const { cancelCashSale, createCashSale, createSale, getSaleById, listSalePayments, listSales } =
+const { cancelSale, createCashSale, createSale, getSaleById, listSalePayments, listSales } =
   await import('./sales.service');
 
 const env = {} as ApiEnv;
@@ -434,6 +483,9 @@ function buildSale(overrides: Partial<SaleListRecord> = {}): SaleListRecord {
     observaciones: 'Venta de contado',
     creado_en: '2026-07-02 10:00:00',
     actualizado_en: '2026-07-02 10:00:00',
+    anulado_por: null,
+    anulado_en: null,
+    motivo_anulacion: null,
     cliente_nombre: 'Cliente Uno',
     vendedor_nombre: 'Admin',
     vendedor_correo: 'admin@norbe.test',
@@ -985,7 +1037,7 @@ describe('sales service', () => {
   it('ADMINISTRADOR anula venta de contado, devuelve stock, crea movimiento y anula pagos', async () => {
     mocks.variants.find((variant) => variant.id_variante === 'var_1')!.stock_actual = 2;
 
-    const result = await cancelCashSale(env, adminAuth, 'ven_1', {
+    const result = await cancelSale(env, adminAuth, 'ven_1', {
       motivoAnulacion: 'Cliente cancelo la compra',
     });
 
@@ -1011,43 +1063,202 @@ describe('sales service', () => {
     });
   });
 
-  it('rechaza venta inexistente, ya anulada o no contado', async () => {
+  it('ADMINISTRADOR anula venta a credito sin abonos ni ajustes', async () => {
+    mocks.sales[0] = buildSale({
+      tipo_venta: 'CREDITO',
+      valor_pagado_inicial: 0,
+      saldo_pendiente: 50000,
+    });
+    mocks.payments = [];
+    mocks.credits = [
+      {
+        id_credito: 'cre_1',
+        id_cliente: 'cli_1',
+        id_venta: 'ven_1',
+        origen_credito: 'VENTA',
+        monto_inicial: 50000,
+        monto_abonado: 0,
+        saldo_pendiente: 50000,
+        estado_credito: 'PENDIENTE',
+      },
+    ];
+    mocks.variants.find((variant) => variant.id_variante === 'var_1')!.stock_actual = 2;
+
+    const result = await cancelSale(env, adminAuth, 'ven_1', {
+      motivoAnulacion: 'Cliente solicito cancelar la venta',
+    });
+
+    expect(result).toMatchObject({
+      id_venta: 'ven_1',
+      estado_venta: 'ANULADA',
+      id_credito: 'cre_1',
+      credito_anulado: true,
+      pagos_anulados: 0,
+      movimientos_creados: 1,
+    });
+    expect(mocks.sales[0]?.estado_venta).toBe('ANULADA');
+    expect(mocks.credits[0]).toMatchObject({
+      estado_credito: 'ANULADO',
+      saldo_pendiente: 0,
+      monto_inicial: 50000,
+      monto_abonado: 0,
+    });
+    expect(mocks.variants.find((variant) => variant.id_variante === 'var_1')?.stock_actual).toBe(3);
+    expect(mocks.movements[0]).toMatchObject({
+      tipo_movimiento: 'ANULACION_VENTA',
+      referencia_tipo: 'ANULACION_VENTA',
+    });
+    expect(mocks.installments).toHaveLength(0);
+    expect(mocks.adjustments).toHaveLength(0);
+  });
+
+  it('ADMINISTRADOR anula venta mixta y marca pago inicial como anulado', async () => {
+    mocks.sales[0] = buildSale({
+      tipo_venta: 'MIXTA',
+      total: 100000,
+      valor_pagado_inicial: 40000,
+      saldo_pendiente: 60000,
+    });
+    mocks.payments = [
+      buildPayment({
+        id_pago_venta: 'pag_mixta',
+        id_venta: 'ven_1',
+        valor_pagado: 40000,
+        metodo_pago: 'NEQUI',
+      }),
+    ];
+    mocks.credits = [
+      {
+        id_credito: 'cre_1',
+        id_cliente: 'cli_1',
+        id_venta: 'ven_1',
+        origen_credito: 'VENTA',
+        monto_inicial: 60000,
+        monto_abonado: 0,
+        saldo_pendiente: 60000,
+        estado_credito: 'PENDIENTE',
+      },
+    ];
+    mocks.variants.find((variant) => variant.id_variante === 'var_1')!.stock_actual = 2;
+
+    const result = await cancelSale(env, adminAuth, 'ven_1', {
+      motivoAnulacion: 'Cliente solicito cancelar la venta',
+    });
+
+    expect(result).toMatchObject({
+      id_credito: 'cre_1',
+      credito_anulado: true,
+      pagos_anulados: 1,
+      movimientos_creados: 1,
+    });
+    expect(mocks.payments[0]).toMatchObject({
+      estado_pago: 'ANULADO',
+      motivo_anulacion: 'Cliente solicito cancelar la venta',
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      estado_credito: 'ANULADO',
+      saldo_pendiente: 0,
+    });
+    expect(mocks.variants.find((variant) => variant.id_variante === 'var_1')?.stock_actual).toBe(3);
+  });
+
+  it('bloquea ventas con credito que ya tiene abonos o ajustes', async () => {
+    mocks.sales[0] = buildSale({
+      tipo_venta: 'CREDITO',
+      valor_pagado_inicial: 0,
+      saldo_pendiente: 50000,
+    });
+    mocks.payments = [];
+    mocks.credits = [
+      {
+        id_credito: 'cre_1',
+        id_cliente: 'cli_1',
+        id_venta: 'ven_1',
+        origen_credito: 'VENTA',
+        monto_inicial: 50000,
+        monto_abonado: 0,
+        saldo_pendiente: 50000,
+        estado_credito: 'PENDIENTE',
+      },
+    ];
+    mocks.installments = [{ id_abono: 'abo_1' }];
+
     await expect(
-      cancelCashSale(env, adminAuth, 'missing', { motivoAnulacion: 'Error' }),
+      cancelSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'VENTA_CON_CREDITO_MODIFICADO' });
+
+    mocks.installments = [];
+    mocks.adjustments = [{ id_ajuste: 'aju_1' }];
+
+    await expect(
+      cancelSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'VENTA_CON_CREDITO_MODIFICADO' });
+  });
+
+  it('rechaza credito o mixta sin datos asociados requeridos', async () => {
+    mocks.sales[0] = buildSale({ tipo_venta: 'CREDITO', saldo_pendiente: 50000 });
+    mocks.payments = [];
+    mocks.credits = [];
+
+    await expect(
+      cancelSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'SALE_CREDIT_NOT_FOUND' });
+
+    mocks.sales[0] = buildSale({
+      tipo_venta: 'MIXTA',
+      valor_pagado_inicial: 40000,
+      saldo_pendiente: 60000,
+    });
+    mocks.credits = [
+      {
+        id_credito: 'cre_1',
+        id_cliente: 'cli_1',
+        id_venta: 'ven_1',
+        origen_credito: 'VENTA',
+        monto_inicial: 60000,
+        monto_abonado: 0,
+        saldo_pendiente: 60000,
+        estado_credito: 'PENDIENTE',
+      },
+    ];
+
+    await expect(
+      cancelSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'SALE_MIXED_INITIAL_PAYMENT_NOT_FOUND' });
+  });
+
+  it('rechaza venta inexistente o ya anulada', async () => {
+    await expect(
+      cancelSale(env, adminAuth, 'missing', { motivoAnulacion: 'Error' }),
     ).rejects.toMatchObject({ code: 'SALE_NOT_FOUND' });
 
     mocks.sales[0]!.estado_venta = 'ANULADA';
     await expect(
-      cancelCashSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Error' }),
+      cancelSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Error' }),
     ).rejects.toMatchObject({ code: 'SALE_ALREADY_CANCELLED' });
-
-    mocks.sales[0] = buildSale({ tipo_venta: 'MIXTA' });
-    await expect(
-      cancelCashSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Error' }),
-    ).rejects.toMatchObject({ code: 'ONLY_CASH_SALE_CANCELLATION_ALLOWED' });
   });
 
   it('rechaza venta sin detalles o con variante faltante', async () => {
     mocks.details = [];
 
     await expect(
-      cancelCashSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Error' }),
+      cancelSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Error' }),
     ).rejects.toMatchObject({ code: 'SALE_DETAILS_NOT_FOUND' });
 
     mocks.details = [buildDetail({ id_variante: 'missing' })];
 
     await expect(
-      cancelCashSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Error' }),
+      cancelSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Error' }),
     ).rejects.toMatchObject({ code: 'SALE_VARIANT_NOT_FOUND' });
   });
 
   it('no permite anulacion doble ni crea creditos, abonos, imagenes o etiquetas', async () => {
-    await cancelCashSale(env, adminAuth, 'ven_1', {
+    await cancelSale(env, adminAuth, 'ven_1', {
       motivoAnulacion: 'Cliente cancelo la compra',
     });
 
     await expect(
-      cancelCashSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Segundo intento' }),
+      cancelSale(env, adminAuth, 'ven_1', { motivoAnulacion: 'Segundo intento' }),
     ).rejects.toMatchObject({ code: 'SALE_ALREADY_CANCELLED' });
 
     expect(mocks.credits).toHaveLength(0);
@@ -1057,7 +1268,7 @@ describe('sales service', () => {
   });
 
   it('GET de venta y pagos reflejan anulacion', async () => {
-    await cancelCashSale(env, adminAuth, 'ven_1', {
+    await cancelSale(env, adminAuth, 'ven_1', {
       motivoAnulacion: 'Cliente cancelo la compra',
     });
 
@@ -1065,6 +1276,7 @@ describe('sales service', () => {
     const payments = await listSalePayments(env, adminAuth, 'ven_1');
 
     expect(sale.estadoVenta).toBe('ANULADA');
+    expect(sale.motivoAnulacion).toBe('Cliente cancelo la compra');
     expect(payments[0]?.estadoPago).toBe('ANULADO');
   });
 });

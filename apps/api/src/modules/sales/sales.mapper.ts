@@ -84,6 +84,8 @@ export function toPublicSaleDetail(record: SaleDetailViewRecord): PublicSaleDeta
     descuento: record.descuento,
     valorPagadoInicial: record.valor_pagado_inicial,
     observaciones: record.observaciones,
+    anuladoEn: record.anulado_en,
+    motivoAnulacion: record.motivo_anulacion,
     actualizadoEn: record.actualizado_en,
     detalles,
     pagos,

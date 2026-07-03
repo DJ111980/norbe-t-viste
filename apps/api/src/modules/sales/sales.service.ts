@@ -9,8 +9,8 @@ import {
 } from './sales.mapper';
 import * as salesRepository from './sales.repository';
 import type {
-  CancelCashSaleInput,
-  CancelCashSaleResult,
+  CancelSaleInput,
+  CancelSaleResult,
   CreateCashSaleInput,
   CreateCashSaleResult,
   CreateCreditSaleRepositoryInput,
@@ -369,24 +369,16 @@ export async function listSalePayments(
   return payments.map(toPublicSalePayment);
 }
 
-export async function cancelCashSale(
+export async function cancelSale(
   env: ApiEnv,
   auth: AuthContext,
   idVenta: string,
-  input: CancelCashSaleInput,
-): Promise<CancelCashSaleResult> {
+  input: CancelSaleInput,
+): Promise<CancelSaleResult> {
   const sale = await salesRepository.findSaleById(env, idVenta);
 
   if (!sale) {
     throw new ApiError('SALE_NOT_FOUND', 'La venta no existe.', 404);
-  }
-
-  if (sale.tipo_venta !== 'CONTADO') {
-    throw new ApiError(
-      'ONLY_CASH_SALE_CANCELLATION_ALLOWED',
-      'Por ahora solo se permite anular ventas de contado.',
-      400,
-    );
   }
 
   if (sale.estado_venta === 'ANULADA') {
@@ -427,26 +419,133 @@ export async function cancelCashSale(
     });
   }
 
-  const pagosActivos = (await salesRepository.listSalePayments(env, idVenta)).filter(
-    (payment) => payment.estado_pago === 'ACTIVO',
-  ).length;
+  const pagos = await salesRepository.listSalePayments(env, idVenta);
+  const pagosActivos = pagos.filter((payment) => payment.estado_pago === 'ACTIVO').length;
+  let idCredito: string | undefined;
 
-  // Solo se anula contado en esta fase: credito y mixta afectan cartera, abonos
-  // y saldos. Al anular contado se devuelve stock completo y cada devolucion
-  // queda auditada como movimiento ANULACION_VENTA.
-  await salesRepository.cancelCashSale(env, {
+  if (sale.tipo_venta === 'CREDITO' || sale.tipo_venta === 'MIXTA') {
+    const creditos = await salesRepository.listSaleCredits(env, idVenta);
+
+    if (creditos.length === 0) {
+      throw new ApiError(
+        'SALE_CREDIT_NOT_FOUND',
+        'No existe un credito asociado a la venta para anular.',
+        409,
+      );
+    }
+
+    if (creditos.length > 1) {
+      throw new ApiError(
+        'SALE_CREDIT_INCONSISTENT',
+        'La venta tiene mas de un credito asociado y requiere revision manual.',
+        409,
+      );
+    }
+
+    const credito = creditos[0];
+
+    if (!credito || credito.origen_credito !== 'VENTA' || credito.id_venta !== idVenta) {
+      throw new ApiError(
+        'SALE_CREDIT_INCONSISTENT',
+        'El credito asociado a la venta no es consistente.',
+        409,
+      );
+    }
+
+    if (credito.estado_credito === 'ANULADO') {
+      throw new ApiError('SALE_CREDIT_ALREADY_CANCELLED', 'El credito ya esta anulado.', 400);
+    }
+
+    if (
+      credito.estado_credito !== 'PENDIENTE' ||
+      credito.monto_abonado !== 0 ||
+      credito.saldo_pendiente !== credito.monto_inicial
+    ) {
+      throw new ApiError(
+        'VENTA_CON_CREDITO_MODIFICADO',
+        'No se puede anular automaticamente una venta con credito que ya tiene abonos o ajustes. Requiere manejo manual por administracion.',
+        409,
+      );
+    }
+
+    const tieneAbonos = await salesRepository.creditHasPayments(env, credito.id_credito);
+    const tieneAjustes = await salesRepository.creditHasAdjustments(env, credito.id_credito);
+
+    // Si la cartera ya tuvo abonos o ajustes, el sistema no debe inventar el
+    // reverso de dinero recibido, descuentos o correcciones administrativas.
+    if (tieneAbonos || tieneAjustes) {
+      throw new ApiError(
+        'VENTA_CON_CREDITO_MODIFICADO',
+        'No se puede anular automaticamente una venta con credito que ya tiene abonos o ajustes. Requiere manejo manual por administracion.',
+        409,
+      );
+    }
+
+    if (sale.tipo_venta === 'CREDITO' && pagos.length > 0) {
+      throw new ApiError(
+        'SALE_CREDIT_INCONSISTENT',
+        'La venta a credito no debe tener pagos de venta asociados.',
+        409,
+      );
+    }
+
+    if (sale.tipo_venta === 'MIXTA') {
+      if (pagosActivos !== 1) {
+        throw new ApiError(
+          'SALE_MIXED_INITIAL_PAYMENT_NOT_FOUND',
+          'La venta mixta debe tener exactamente un pago inicial activo para anular.',
+          409,
+        );
+      }
+
+      const pagoInicial = pagos.find((payment) => payment.estado_pago === 'ACTIVO');
+
+      if (!pagoInicial || pagoInicial.valor_pagado !== sale.valor_pagado_inicial) {
+        throw new ApiError(
+          'SALE_CREDIT_INCONSISTENT',
+          'El pago inicial de la venta mixta no coincide con la venta.',
+          409,
+        );
+      }
+    }
+
+    idCredito = credito.id_credito;
+  }
+
+  // Esta fase devuelve siempre la venta completa. Las devoluciones parciales
+  // quedan fuera porque requieren otro modelo de detalle, saldos y auditoria.
+  await salesRepository.cancelSale(env, {
     idVenta,
+    tipoVenta: sale.tipo_venta,
     idUsuario: auth.user.id_usuario,
     motivoAnulacion: input.motivoAnulacion,
     movimientos,
+    idCredito,
   });
 
-  const status = await salesRepository.getCancellationPersistenceStatus(env, idVenta);
+  const status = await salesRepository.getCancellationPersistenceStatus(
+    env,
+    idVenta,
+    sale.tipo_venta,
+    movimientos.map((movement) => ({
+      idVariante: movement.idVariante,
+      stockDespues: movement.stockDespues,
+    })),
+    idCredito,
+  );
+
+  const expectedActivePayments = sale.tipo_venta === 'CREDITO' ? 0 : 0;
 
   if (
     !status.saleCancelled ||
-    status.activePaymentsCount !== 0 ||
-    status.cancellationMovementCount !== movimientos.length
+    status.activePaymentsCount !== expectedActivePayments ||
+    status.cancellationMovementCount !== movimientos.length ||
+    status.stockMatchesCount !== movimientos.length ||
+    (sale.tipo_venta !== 'CONTADO' &&
+      (!status.creditCancelled ||
+        status.creditBalance !== 0 ||
+        status.creditPaymentExists ||
+        status.creditAdjustmentExists))
   ) {
     throw new ApiError(
       'SALE_CANCELLATION_NOT_APPLIED',
@@ -461,6 +560,8 @@ export async function cancelCashSale(
     items_revertidos: detalles.length,
     movimientos_creados: movimientos.length,
     pagos_anulados: status.cancelledPaymentsCount || pagosActivos,
+    id_credito: idCredito,
+    credito_anulado: sale.tipo_venta === 'CONTADO' ? undefined : true,
     total_unidades_devuelto: totalUnidadesDevuelto,
   };
 }

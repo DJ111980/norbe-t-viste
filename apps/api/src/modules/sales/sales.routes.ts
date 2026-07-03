@@ -3,15 +3,9 @@ import { requireAuth, requireRole } from '../../middleware/auth.middleware';
 import { ApiError } from '../../shared/errors';
 import { successResponse } from '../../shared/responses';
 import { ensureMethod, readJsonBody } from '../../shared/validation';
+import { cancelSale, createSale, getSaleById, listSalePayments, listSales } from './sales.service';
 import {
-  cancelCashSale,
-  createSale,
-  getSaleById,
-  listSalePayments,
-  listSales,
-} from './sales.service';
-import {
-  validateCancelCashSaleInput,
+  validateCancelSaleInput,
   validateCreateSaleInput,
   validateListSalesFilters,
 } from './sales.validation';
@@ -85,11 +79,11 @@ export async function handleSaleRoutes(request: Request, env: ApiEnv): Promise<R
 
     if (request.method === 'POST') {
       return successResponse({
-        anulacion: await cancelCashSale(
+        anulacion: await cancelSale(
           env,
           auth,
           salePath.idVenta,
-          validateCancelCashSaleInput(await readJsonBody(request)),
+          validateCancelSaleInput(await readJsonBody(request)),
         ),
       });
     }

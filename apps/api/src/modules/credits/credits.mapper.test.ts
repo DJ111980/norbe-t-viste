@@ -45,6 +45,24 @@ describe('credits mapper', () => {
     expect(JSON.stringify(summary)).not.toContain('contrasena');
   });
 
+  it('mapea auditoria de credito anulado', () => {
+    const summary = toPublicCreditSummary(
+      buildCredit({
+        estado_credito: 'ANULADO',
+        saldo_pendiente: 0,
+        anulado_en: '2026-07-02 11:00:00',
+        motivo_anulacion: 'Venta anulada',
+      }),
+    );
+
+    expect(summary).toMatchObject({
+      estadoCredito: 'ANULADO',
+      saldoPendiente: 0,
+      anuladoEn: '2026-07-02 11:00:00',
+      motivoAnulacion: 'Venta anulada',
+    });
+  });
+
   it('mapea detalle con venta, abonos y ajustes', () => {
     const detail = toPublicCreditDetail({
       ...buildCredit(),
