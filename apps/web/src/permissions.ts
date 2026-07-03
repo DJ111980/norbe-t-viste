@@ -31,3 +31,27 @@ export function canManageEntryLots(role: UserRole): boolean {
 export function canCancelSales(role: UserRole): boolean {
   return role === 'ADMINISTRADOR';
 }
+
+export function canViewGeneralPortfolio(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}
+
+export function canManageOldDebts(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}
+
+export function canRegisterCreditPayments(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR' || role === 'VENDEDOR';
+}
+
+export function canManageCreditAdjustments(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}
+
+export function canCancelCreditPayments(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}
+
+export function canCancelIndependentCredits(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}

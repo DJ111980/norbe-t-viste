@@ -8,6 +8,12 @@ import {
   canManageProducts,
   canManageProviders,
   canManageVariants,
+  canCancelCreditPayments,
+  canCancelIndependentCredits,
+  canManageCreditAdjustments,
+  canManageOldDebts,
+  canRegisterCreditPayments,
+  canViewGeneralPortfolio,
 } from './permissions';
 
 describe('crud permissions', () => {
@@ -43,5 +49,20 @@ describe('crud permissions', () => {
   it('solo ADMINISTRADOR anula ventas', () => {
     expect(canCancelSales('ADMINISTRADOR')).toBe(true);
     expect(canCancelSales('VENDEDOR')).toBe(false);
+  });
+
+  it('aplica permisos de creditos y cartera por rol', () => {
+    expect(canViewGeneralPortfolio('ADMINISTRADOR')).toBe(true);
+    expect(canViewGeneralPortfolio('VENDEDOR')).toBe(false);
+    expect(canManageOldDebts('ADMINISTRADOR')).toBe(true);
+    expect(canManageOldDebts('VENDEDOR')).toBe(false);
+    expect(canRegisterCreditPayments('ADMINISTRADOR')).toBe(true);
+    expect(canRegisterCreditPayments('VENDEDOR')).toBe(true);
+    expect(canManageCreditAdjustments('ADMINISTRADOR')).toBe(true);
+    expect(canManageCreditAdjustments('VENDEDOR')).toBe(false);
+    expect(canCancelCreditPayments('ADMINISTRADOR')).toBe(true);
+    expect(canCancelCreditPayments('VENDEDOR')).toBe(false);
+    expect(canCancelIndependentCredits('ADMINISTRADOR')).toBe(true);
+    expect(canCancelIndependentCredits('VENDEDOR')).toBe(false);
   });
 });

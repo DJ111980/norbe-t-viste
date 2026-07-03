@@ -9,6 +9,7 @@ import { InventoryPage } from './pages/InventoryPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { PortfolioPage } from './pages/PortfolioPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { ProvidersPage } from './pages/ProvidersPage';
 import { SalesPage } from './pages/SalesPage';
@@ -24,7 +25,7 @@ const routeTitles: Record<string, string> = {
   '/inventario': 'Inventario',
   '/lotes-entrada': 'Lotes de entrada',
   '/ventas': 'Ventas',
-  '/creditos': 'Creditos / cartera',
+  '/creditos': 'Creditos',
   '/cartera': 'Cartera',
   '/devoluciones': 'Devoluciones',
   '/etiquetas': 'Etiquetas',
@@ -118,6 +119,14 @@ function renderProtectedPage(
 
   if (path === '/ventas') {
     return <SalesPage onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/cartera') {
+    return <PortfolioPage initialView="portfolio" onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/creditos') {
+    return <PortfolioPage initialView="credits" onSessionExpired={onSessionExpired} />;
   }
 
   if (path === '/usuarios' && role !== 'ADMINISTRADOR') {

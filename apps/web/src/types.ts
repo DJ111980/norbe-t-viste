@@ -447,3 +447,178 @@ export interface SaleFormValues {
   observaciones: string;
   detalles: SaleItemFormValues[];
 }
+
+export type CreditOrigin = 'VENTA' | 'DEUDA_ANTIGUA' | 'AJUSTE_MANUAL';
+export type OldDebtType = 'SOLO_MONTO' | 'CON_PRODUCTOS';
+export type CreditStatus = 'PENDIENTE' | 'PARCIAL' | 'PAGADO' | 'VENCIDO' | 'ANULADO';
+export type CreditAdjustmentType = 'AUMENTO' | 'DESCUENTO' | 'CORRECCION';
+
+export interface CreditClientInfo {
+  idCliente: string;
+  nombreCompleto: string;
+  documento: string | null;
+  telefono: string | null;
+}
+
+export interface CreditSummary {
+  idCredito: string;
+  origenCredito: CreditOrigin;
+  tipoDeudaAntigua: OldDebtType | null;
+  descripcionCredito: string | null;
+  montoInicial: number;
+  montoAbonado: number;
+  saldoPendiente: number;
+  fechaCredito: string;
+  fechaVencimiento: string | null;
+  estadoCredito: CreditStatus;
+  anuladoEn: string | null;
+  motivoAnulacion: string | null;
+  cliente: CreditClientInfo;
+}
+
+export interface CreditPayment {
+  id_abono: string;
+  id_credito: string;
+  id_cliente: string;
+  id_usuario: string;
+  valor_abono: number;
+  metodo_pago: PaymentMethod;
+  referencia_pago: string | null;
+  fecha_abono: string;
+  observaciones: string | null;
+  creado_en: string;
+  estado_abono: 'ACTIVO' | 'ANULADO';
+  anulado_en: string | null;
+  motivo_anulacion: string | null;
+  usuario_nombre: string | null;
+}
+
+export interface CreditAdjustment {
+  id_ajuste: string;
+  id_credito: string;
+  id_usuario: string;
+  tipo_ajuste: CreditAdjustmentType;
+  valor_ajuste: number;
+  saldo_antes: number;
+  saldo_despues: number;
+  motivo: string;
+  creado_en: string;
+  usuario_nombre: string | null;
+}
+
+export interface CreditLine {
+  id_detalle_credito: string;
+  id_credito: string;
+  id_variante: string | null;
+  nombre_producto: string;
+  sku: string | null;
+  talla: string | null;
+  color: string | null;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+  observaciones: string | null;
+  creado_en: string;
+}
+
+export interface CreditDetail extends CreditSummary {
+  idVenta: string | null;
+  venta: {
+    id_venta: string;
+    numero_venta: string;
+    tipo_venta: SaleType;
+    estado_venta: SaleStatus;
+    total: number;
+  } | null;
+  observaciones: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
+  detalles: CreditLine[];
+  abonos: CreditPayment[];
+  ajustes: CreditAdjustment[];
+  resumen: {
+    montoInicial: number;
+    montoAbonado: number;
+    saldoPendiente: number;
+    estadoCredito: CreditStatus;
+  };
+}
+
+export interface OldDebtFormValues {
+  id_cliente: string;
+  monto_inicial: number;
+  descripcion: string;
+  tipo_deuda_antigua: OldDebtType;
+}
+
+export interface CreditPaymentFormValues {
+  valor_abono: number;
+  metodo_pago: PaymentMethod;
+  referencia_pago: string;
+  observaciones: string;
+}
+
+export interface CreditAdjustmentFormValues {
+  tipo_ajuste: CreditAdjustmentType;
+  valor_ajuste: number;
+  saldo_final: number;
+  motivo: string;
+}
+
+export interface PortfolioCredit {
+  idCredito: string;
+  idVenta: string | null;
+  origenCredito: CreditOrigin;
+  descripcionCredito: string | null;
+  montoInicial: number;
+  montoAbonado: number;
+  saldoPendiente: number;
+  fechaCredito: string;
+  estadoCredito: CreditStatus;
+  cliente: CreditClientInfo;
+}
+
+export interface PortfolioSummary {
+  totalCreditos: number;
+  creditosPendientes: number;
+  creditosParciales: number;
+  creditosPagados: number;
+  creditosAnulados: number;
+  totalMontoInicial: number;
+  totalMontoAbonado: number;
+  totalSaldoPendiente: number;
+  clientesConDeuda: number;
+}
+
+export interface Portfolio {
+  resumen: PortfolioSummary;
+  creditos: PortfolioCredit[];
+  paginacion: {
+    limit: number;
+    offset: number;
+  };
+}
+
+export interface ClientPortfolio {
+  cliente: CreditClientInfo & {
+    estado: CommonStatus;
+  };
+  resumen: {
+    totalCreditos: number;
+    totalMontoInicial: number;
+    totalMontoAbonado: number;
+    totalSaldoPendiente: number;
+    ultimoCreditoEn: string | null;
+  };
+  creditosActivos: PortfolioCredit[];
+  creditosPagados: PortfolioCredit[];
+  creditosAnulados: PortfolioCredit[];
+  ultimoAbono: {
+    idAbono: string;
+    idCredito: string;
+    valorAbono: number;
+    metodoPago: PaymentMethod;
+    fechaAbono: string;
+    creadoEn: string;
+  } | null;
+}
