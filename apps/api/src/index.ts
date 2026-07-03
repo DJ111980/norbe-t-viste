@@ -10,6 +10,7 @@ import { handleInventoryRoutes } from './modules/inventory/inventory.routes';
 import { handlePortfolioRoutes } from './modules/portfolio/portfolio.routes';
 import { handleProductRoutes } from './modules/products/products.routes';
 import { handleProviderRoutes } from './modules/providers/providers.routes';
+import { handleReturnRoutes } from './modules/returns/returns.routes';
 import { handleSaleRoutes } from './modules/sales/sales.routes';
 import { handleUserRoutes } from './modules/users/users.routes';
 import { handleVariantRoutes } from './modules/variants/variants.routes';
@@ -40,6 +41,12 @@ async function handleRequest(request: Request, env: ApiEnv): Promise<Response> {
 
   if (inventoryResponse) {
     return inventoryResponse;
+  }
+
+  const returnResponse = await handleReturnRoutes(request, env);
+
+  if (returnResponse) {
+    return returnResponse;
   }
 
   const saleResponse = await handleSaleRoutes(request, env);
