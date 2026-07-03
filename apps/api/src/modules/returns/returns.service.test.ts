@@ -292,6 +292,71 @@ describe('returns service', () => {
     });
   });
 
+  it('ADMINISTRADOR registra devolucion parcial MIXTA sin modificar pago inicial', async () => {
+    mocks.sale = buildSale({ tipo_venta: 'MIXTA' });
+    mocks.credits = [buildCredit()];
+    mocks.payments = [{ id_pago_venta: 'pag_inicial', estado_pago: 'ACTIVO', valor_pagado: 50000 }];
+
+    const result = await createSaleReturn(env, adminAuth, 'ven_1', {
+      motivo: 'Cliente devuelve una prenda de venta mixta',
+      detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+    });
+
+    expect(result).toMatchObject({
+      id_venta: 'ven_1',
+      tipo_venta: 'MIXTA',
+      total_devuelto: 50000,
+      impacto_credito: 50000,
+      impacto_pago: 0,
+      items_devueltos: 1,
+      movimientos_creados: 1,
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      saldo_pendiente: 100000,
+      monto_abonado: 0,
+      estado_credito: 'PENDIENTE',
+    });
+    expect(mocks.payments).toEqual([
+      { id_pago_venta: 'pag_inicial', estado_pago: 'ACTIVO', valor_pagado: 50000 },
+    ]);
+    expect(mocks.movements[0]).toMatchObject({
+      tipo_movimiento: 'DEVOLUCION',
+      referencia_tipo: 'DEVOLUCION',
+      referencia_id: result.id_devolucion,
+    });
+    expect(mocks.creditPayments).toHaveLength(0);
+    expect(mocks.creditAdjustments).toHaveLength(0);
+    expect(mocks.sale?.estado_venta).toBe('COMPLETADA');
+  });
+
+  it('devolucion MIXTA puede dejar credito PAGADO sin tocar pago inicial', async () => {
+    mocks.sale = buildSale({ tipo_venta: 'MIXTA' });
+    mocks.credits = [buildCredit({ saldo_pendiente: 50000, monto_abonado: 0 })];
+    mocks.payments = [
+      { id_pago_venta: 'pag_inicial', estado_pago: 'ACTIVO', valor_pagado: 100000 },
+    ];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Cliente devuelve una prenda',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).resolves.toMatchObject({
+      tipo_venta: 'MIXTA',
+      impacto_credito: 50000,
+      impacto_pago: 0,
+    });
+
+    expect(mocks.credits[0]).toMatchObject({
+      saldo_pendiente: 0,
+      monto_abonado: 0,
+      estado_credito: 'PAGADO',
+    });
+    expect(mocks.payments).toEqual([
+      { id_pago_venta: 'pag_inicial', estado_pago: 'ACTIVO', valor_pagado: 100000 },
+    ]);
+  });
+
   it('GET lista devoluciones sin modificar stock', async () => {
     await createSaleReturn(env, adminAuth, 'ven_1', {
       motivo: 'Cliente devuelve una prenda',
@@ -308,7 +373,7 @@ describe('returns service', () => {
     expect(mocks.details[0]?.stock_actual).toBe(stockDespues);
   });
 
-  it('rechaza venta inexistente, MIXTA o anulada', async () => {
+  it('rechaza venta inexistente o anulada', async () => {
     mocks.sale = null;
     await expect(
       createSaleReturn(env, adminAuth, 'missing', {
@@ -316,14 +381,6 @@ describe('returns service', () => {
         detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
       }),
     ).rejects.toMatchObject({ code: 'VENTA_NO_ENCONTRADA' });
-
-    mocks.sale = buildSale({ tipo_venta: 'MIXTA' });
-    await expect(
-      createSaleReturn(env, adminAuth, 'ven_1', {
-        motivo: 'Error',
-        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
-      }),
-    ).rejects.toMatchObject({ code: 'DEVOLUCION_MIXTA_NO_IMPLEMENTADA' });
 
     mocks.sale = buildSale({ estado_venta: 'ANULADA' });
     await expect(
@@ -395,6 +452,66 @@ describe('returns service', () => {
         detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
       }),
     ).rejects.toMatchObject({ code: 'DEVOLUCION_EXCEDE_SALDO_CREDITO' });
+  });
+
+  it('rechaza MIXTA sin credito, con multiples creditos, abonos, ajustes o saldo insuficiente', async () => {
+    mocks.sale = buildSale({ tipo_venta: 'MIXTA' });
+    mocks.credits = [];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CREDITO_ASOCIADO_NO_ENCONTRADO' });
+
+    mocks.credits = [buildCredit(), buildCredit({ id_credito: 'cre_2' })];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CREDITO_ASOCIADO_INCONSISTENTE' });
+
+    mocks.credits = [buildCredit({ estado_credito: 'ANULADO' })];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CREDITO_ANULADO_NO_DEVOLUBLE' });
+
+    mocks.credits = [buildCredit()];
+    mocks.creditPayments = [{ id_abono: 'abo_1', estado_abono: 'ACTIVO' }];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CREDITO_CON_ABONOS_NO_DEVOLUBLE' });
+
+    mocks.creditPayments = [];
+    mocks.creditAdjustments = [{ id_ajuste: 'aju_1' }];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CREDITO_CON_AJUSTES_NO_DEVOLUBLE' });
+
+    mocks.creditAdjustments = [];
+    mocks.credits = [buildCredit({ saldo_pendiente: 20000 })];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'DEVOLUCION_MIXTA_EXCEDE_SALDO_CREDITO' });
   });
 
   it('rechaza detalle ajeno, variante historica inexistente o exceso de cantidad', async () => {

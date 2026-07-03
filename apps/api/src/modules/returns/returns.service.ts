@@ -10,6 +10,7 @@ import type {
   ReturnCreditRecord,
   SaleReturnDetailToCreate,
 } from './returns.types';
+import type { SaleType } from '../sales/sales.types';
 
 function createId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID()}`;
@@ -25,14 +26,6 @@ export async function createSaleReturn(
 
   if (!sale) {
     throw new ApiError('VENTA_NO_ENCONTRADA', 'La venta no existe.', 404);
-  }
-
-  if (sale.tipo_venta === 'MIXTA') {
-    throw new ApiError(
-      'DEVOLUCION_MIXTA_NO_IMPLEMENTADA',
-      'Las devoluciones de ventas mixtas aun no estan implementadas.',
-      400,
-    );
   }
 
   if (sale.estado_venta === 'ANULADA') {
@@ -100,8 +93,8 @@ export async function createSaleReturn(
   );
   const sideEffectsBefore = await returnsRepository.countSaleSideEffects(env, idVenta);
   const creditUpdate =
-    sale.tipo_venta === 'CREDITO'
-      ? await buildCreditReturnUpdate(env, idVenta, totalDevuelto)
+    sale.tipo_venta === 'CREDITO' || sale.tipo_venta === 'MIXTA'
+      ? await buildCreditReturnUpdate(env, idVenta, sale.tipo_venta, totalDevuelto)
       : undefined;
 
   await returnsRepository.createSaleReturn(env, {
@@ -110,7 +103,7 @@ export async function createSaleReturn(
     tipoVenta: sale.tipo_venta,
     motivo: input.motivo,
     totalDevuelto,
-    impactoCredito: sale.tipo_venta === 'CREDITO' ? totalDevuelto : 0,
+    impactoCredito: sale.tipo_venta === 'CONTADO' ? 0 : totalDevuelto,
     impactoPago: sale.tipo_venta === 'CONTADO' ? totalDevuelto : 0,
     creadoPor: auth.user.id_usuario,
     detalles: detailsToCreate,
@@ -155,7 +148,7 @@ export async function createSaleReturn(
     tipo_venta: sale.tipo_venta,
     estado_devolucion: 'ACTIVA',
     total_devuelto: totalDevuelto,
-    impacto_credito: sale.tipo_venta === 'CREDITO' ? totalDevuelto : 0,
+    impacto_credito: sale.tipo_venta === 'CONTADO' ? 0 : totalDevuelto,
     impacto_pago: sale.tipo_venta === 'CONTADO' ? totalDevuelto : 0,
     items_devueltos: detailsToCreate.length,
     movimientos_creados: detailsToCreate.length,
@@ -176,6 +169,7 @@ export async function listSaleReturns(env: ApiEnv, idVenta: string): Promise<Pub
 async function buildCreditReturnUpdate(
   env: ApiEnv,
   idVenta: string,
+  tipoVenta: Extract<SaleType, 'CREDITO' | 'MIXTA'>,
   totalDevuelto: number,
 ): Promise<NonNullable<Parameters<typeof returnsRepository.createSaleReturn>[1]['creditUpdate']>> {
   const credits = await returnsRepository.listCreditsForReturn(env, idVenta);
@@ -233,11 +227,12 @@ async function buildCreditReturnUpdate(
   }
 
   if (totalDevuelto > credit.saldo_pendiente) {
-    throw new ApiError(
-      'DEVOLUCION_EXCEDE_SALDO_CREDITO',
-      'El valor devuelto excede el saldo pendiente del credito.',
-      400,
-    );
+    const code =
+      tipoVenta === 'MIXTA'
+        ? 'DEVOLUCION_MIXTA_EXCEDE_SALDO_CREDITO'
+        : 'DEVOLUCION_EXCEDE_SALDO_CREDITO';
+
+    throw new ApiError(code, 'El valor devuelto excede el saldo pendiente del credito.', 400);
   }
 
   const saldoDespues = credit.saldo_pendiente - totalDevuelto;

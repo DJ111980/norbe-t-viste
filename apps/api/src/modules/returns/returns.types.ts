@@ -55,7 +55,7 @@ export interface SaleReturnDetailToCreate {
 export interface CreateSaleReturnRepositoryInput {
   idDevolucion: string;
   idVenta: string;
-  tipoVenta: Extract<SaleType, 'CONTADO' | 'CREDITO'>;
+  tipoVenta: SaleType;
   motivo: string;
   totalDevuelto: number;
   impactoCredito: number;
@@ -125,7 +125,7 @@ export interface SaleReturnViewRecord extends SaleReturnRecord {
 export interface CreateSaleReturnResult {
   id_devolucion: string;
   id_venta: string;
-  tipo_venta: Extract<SaleType, 'CONTADO' | 'CREDITO'>;
+  tipo_venta: SaleType;
   estado_devolucion: 'ACTIVA';
   total_devuelto: number;
   impacto_credito: number;
