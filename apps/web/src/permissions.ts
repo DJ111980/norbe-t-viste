@@ -11,3 +11,11 @@ export function canManageCategories(role: UserRole): boolean {
 export function canChangeClientStatus(role: UserRole): boolean {
   return role === 'ADMINISTRADOR';
 }
+
+export function canManageProducts(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}
+
+export function canManageVariants(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}

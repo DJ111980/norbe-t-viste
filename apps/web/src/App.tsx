@@ -7,7 +7,9 @@ import { DashboardPage } from './pages/DashboardPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { ProductsPage } from './pages/ProductsPage';
 import { ProvidersPage } from './pages/ProvidersPage';
+import { VariantsPage } from './pages/VariantsPage';
 import { useRoute } from './routing/useRoute';
 
 const routeTitles: Record<string, string> = {
@@ -93,6 +95,14 @@ function renderProtectedPage(
 
   if (path === '/categorias') {
     return <CategoriesPage onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/productos') {
+    return <ProductsPage onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/variantes') {
+    return <VariantsPage onSessionExpired={onSessionExpired} />;
   }
 
   if (path === '/usuarios' && role !== 'ADMINISTRADOR') {

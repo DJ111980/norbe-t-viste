@@ -98,3 +98,136 @@ export async function apiRequest<TData, TBody = unknown>(
 
   return payload.data;
 }
+
+export async function apiFormRequest<TData>(
+  path: string,
+  formData: FormData,
+  token?: string | null,
+): Promise<TData> {
+  if (!apiUrl) {
+    throw new ApiClientError({
+      status: 0,
+      code: 'API_URL_MISSING',
+      message: 'Falta configurar VITE_API_URL para conectar con la API.',
+    });
+  }
+
+  const headers = new Headers({ Accept: 'application/json' });
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiUrl}${path}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+  } catch {
+    throw new ApiClientError({
+      status: 0,
+      code: 'NETWORK_ERROR',
+      message: 'No se pudo conectar con la API. Revisa que el backend este levantado.',
+    });
+  }
+
+  const payload = (await response.json().catch(() => null)) as
+    ApiSuccessResponse<TData> | ApiErrorResponse | null;
+
+  if (!response.ok || !payload || payload.ok === false) {
+    const error = payload && 'error' in payload ? payload.error : null;
+
+    throw new ApiClientError({
+      status: response.status,
+      code: error?.code ?? 'HTTP_ERROR',
+      message: error?.message ?? 'La API devolvio una respuesta inesperada.',
+    });
+  }
+
+  return payload.data;
+}
+
+export async function apiTextRequest(path: string, token?: string | null): Promise<string> {
+  if (!apiUrl) {
+    throw new ApiClientError({
+      status: 0,
+      code: 'API_URL_MISSING',
+      message: 'Falta configurar VITE_API_URL para conectar con la API.',
+    });
+  }
+
+  const headers = new Headers();
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiUrl}${path}`, { headers });
+  } catch {
+    throw new ApiClientError({
+      status: 0,
+      code: 'NETWORK_ERROR',
+      message: 'No se pudo conectar con la API. Revisa que el backend este levantado.',
+    });
+  }
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as ApiErrorResponse | null;
+    const error = payload?.ok === false ? payload.error : null;
+
+    throw new ApiClientError({
+      status: response.status,
+      code: error?.code ?? 'HTTP_ERROR',
+      message: error?.message ?? 'La API devolvio una respuesta inesperada.',
+    });
+  }
+
+  return response.text();
+}
+
+export async function apiBlobRequest(path: string, token?: string | null): Promise<Blob> {
+  if (!apiUrl) {
+    throw new ApiClientError({
+      status: 0,
+      code: 'API_URL_MISSING',
+      message: 'Falta configurar VITE_API_URL para conectar con la API.',
+    });
+  }
+
+  const headers = new Headers();
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiUrl}${path}`, { headers });
+  } catch {
+    throw new ApiClientError({
+      status: 0,
+      code: 'NETWORK_ERROR',
+      message: 'No se pudo conectar con la API. Revisa que el backend este levantado.',
+    });
+  }
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as ApiErrorResponse | null;
+    const error = payload?.ok === false ? payload.error : null;
+
+    throw new ApiClientError({
+      status: response.status,
+      code: error?.code ?? 'HTTP_ERROR',
+      message: error?.message ?? 'La API devolvio una respuesta inesperada.',
+    });
+  }
+
+  return response.blob();
+}

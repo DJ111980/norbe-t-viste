@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { canChangeClientStatus, canManageCategories, canManageProviders } from './permissions';
+import {
+  canChangeClientStatus,
+  canManageCategories,
+  canManageProducts,
+  canManageProviders,
+  canManageVariants,
+} from './permissions';
 
 describe('crud permissions', () => {
   it('ADMINISTRADOR puede administrar proveedores y categorias', () => {
@@ -15,5 +21,12 @@ describe('crud permissions', () => {
   it('solo ADMINISTRADOR cambia estado de clientes', () => {
     expect(canChangeClientStatus('ADMINISTRADOR')).toBe(true);
     expect(canChangeClientStatus('VENDEDOR')).toBe(false);
+  });
+
+  it('solo ADMINISTRADOR administra productos y variantes', () => {
+    expect(canManageProducts('ADMINISTRADOR')).toBe(true);
+    expect(canManageVariants('ADMINISTRADOR')).toBe(true);
+    expect(canManageProducts('VENDEDOR')).toBe(false);
+    expect(canManageVariants('VENDEDOR')).toBe(false);
   });
 });

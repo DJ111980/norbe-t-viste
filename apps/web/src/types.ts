@@ -143,3 +143,65 @@ export interface CategoryFormValues {
   nombre_categoria: string;
   descripcion: string;
 }
+
+export type ProductStatus = 'ACTIVO' | 'INACTIVO';
+export type VariantStatus = 'ACTIVA' | 'INACTIVA';
+
+export interface Product {
+  idProducto: string;
+  nombreProducto: string;
+  descripcion: string | null;
+  marca: string | null;
+  referencia: string | null;
+  visibleCatalogo: boolean;
+  estado: ProductStatus;
+  categoria: {
+    idCategoria: string;
+    nombreCategoria: string | null;
+    estado: CategoryStatus | null;
+  };
+  actualizadoEn: string;
+}
+
+export interface ProductFormValues {
+  nombre_producto: string;
+  id_categoria: string;
+  descripcion: string;
+  marca: string;
+  referencia: string;
+  visible_catalogo: boolean;
+}
+
+export interface Variant {
+  idVariante: string;
+  producto: {
+    idProducto: string;
+    nombreProducto: string | null;
+    estadoProducto: ProductStatus | null;
+  };
+  sku: string;
+  codigoQr: string;
+  talla: string | null;
+  color: string | null;
+  precioCompraReferencia: number;
+  precioVenta: number;
+  stockActual: number;
+  stockMinimo: number;
+  estado: VariantStatus;
+  actualizadoEn: string;
+}
+
+export interface VariantFormValues {
+  id_producto: string;
+  talla: string;
+  color: string;
+  sku: string;
+  precio_venta: number;
+  precio_compra_referencia: number;
+  stock_minimo: number;
+}
+
+export interface ImageMetadata {
+  key: string;
+  origen: 'PRODUCTO' | 'VARIANTE';
+}
