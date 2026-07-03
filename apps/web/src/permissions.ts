@@ -59,3 +59,7 @@ export function canCancelIndependentCredits(role: UserRole): boolean {
 export function canCreateSaleReturns(role: UserRole): boolean {
   return role === 'ADMINISTRADOR';
 }
+
+export function canViewSensitiveReports(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}

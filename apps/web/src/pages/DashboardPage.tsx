@@ -1,72 +1,74 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { FormEvent, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '../auth/auth-context';
-import { apiRequest, ApiClientError, isUnauthorizedError } from '../lib/api';
-import type { DashboardSummary } from '../types';
+import {
+  ErrorMessage,
+  Field,
+  inputClassName,
+  LoadingState,
+  PageHeader,
+  primaryButtonClassName,
+  secondaryButtonClassName,
+} from '../components/ui';
+import { ApiClientError, isUnauthorizedError } from '../lib/api';
+import { getDashboardSummary } from '../services/dashboard';
+import type { DashboardFilters, DashboardSummary } from '../types';
 
-interface DashboardResponse {
-  resumen: DashboardSummary;
-}
-
-function money(value: number): string {
+function money(value: number | undefined): string {
   return new Intl.NumberFormat('es-CO', {
     style: 'currency',
     currency: 'COP',
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(value ?? 0);
 }
 
-function number(value: number): string {
-  return new Intl.NumberFormat('es-CO').format(value);
+function number(value: number | undefined): string {
+  return new Intl.NumberFormat('es-CO').format(value ?? 0);
+}
+
+export function totalAlerts(summary: DashboardSummary): number {
+  return (
+    (summary.alertas.variantes_sin_qr ?? 0) +
+    (summary.alertas.variantes_sin_imagen ?? 0) +
+    (summary.alertas.productos_sin_imagen ?? 0) +
+    (summary.alertas.creditos_con_saldo ?? 0)
+  );
 }
 
 export function DashboardPage({ onSessionExpired }: { onSessionExpired: () => void }) {
   const { token, logout } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [filters, setFilters] = useState<DashboardFilters>({ fecha_desde: '', fecha_hasta: '' });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
+  async function loadDashboard(nextFilters = filters) {
+    if (!token) return;
 
-    async function loadDashboard() {
-      if (!token) return;
+    setIsLoading(true);
+    setError(null);
 
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const data = await apiRequest<DashboardResponse>('/dashboard/resumen', { token });
-
-        if (isMounted) {
-          setSummary(data.resumen);
-        }
-      } catch (dashboardError) {
-        if (isUnauthorizedError(dashboardError)) {
-          await logout();
-          onSessionExpired();
-          return;
-        }
-
-        if (isMounted) {
-          setError(
-            dashboardError instanceof ApiClientError
-              ? dashboardError.message
-              : 'No se pudo cargar el dashboard.',
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+    try {
+      setSummary(await getDashboardSummary(token, nextFilters));
+    } catch (dashboardError) {
+      if (isUnauthorizedError(dashboardError)) {
+        await logout();
+        onSessionExpired();
+        return;
       }
+
+      setError(
+        dashboardError instanceof ApiClientError
+          ? dashboardError.message
+          : 'No se pudo cargar el dashboard.',
+      );
+    } finally {
+      setIsLoading(false);
     }
+  }
 
-    void loadDashboard();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [logout, onSessionExpired, token]);
+  useEffect(() => {
+    void loadDashboard({ fecha_desde: '', fecha_hasta: '' });
+  }, [token]);
 
   const cards = useMemo(() => {
     if (!summary) return [];
@@ -77,9 +79,7 @@ export function DashboardPage({ onSessionExpired }: { onSessionExpired: () => vo
       { label: 'Pagos recibidos', value: money(summary.pagos.total_recibido) },
       { label: 'Cartera pendiente', value: money(summary.cartera.saldo_pendiente_total) },
       { label: 'Stock total', value: number(summary.inventario.stock_total) },
-      { label: 'Variantes sin stock', value: number(summary.inventario.variantes_sin_stock) },
-      { label: 'Variantes bajo stock', value: number(summary.inventario.variantes_bajo_stock) },
-      { label: 'Devoluciones', value: number(summary.devoluciones.cantidad_total) },
+      { label: 'Devoluciones', value: money(summary.devoluciones.total_devuelto) },
       { label: 'Lotes confirmados', value: number(summary.lotes.lotes_confirmados) },
       { label: 'Alertas', value: number(totalAlerts(summary)) },
     ];
@@ -87,31 +87,67 @@ export function DashboardPage({ onSessionExpired }: { onSessionExpired: () => vo
 
   return (
     <section className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-stone-950">Dashboard</h1>
-        <p className="mt-1 text-sm text-stone-600">Resumen operativo inicial del sistema.</p>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description="Resumen operativo del periodo con accesos rapidos a los modulos principales."
+        action={
+          <button
+            type="button"
+            onClick={() => void loadDashboard()}
+            disabled={isLoading}
+            className={secondaryButtonClassName}
+          >
+            Refrescar
+          </button>
+        }
+      />
 
-      {isLoading && (
-        <div className="rounded-md border border-stone-200 bg-white p-6 text-sm text-stone-600">
-          Cargando dashboard...
+      <form
+        className="rounded-md border border-stone-200 bg-white p-4"
+        onSubmit={(event: FormEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          void loadDashboard();
+        }}
+      >
+        <div className="grid gap-3 md:grid-cols-[180px_180px_auto]">
+          <Field label="Fecha desde">
+            <input
+              type="date"
+              value={filters.fecha_desde}
+              onChange={(event) => setFilters({ ...filters, fecha_desde: event.target.value })}
+              className={inputClassName}
+            />
+          </Field>
+          <Field label="Fecha hasta">
+            <input
+              type="date"
+              value={filters.fecha_hasta}
+              onChange={(event) => setFilters({ ...filters, fecha_hasta: event.target.value })}
+              className={inputClassName}
+            />
+          </Field>
+          <div className="flex items-end">
+            <button type="submit" disabled={isLoading} className={primaryButtonClassName}>
+              Aplicar filtros
+            </button>
+          </div>
         </div>
-      )}
+        {summary?.periodo && (
+          <p className="mt-3 text-xs text-stone-500">
+            Periodo consultado: {new Date(summary.periodo.fechaDesde).toLocaleDateString('es-CO')} a{' '}
+            {new Date(summary.periodo.fechaHasta).toLocaleDateString('es-CO')}.
+          </p>
+        )}
+      </form>
 
-      {!isLoading && error && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          {error}
-        </div>
-      )}
+      {isLoading && <LoadingState />}
+      {!isLoading && error && <ErrorMessage message={error} />}
 
       {!isLoading && !error && summary && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {cards.map((card) => (
-              <article key={card.label} className="rounded-md border border-stone-200 bg-white p-4">
-                <p className="text-xs font-medium uppercase text-stone-500">{card.label}</p>
-                <p className="mt-3 text-2xl font-semibold text-stone-950">{card.value}</p>
-              </article>
+              <MetricCard key={card.label} label={card.label} value={card.value} />
             ))}
           </div>
 
@@ -119,14 +155,35 @@ export function DashboardPage({ onSessionExpired }: { onSessionExpired: () => vo
             <DashboardPanel title="Ventas">
               <Metric label="Contado" value={money(summary.ventas.total_contado)} />
               <Metric label="Credito" value={money(summary.ventas.total_credito)} />
-              <Metric label="Mixto" value={money(summary.ventas.total_mixto)} />
+              <Metric label="Mixta" value={money(summary.ventas.total_mixto)} />
               <Metric label="Anuladas" value={number(summary.ventas.ventas_anuladas)} />
+            </DashboardPanel>
+
+            <DashboardPanel title="Inventario">
+              <Metric
+                label="Variantes totales"
+                value={number(summary.inventario.variantes_total)}
+              />
+              <Metric
+                label="Variantes activas"
+                value={number(summary.inventario.variantes_activas)}
+              />
+              <Metric label="Sin stock" value={number(summary.inventario.variantes_sin_stock)} />
+              <Metric label="Bajo stock" value={number(summary.inventario.variantes_bajo_stock)} />
             </DashboardPanel>
 
             <DashboardPanel title="Cartera">
               <Metric label="Pendientes" value={number(summary.cartera.creditos_pendientes)} />
               <Metric label="Pagados" value={number(summary.cartera.creditos_pagados)} />
               <Metric label="Anulados" value={number(summary.cartera.creditos_anulados)} />
+              <Metric label="Saldo" value={money(summary.cartera.saldo_pendiente_total)} />
+            </DashboardPanel>
+
+            <DashboardPanel title="Devoluciones y lotes">
+              <Metric label="Devoluciones" value={number(summary.devoluciones.cantidad_total)} />
+              <Metric label="Total devuelto" value={money(summary.devoluciones.total_devuelto)} />
+              <Metric label="Lotes borrador" value={number(summary.lotes.lotes_borrador)} />
+              <Metric label="Lotes anulados" value={number(summary.lotes.lotes_anulados)} />
             </DashboardPanel>
 
             <DashboardPanel title="Alertas">
@@ -144,6 +201,15 @@ export function DashboardPage({ onSessionExpired }: { onSessionExpired: () => vo
                 value={number(summary.alertas.creditos_con_saldo)}
               />
             </DashboardPanel>
+
+            <DashboardPanel title="Accesos rapidos">
+              <QuickLink href="/ventas" label="Ventas" />
+              <QuickLink href="/inventario" label="Inventario" />
+              <QuickLink href="/lotes-entrada" label="Lotes de entrada" />
+              <QuickLink href="/cartera" label="Cartera" />
+              <QuickLink href="/devoluciones" label="Devoluciones" />
+              <QuickLink href="/reportes" label="Reportes" />
+            </DashboardPanel>
           </div>
         </>
       )}
@@ -151,12 +217,12 @@ export function DashboardPage({ onSessionExpired }: { onSessionExpired: () => vo
   );
 }
 
-function totalAlerts(summary: DashboardSummary): number {
+function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    summary.alertas.variantes_sin_qr +
-    summary.alertas.variantes_sin_imagen +
-    summary.alertas.productos_sin_imagen +
-    summary.alertas.creditos_con_saldo
+    <article className="rounded-md border border-stone-200 bg-white p-4">
+      <p className="text-xs font-medium uppercase text-stone-500">{label}</p>
+      <p className="mt-3 text-2xl font-semibold text-stone-950">{value}</p>
+    </article>
   );
 }
 
@@ -175,5 +241,16 @@ function Metric({ label, value }: { label: string; value: string }) {
       <span className="text-sm text-stone-600">{label}</span>
       <span className="text-sm font-semibold text-stone-950">{value}</span>
     </div>
+  );
+}
+
+function QuickLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      className="block rounded-md border border-stone-200 px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+    >
+      {label}
+    </a>
   );
 }

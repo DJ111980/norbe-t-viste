@@ -11,6 +11,7 @@ import {
   canCancelCreditPayments,
   canCancelIndependentCredits,
   canCreateSaleReturns,
+  canViewSensitiveReports,
   canManageCreditAdjustments,
   canManageOldDebts,
   canRegisterCreditPayments,
@@ -70,5 +71,10 @@ describe('crud permissions', () => {
   it('solo ADMINISTRADOR registra devoluciones de venta', () => {
     expect(canCreateSaleReturns('ADMINISTRADOR')).toBe(true);
     expect(canCreateSaleReturns('VENDEDOR')).toBe(false);
+  });
+
+  it('solo ADMINISTRADOR ve reportes sensibles', () => {
+    expect(canViewSensitiveReports('ADMINISTRADOR')).toBe(true);
+    expect(canViewSensitiveReports('VENDEDOR')).toBe(false);
   });
 });

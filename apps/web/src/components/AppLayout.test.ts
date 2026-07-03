@@ -20,5 +20,7 @@ describe('AppLayout navigation', () => {
     expect(paths).toContain('/ventas');
     expect(paths).toContain('/creditos');
     expect(paths).toContain('/cartera');
+    expect(paths).toContain('/devoluciones');
+    expect(paths).toContain('/reportes');
   });
 });
