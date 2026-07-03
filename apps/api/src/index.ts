@@ -7,6 +7,7 @@ import { handleCreditRoutes } from './modules/credits/credits.routes';
 import { handleEntryLotRoutes } from './modules/entry-lots/entry-lots.routes';
 import { handleImageRoutes } from './modules/images/images.routes';
 import { handleInventoryRoutes } from './modules/inventory/inventory.routes';
+import { handlePortfolioRoutes } from './modules/portfolio/portfolio.routes';
 import { handleProductRoutes } from './modules/products/products.routes';
 import { handleProviderRoutes } from './modules/providers/providers.routes';
 import { handleSaleRoutes } from './modules/sales/sales.routes';
@@ -75,6 +76,12 @@ async function handleRequest(request: Request, env: ApiEnv): Promise<Response> {
 
   if (creditResponse) {
     return creditResponse;
+  }
+
+  const portfolioResponse = await handlePortfolioRoutes(request, env);
+
+  if (portfolioResponse) {
+    return portfolioResponse;
   }
 
   const clientResponse = await handleClientRoutes(request, env);
