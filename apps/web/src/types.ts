@@ -58,3 +58,88 @@ export interface ApiErrorInfo {
   code: string;
   message: string;
 }
+
+export type CommonStatus = 'ACTIVO' | 'INACTIVO';
+export type CategoryStatus = 'ACTIVA' | 'INACTIVA';
+
+export interface Client {
+  idCliente: string;
+  nombreCompleto: string;
+  documento: string | null;
+  telefono: string | null;
+  telefonoSecundario: string | null;
+  direccion: string | null;
+  ciudad: string | null;
+  correo: string | null;
+  observaciones: string | null;
+  estado: CommonStatus;
+  actualizadoEn: string;
+}
+
+export interface ClientFormValues {
+  nombre_completo: string;
+  documento: string;
+  telefono: string;
+  telefono_secundario: string;
+  direccion: string;
+  ciudad: string;
+  correo: string;
+  observaciones: string;
+}
+
+export type ShippingMode =
+  'ENVIO_TRANSPORTADORA' | 'RECOGIDA_EN_LOCAL' | 'DOMICILIO' | 'ENCOMIENDA' | 'OTRO';
+
+export interface Provider {
+  idProveedor: string;
+  nombreProveedor: string;
+  tipoDocumento: string | null;
+  numeroDocumento: string | null;
+  nombreContacto: string | null;
+  telefonoPrincipal: string | null;
+  telefonoSecundario: string | null;
+  correo: string | null;
+  ciudad: string | null;
+  direccion: string | null;
+  pais: string | null;
+  modoEnvio: ShippingMode | null;
+  empresaTransportadora: string | null;
+  tiempoEntregaEstimado: string | null;
+  formaPago: string | null;
+  cuentaPago: string | null;
+  notas: string | null;
+  estado: CommonStatus;
+  actualizadoEn: string;
+}
+
+export interface ProviderFormValues {
+  nombre_proveedor: string;
+  tipo_documento: string;
+  numero_documento: string;
+  nombre_contacto: string;
+  telefono_principal: string;
+  telefono_secundario: string;
+  correo: string;
+  ciudad: string;
+  direccion: string;
+  pais: string;
+  modo_envio: string;
+  empresa_transportadora: string;
+  tiempo_entrega_estimado: string;
+  forma_pago: string;
+  cuenta_pago: string;
+  notas: string;
+}
+
+export interface Category {
+  idCategoria: string;
+  nombreCategoria: string;
+  descripcion: string | null;
+  estado: CategoryStatus;
+  actualizadoEn: string;
+}
+
+export interface CategoryFormValues {
+  nombre_categoria: string;
+  descripcion: string;
+}

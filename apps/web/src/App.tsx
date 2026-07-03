@@ -4,7 +4,10 @@ import { useAuth } from './auth/auth-context';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { CategoriesPage } from './pages/CategoriesPage';
+import { ClientsPage } from './pages/ClientsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { ProvidersPage } from './pages/ProvidersPage';
 import { useRoute } from './routing/useRoute';
 
 const routeTitles: Record<string, string> = {
@@ -78,6 +81,18 @@ function renderProtectedPage(
 ) {
   if (path === '/dashboard') {
     return <DashboardPage onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/clientes') {
+    return <ClientsPage onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/proveedores') {
+    return <ProvidersPage onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/categorias') {
+    return <CategoriesPage onSessionExpired={onSessionExpired} />;
   }
 
   if (path === '/usuarios' && role !== 'ADMINISTRADOR') {
