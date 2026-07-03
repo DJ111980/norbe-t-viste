@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  validateCancelCreditInput,
   validateCancelCreditPaymentInput,
   validateCreateCreditAdjustmentInput,
   validateCreateCreditPaymentInput,
@@ -179,6 +180,26 @@ describe('credits validation', () => {
 
     expect(() => validateCancelCreditPaymentInput({ motivo_anulacion: ' ' })).toThrowError(
       expect.objectContaining({ code: 'CREDIT_PAYMENT_CANCELLATION_REASON_REQUIRED' }),
+    );
+  });
+
+  it('valida anulacion directa de credito', () => {
+    const input = validateCancelCreditInput({
+      motivo_anulacion: ' Credito registrado por error ',
+    });
+
+    expect(input).toEqual({
+      motivoAnulacion: 'Credito registrado por error',
+    });
+  });
+
+  it('rechaza anulacion directa de credito invalida', () => {
+    expect(() => validateCancelCreditInput(null)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_CREDIT_CANCELLATION' }),
+    );
+
+    expect(() => validateCancelCreditInput({ motivo_anulacion: ' ' })).toThrowError(
+      expect.objectContaining({ code: 'CREDIT_CANCELLATION_REASON_REQUIRED' }),
     );
   });
 

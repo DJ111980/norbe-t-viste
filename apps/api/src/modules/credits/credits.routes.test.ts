@@ -32,6 +32,14 @@ vi.mock('./credits.service', () => ({
   listCredits: vi.fn(async () => []),
   getCreditById: vi.fn(async () => ({ idCredito: 'cre_1' })),
   listClientCredits: vi.fn(async () => []),
+  cancelCredit: vi.fn(async () => ({
+    id_credito: 'cre_1',
+    estado_credito: 'ANULADO',
+    saldo_anterior: 150000,
+    saldo_nuevo: 0,
+    monto_inicial: 150000,
+    monto_abonado: 0,
+  })),
   createOldDebt: vi.fn(async () => ({
     id_credito: 'cre_1',
     id_cliente: 'cli_1',
@@ -186,6 +194,54 @@ describe('credits routes', () => {
             monto_inicial: 150000,
             descripcion: 'Deuda vieja',
             tipo_deuda_antigua: 'SOLO_MONTO',
+          }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'AUTH_REQUIRED', status: 401 });
+  });
+
+  it('solo ADMINISTRADOR puede anular creditos directamente', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'ADMINISTRADOR';
+
+    const response = await handleCreditRoutes(
+      new Request('http://localhost/creditos/cre_1/anular', {
+        method: 'POST',
+        body: JSON.stringify({
+          motivo_anulacion: 'Credito registrado por error',
+        }),
+      }),
+      {} as ApiEnv,
+    );
+
+    expect(response?.status).toBe(200);
+
+    mocks.role = 'VENDEDOR';
+
+    await expect(
+      handleCreditRoutes(
+        new Request('http://localhost/creditos/cre_1/anular', {
+          method: 'POST',
+          body: JSON.stringify({
+            motivo_anulacion: 'Credito registrado por error',
+          }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+  });
+
+  it('usuario sin token no puede anular creditos directamente', async () => {
+    mocks.authenticated = false;
+    mocks.role = 'ADMINISTRADOR';
+
+    await expect(
+      handleCreditRoutes(
+        new Request('http://localhost/creditos/cre_1/anular', {
+          method: 'POST',
+          body: JSON.stringify({
+            motivo_anulacion: 'Credito registrado por error',
           }),
         }),
         {} as ApiEnv,

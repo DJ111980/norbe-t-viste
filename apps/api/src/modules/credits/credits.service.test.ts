@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   payments: [] as CreditPaymentRecord[],
   adjustments: [] as CreditAdjustmentRecord[],
   sales: [] as unknown[],
+  salePayments: [] as unknown[],
   inventoryMovements: [] as unknown[],
   lastListFilters: undefined as ListCreditsFilters | undefined,
   lastClientFilters: undefined as ListClientCreditsFilters | undefined,
@@ -83,6 +84,22 @@ function buildPayment(overrides: Partial<CreditPaymentRecord> = {}): CreditPayme
   };
 }
 
+function buildAdjustment(overrides: Partial<CreditAdjustmentRecord> = {}): CreditAdjustmentRecord {
+  return {
+    id_ajuste: 'aju_1',
+    id_credito: 'cre_1',
+    id_usuario: 'usr_admin',
+    tipo_ajuste: 'AUMENTO',
+    valor_ajuste: 10000,
+    saldo_antes: 150000,
+    saldo_despues: 160000,
+    motivo: 'Ajuste',
+    creado_en: '2026-07-02',
+    usuario_nombre: 'Admin',
+    ...overrides,
+  };
+}
+
 vi.mock('./credits.repository', () => ({
   findClientForCredit: vi.fn(async (_env: ApiEnv, idCliente: string) => {
     return mocks.clients.find((client) => client.id_cliente === idCliente) ?? null;
@@ -117,6 +134,51 @@ vi.mock('./credits.repository', () => ({
       abonos: mocks.payments.filter((payment) => payment.id_credito === idCredito),
       ajustes: mocks.adjustments.filter((adjustment) => adjustment.id_credito === idCredito),
     } satisfies CreditDetailViewRecord;
+  }),
+  countCreditActivity: vi.fn(async (_env: ApiEnv, idCredito: string) => {
+    return {
+      paymentsCount: mocks.payments.filter((payment) => payment.id_credito === idCredito).length,
+      adjustmentsCount: mocks.adjustments.filter(
+        (adjustment) => adjustment.id_credito === idCredito,
+      ).length,
+    };
+  }),
+  cancelCredit: vi.fn(async (_env: ApiEnv, input) => {
+    const credit = mocks.credits.find((item) => item.id_credito === input.idCredito);
+
+    if (!credit) return;
+    if (
+      credit.estado_credito === 'ANULADO' ||
+      credit.origen_credito !== 'DEUDA_ANTIGUA' ||
+      credit.id_venta !== null ||
+      credit.saldo_pendiente !== input.saldoAnterior ||
+      credit.monto_inicial !== input.montoInicial ||
+      credit.monto_abonado !== input.montoAbonado ||
+      mocks.payments.some((payment) => payment.id_credito === input.idCredito) ||
+      mocks.adjustments.some((adjustment) => adjustment.id_credito === input.idCredito)
+    ) {
+      return;
+    }
+
+    credit.estado_credito = 'ANULADO';
+    credit.saldo_pendiente = 0;
+    credit.anulado_por = input.idUsuario;
+    credit.anulado_en = '2026-07-03 11:00:00';
+    credit.motivo_anulacion = input.motivoAnulacion;
+    credit.actualizado_por = input.idUsuario;
+  }),
+  getCreditCancellationPersistenceStatus: vi.fn(async (_env: ApiEnv, idCredito: string) => {
+    const credit = mocks.credits.find((item) => item.id_credito === idCredito);
+
+    return {
+      creditSaldoPendiente: credit?.saldo_pendiente ?? null,
+      creditMontoInicial: credit?.monto_inicial ?? null,
+      creditMontoAbonado: credit?.monto_abonado ?? null,
+      creditEstado: credit?.estado_credito ?? null,
+      creditCancelledBy: credit?.anulado_por ?? null,
+      creditCancelledAt: credit?.anulado_en ?? null,
+      creditCancellationReason: credit?.motivo_anulacion ?? null,
+    };
   }),
   createOldDebtCredit: vi.fn(async (_env: ApiEnv, idCredito: string, input, userId: string) => {
     const client = mocks.clients.find((item) => item.id_cliente === input.idCliente);
@@ -262,6 +324,7 @@ vi.mock('./credits.repository', () => ({
 }));
 
 const {
+  cancelCredit,
   cancelCreditPayment,
   createCreditAdjustment,
   createCreditPayment,
@@ -286,6 +349,7 @@ describe('credits service', () => {
     mocks.payments = [];
     mocks.adjustments = [];
     mocks.sales = [];
+    mocks.salePayments = [];
     mocks.inventoryMovements = [];
     mocks.lastListFilters = undefined;
     mocks.lastClientFilters = undefined;
@@ -387,6 +451,105 @@ describe('credits service', () => {
         tipoDeudaAntigua: 'SOLO_MONTO',
       }),
     ).rejects.toMatchObject({ code: 'CLIENT_INACTIVE' });
+  });
+
+  it('ADMINISTRADOR anula credito DEUDA_ANTIGUA sin abonos ni ajustes', async () => {
+    const result = await cancelCredit(env, adminAuth, 'cre_1', {
+      motivoAnulacion: 'Credito registrado por error',
+    });
+
+    expect(result).toEqual({
+      id_credito: 'cre_1',
+      estado_credito: 'ANULADO',
+      saldo_anterior: 150000,
+      saldo_nuevo: 0,
+      monto_inicial: 150000,
+      monto_abonado: 0,
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      estado_credito: 'ANULADO',
+      saldo_pendiente: 0,
+      monto_inicial: 150000,
+      monto_abonado: 0,
+      anulado_por: 'usr_admin',
+      anulado_en: '2026-07-03 11:00:00',
+      motivo_anulacion: 'Credito registrado por error',
+      actualizado_por: 'usr_admin',
+    });
+    expect(mocks.payments).toHaveLength(0);
+    expect(mocks.adjustments).toHaveLength(0);
+    expect(mocks.sales).toHaveLength(0);
+    expect(mocks.salePayments).toHaveLength(0);
+    expect(mocks.inventoryMovements).toHaveLength(0);
+  });
+
+  it('GET credito y listado de cliente reflejan credito ANULADO', async () => {
+    await cancelCredit(env, adminAuth, 'cre_1', {
+      motivoAnulacion: 'Credito registrado por error',
+    });
+
+    const detail = await getCreditById(env, 'cre_1');
+    const list = await listClientCredits(env, 'cli_1', { limit: 50, offset: 0 });
+
+    expect(detail).toMatchObject({
+      estadoCredito: 'ANULADO',
+      saldoPendiente: 0,
+      motivoAnulacion: 'Credito registrado por error',
+      resumen: {
+        saldoPendiente: 0,
+        estadoCredito: 'ANULADO',
+      },
+    });
+    expect(list[0]).toMatchObject({
+      estadoCredito: 'ANULADO',
+      saldoPendiente: 0,
+      motivoAnulacion: 'Credito registrado por error',
+    });
+  });
+
+  it('rechaza anulacion directa de credito inexistente, anulado o no permitido', async () => {
+    await expect(
+      cancelCredit(env, adminAuth, 'missing', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDIT_NOT_FOUND' });
+
+    mocks.credits[0] = buildCredit({ estado_credito: 'ANULADO' });
+    await expect(
+      cancelCredit(env, adminAuth, 'cre_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDIT_CANCELLED' });
+
+    mocks.credits[0] = buildCredit({ origen_credito: 'VENTA' });
+    await expect(
+      cancelCredit(env, adminAuth, 'cre_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDITO_DE_VENTA_NO_ANULABLE_DIRECTAMENTE' });
+
+    mocks.credits[0] = buildCredit({ id_venta: 'ven_1' });
+    await expect(
+      cancelCredit(env, adminAuth, 'cre_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDITO_DE_VENTA_NO_ANULABLE_DIRECTAMENTE' });
+  });
+
+  it('rechaza anulacion directa con cualquier abono o ajuste asociado', async () => {
+    mocks.payments = [buildPayment({ estado_abono: 'ANULADO' })];
+
+    await expect(
+      cancelCredit(env, adminAuth, 'cre_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDITO_CON_ABONOS_NO_ANULABLE' });
+
+    expect(mocks.credits[0]?.estado_credito).toBe('PENDIENTE');
+
+    mocks.payments = [];
+    mocks.adjustments = [buildAdjustment()];
+
+    await expect(
+      cancelCredit(env, adminAuth, 'cre_1', { motivoAnulacion: 'Error' }),
+    ).rejects.toMatchObject({ code: 'CREDITO_CON_AJUSTES_NO_ANULABLE' });
+
+    expect(mocks.credits[0]).toMatchObject({
+      estado_credito: 'PENDIENTE',
+      saldo_pendiente: 150000,
+      anulado_por: null,
+      anulado_en: null,
+    });
   });
 
   it('ADMINISTRADOR registra abono parcial y actualiza cartera sin tocar ventas ni inventario', async () => {

@@ -144,6 +144,10 @@ export interface CancelCreditPaymentInput {
   motivoAnulacion: string;
 }
 
+export interface CancelCreditInput {
+  motivoAnulacion: string;
+}
+
 export interface CreateCreditPaymentRepositoryInput extends CreateCreditPaymentInput {
   idAbono: string;
   idCredito: string;
@@ -179,6 +183,20 @@ export interface CancelCreditPaymentRepositoryInput {
   motivoAnulacion: string;
 }
 
+export interface CancelCreditRepositoryInput {
+  idCredito: string;
+  idUsuario: string;
+  saldoAnterior: number;
+  montoInicial: number;
+  montoAbonado: number;
+  motivoAnulacion: string;
+}
+
+export interface CreditActivityCounts {
+  paymentsCount: number;
+  adjustmentsCount: number;
+}
+
 export interface CreditPaymentPersistenceStatus {
   creditSaldoPendiente: number | null;
   creditMontoAbonado: number | null;
@@ -201,6 +219,16 @@ export interface CreditPaymentCancellationPersistenceStatus {
   paymentCancelledBy: string | null;
   paymentCancelledAt: string | null;
   paymentCancellationReason: string | null;
+}
+
+export interface CreditCancellationPersistenceStatus {
+  creditSaldoPendiente: number | null;
+  creditMontoInicial: number | null;
+  creditMontoAbonado: number | null;
+  creditEstado: CreditStatus | null;
+  creditCancelledBy: string | null;
+  creditCancelledAt: string | null;
+  creditCancellationReason: string | null;
 }
 
 export interface PublicCreditSummary {
@@ -281,4 +309,13 @@ export interface CancelCreditPaymentResult {
   monto_abonado_anterior: number;
   monto_abonado_nuevo: number;
   estado_credito: Extract<CreditStatus, 'PENDIENTE' | 'PARCIAL' | 'PAGADO'>;
+}
+
+export interface CancelCreditResult {
+  id_credito: string;
+  estado_credito: 'ANULADO';
+  saldo_anterior: number;
+  saldo_nuevo: 0;
+  monto_inicial: number;
+  monto_abonado: number;
 }

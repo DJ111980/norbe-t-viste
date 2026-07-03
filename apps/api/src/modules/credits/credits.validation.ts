@@ -1,5 +1,6 @@
 import { ApiError } from '../../shared/errors';
 import type {
+  CancelCreditInput,
   CancelCreditPaymentInput,
   CreateCreditAdjustmentInput,
   CreateCreditPaymentInput,
@@ -233,6 +234,26 @@ export function validateCancelCreditPaymentInput(body: unknown): CancelCreditPay
       rawBody.motivo_anulacion,
       'CREDIT_PAYMENT_CANCELLATION_REASON_REQUIRED',
       'El motivo de anulacion del abono es obligatorio.',
+    ),
+  };
+}
+
+export function validateCancelCreditInput(body: unknown): CancelCreditInput {
+  const rawBody = body as { motivo_anulacion?: unknown };
+
+  if (!rawBody || typeof rawBody !== 'object') {
+    throw new ApiError(
+      'INVALID_CREDIT_CANCELLATION',
+      'La anulacion del credito enviada no es valida.',
+      400,
+    );
+  }
+
+  return {
+    motivoAnulacion: normalizeRequiredText(
+      rawBody.motivo_anulacion,
+      'CREDIT_CANCELLATION_REASON_REQUIRED',
+      'El motivo de anulacion del credito es obligatorio.',
     ),
   };
 }

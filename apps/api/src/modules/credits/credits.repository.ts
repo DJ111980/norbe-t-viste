@@ -1,5 +1,6 @@
 import type { ApiEnv } from '../../config/env';
 import type {
+  CancelCreditRepositoryInput,
   CancelCreditPaymentRepositoryInput,
   CreateCreditAdjustmentRepositoryInput,
   CreateCreditPaymentRepositoryInput,
@@ -11,6 +12,8 @@ import type {
   CreditDetailViewRecord,
   CreditPaymentPersistenceStatus,
   CreditPaymentCancellationPersistenceStatus,
+  CreditActivityCounts,
+  CreditCancellationPersistenceStatus,
   CreditPaymentRecord,
   CreditRecord,
   CreditSaleRecord,
@@ -324,6 +327,26 @@ export async function getCreditDetailView(
   };
 }
 
+export async function countCreditActivity(
+  env: ApiEnv,
+  idCredito: string,
+): Promise<CreditActivityCounts> {
+  const counts = await env.DB.prepare(
+    `
+      SELECT
+        (SELECT COUNT(*) FROM abonos_creditos WHERE id_credito = ?) AS paymentsCount,
+        (SELECT COUNT(*) FROM ajustes_creditos WHERE id_credito = ?) AS adjustmentsCount
+    `,
+  )
+    .bind(idCredito, idCredito)
+    .first<CreditActivityCounts>();
+
+  return {
+    paymentsCount: counts?.paymentsCount ?? 0,
+    adjustmentsCount: counts?.adjustmentsCount ?? 0,
+  };
+}
+
 export async function createOldDebtCredit(
   env: ApiEnv,
   idCredito: string,
@@ -366,6 +389,86 @@ export async function createOldDebtCredit(
     .run();
 
   return (await findCreditById(env, idCredito)) as CreditRecord;
+}
+
+export async function cancelCredit(env: ApiEnv, input: CancelCreditRepositoryInput): Promise<void> {
+  // Esta anulacion directa solo aplica a deudas antiguas limpias. Las guardas
+  // SQL protegen contra doble anulacion, creditos de venta y actividad previa.
+  await env.DB.batch([
+    env.DB.prepare(
+      `
+        UPDATE creditos_clientes
+        SET
+          estado_credito = 'ANULADO',
+          saldo_pendiente = 0,
+          anulado_por = ?,
+          anulado_en = datetime('now'),
+          motivo_anulacion = ?,
+          actualizado_por = ?,
+          actualizado_en = datetime('now')
+        WHERE id_credito = ?
+          AND estado_credito != 'ANULADO'
+          AND origen_credito = 'DEUDA_ANTIGUA'
+          AND id_venta IS NULL
+          AND saldo_pendiente = ?
+          AND monto_inicial = ?
+          AND monto_abonado = ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM abonos_creditos
+            WHERE id_credito = ?
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM ajustes_creditos
+            WHERE id_credito = ?
+          )
+      `,
+    ).bind(
+      input.idUsuario,
+      input.motivoAnulacion,
+      input.idUsuario,
+      input.idCredito,
+      input.saldoAnterior,
+      input.montoInicial,
+      input.montoAbonado,
+      input.idCredito,
+      input.idCredito,
+    ),
+  ]);
+}
+
+export async function getCreditCancellationPersistenceStatus(
+  env: ApiEnv,
+  idCredito: string,
+): Promise<CreditCancellationPersistenceStatus> {
+  const status = await env.DB.prepare(
+    `
+      SELECT
+        saldo_pendiente AS creditSaldoPendiente,
+        monto_inicial AS creditMontoInicial,
+        monto_abonado AS creditMontoAbonado,
+        estado_credito AS creditEstado,
+        anulado_por AS creditCancelledBy,
+        anulado_en AS creditCancelledAt,
+        motivo_anulacion AS creditCancellationReason
+      FROM creditos_clientes
+      WHERE id_credito = ?
+      LIMIT 1
+    `,
+  )
+    .bind(idCredito)
+    .first<CreditCancellationPersistenceStatus>();
+
+  return {
+    creditSaldoPendiente: status?.creditSaldoPendiente ?? null,
+    creditMontoInicial: status?.creditMontoInicial ?? null,
+    creditMontoAbonado: status?.creditMontoAbonado ?? null,
+    creditEstado: status?.creditEstado ?? null,
+    creditCancelledBy: status?.creditCancelledBy ?? null,
+    creditCancelledAt: status?.creditCancelledAt ?? null,
+    creditCancellationReason: status?.creditCancellationReason ?? null,
+  };
 }
 
 export async function createCreditPayment(

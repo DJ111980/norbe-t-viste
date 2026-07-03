@@ -4,6 +4,7 @@ import { ApiError } from '../../shared/errors';
 import { successResponse } from '../../shared/responses';
 import { ensureMethod, readJsonBody } from '../../shared/validation';
 import {
+  cancelCredit,
   cancelCreditPayment,
   createCreditAdjustment,
   createCreditPayment,
@@ -13,6 +14,7 @@ import {
   listCredits,
 } from './credits.service';
 import {
+  validateCancelCreditInput,
   validateCancelCreditPaymentInput,
   validateCreateCreditAdjustmentInput,
   validateCreateCreditPaymentInput,
@@ -50,16 +52,26 @@ function matchCreditPaymentCancellationPath(
   };
 }
 
+function matchCreditCancellationPath(pathname: string): { idCredito: string } | null {
+  const match = pathname.match(/^\/creditos\/([^/]+)\/anular$/);
+
+  if (!match) return null;
+
+  return { idCredito: decodeURIComponent(match[1]) };
+}
+
 export async function handleCreditRoutes(request: Request, env: ApiEnv): Promise<Response | null> {
   const url = new URL(request.url);
   const clientCreditsPath = matchClientCreditsPath(url.pathname);
   const creditPaymentCancellationPath = matchCreditPaymentCancellationPath(url.pathname);
+  const creditCancellationPath = matchCreditCancellationPath(url.pathname);
   const creditPath = matchCreditPath(url.pathname);
 
   if (
     url.pathname !== '/creditos' &&
     url.pathname !== '/creditos/deuda-antigua' &&
     !creditPaymentCancellationPath &&
+    !creditCancellationPath &&
     !creditPath &&
     !clientCreditsPath
   ) {
@@ -79,6 +91,23 @@ export async function handleCreditRoutes(request: Request, env: ApiEnv): Promise
           creditPaymentCancellationPath.idCredito,
           creditPaymentCancellationPath.idAbono,
           validateCancelCreditPaymentInput(await readJsonBody(request)),
+        ),
+      });
+    }
+
+    ensureMethod(request, 'POST');
+  }
+
+  if (creditCancellationPath) {
+    requireRole(auth, ['ADMINISTRADOR']);
+
+    if (request.method === 'POST') {
+      return successResponse({
+        anulacion: await cancelCredit(
+          env,
+          auth,
+          creditCancellationPath.idCredito,
+          validateCancelCreditInput(await readJsonBody(request)),
         ),
       });
     }

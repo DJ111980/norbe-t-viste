@@ -4,6 +4,8 @@ import { ApiError } from '../../shared/errors';
 import { toOldDebtResult, toPublicCreditDetail, toPublicCreditSummary } from './credits.mapper';
 import * as creditsRepository from './credits.repository';
 import type {
+  CancelCreditInput,
+  CancelCreditResult,
   CancelCreditPaymentInput,
   CancelCreditPaymentResult,
   CreateCreditAdjustmentInput,
@@ -95,6 +97,94 @@ export async function createOldDebt(
   );
 
   return toOldDebtResult(credit);
+}
+
+export async function cancelCredit(
+  env: ApiEnv,
+  auth: AuthContext,
+  idCredito: string,
+  input: CancelCreditInput,
+): Promise<CancelCreditResult> {
+  const credit = await creditsRepository.findCreditById(env, idCredito);
+
+  if (!credit) {
+    throw new ApiError('CREDIT_NOT_FOUND', 'El credito no existe.', 404);
+  }
+
+  if (credit.estado_credito === 'ANULADO') {
+    throw new ApiError('CREDIT_CANCELLED', 'El credito ya esta anulado.', 400);
+  }
+
+  if (credit.origen_credito === 'VENTA' || credit.id_venta !== null) {
+    throw new ApiError(
+      'CREDITO_DE_VENTA_NO_ANULABLE_DIRECTAMENTE',
+      'Los creditos originados por una venta deben anularse desde la venta correspondiente.',
+      400,
+    );
+  }
+
+  if (credit.origen_credito !== 'DEUDA_ANTIGUA') {
+    throw new ApiError(
+      'CREDIT_ORIGIN_NOT_CANCELLABLE',
+      'Solo se pueden anular directamente creditos de deuda antigua en esta fase.',
+      400,
+    );
+  }
+
+  const activity = await creditsRepository.countCreditActivity(env, idCredito);
+
+  if (activity.paymentsCount > 0) {
+    throw new ApiError(
+      'CREDITO_CON_ABONOS_NO_ANULABLE',
+      'No se puede anular directamente un credito con abonos registrados.',
+      400,
+    );
+  }
+
+  if (activity.adjustmentsCount > 0) {
+    throw new ApiError(
+      'CREDITO_CON_AJUSTES_NO_ANULABLE',
+      'No se puede anular directamente un credito con ajustes registrados.',
+      400,
+    );
+  }
+
+  // La anulacion independiente solo cierra el credito seguro de deuda antigua:
+  // no crea abonos, no crea ajustes, no toca ventas y no mueve inventario.
+  await creditsRepository.cancelCredit(env, {
+    idCredito,
+    idUsuario: auth.user.id_usuario,
+    saldoAnterior: credit.saldo_pendiente,
+    montoInicial: credit.monto_inicial,
+    montoAbonado: credit.monto_abonado,
+    motivoAnulacion: input.motivoAnulacion,
+  });
+
+  const persistence = await creditsRepository.getCreditCancellationPersistenceStatus(
+    env,
+    idCredito,
+  );
+
+  if (
+    persistence.creditEstado !== 'ANULADO' ||
+    persistence.creditSaldoPendiente !== 0 ||
+    persistence.creditMontoInicial !== credit.monto_inicial ||
+    persistence.creditMontoAbonado !== credit.monto_abonado ||
+    persistence.creditCancelledBy !== auth.user.id_usuario ||
+    !persistence.creditCancelledAt ||
+    persistence.creditCancellationReason !== input.motivoAnulacion
+  ) {
+    throw new ApiError('CREDIT_CANCELLATION_NOT_APPLIED', 'No se pudo anular el credito.', 409);
+  }
+
+  return {
+    id_credito: idCredito,
+    estado_credito: 'ANULADO',
+    saldo_anterior: credit.saldo_pendiente,
+    saldo_nuevo: 0,
+    monto_inicial: credit.monto_inicial,
+    monto_abonado: credit.monto_abonado,
+  };
 }
 
 export async function createCreditPayment(
