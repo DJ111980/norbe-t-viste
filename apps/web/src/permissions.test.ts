@@ -10,6 +10,7 @@ import {
   canManageVariants,
   canCancelCreditPayments,
   canCancelIndependentCredits,
+  canCreateSaleReturns,
   canManageCreditAdjustments,
   canManageOldDebts,
   canRegisterCreditPayments,
@@ -64,5 +65,10 @@ describe('crud permissions', () => {
     expect(canCancelCreditPayments('VENDEDOR')).toBe(false);
     expect(canCancelIndependentCredits('ADMINISTRADOR')).toBe(true);
     expect(canCancelIndependentCredits('VENDEDOR')).toBe(false);
+  });
+
+  it('solo ADMINISTRADOR registra devoluciones de venta', () => {
+    expect(canCreateSaleReturns('ADMINISTRADOR')).toBe(true);
+    expect(canCreateSaleReturns('VENDEDOR')).toBe(false);
   });
 });

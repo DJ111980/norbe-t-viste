@@ -12,6 +12,7 @@ import { PlaceholderPage } from './pages/PlaceholderPage';
 import { PortfolioPage } from './pages/PortfolioPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { ProvidersPage } from './pages/ProvidersPage';
+import { ReturnsPage } from './pages/ReturnsPage';
 import { SalesPage } from './pages/SalesPage';
 import { VariantsPage } from './pages/VariantsPage';
 import { useRoute } from './routing/useRoute';
@@ -127,6 +128,10 @@ function renderProtectedPage(
 
   if (path === '/creditos') {
     return <PortfolioPage initialView="credits" onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/devoluciones') {
+    return <ReturnsPage onSessionExpired={onSessionExpired} />;
   }
 
   if (path === '/usuarios' && role !== 'ADMINISTRADOR') {

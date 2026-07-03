@@ -622,3 +622,61 @@ export interface ClientPortfolio {
     creadoEn: string;
   } | null;
 }
+
+export type SaleReturnStatus = 'ACTIVA' | 'ANULADA';
+
+export interface SaleReturnDetail {
+  id_detalle_devolucion: string;
+  id_devolucion: string;
+  id_detalle_venta: string;
+  id_variante: string;
+  cantidad_devuelta: number;
+  precio_unitario: number;
+  subtotal_devuelto: number;
+  stock_antes: number;
+  stock_despues: number;
+  id_movimiento: string;
+  creado_en: string;
+}
+
+export interface SaleReturn {
+  idDevolucion: string;
+  idVenta: string;
+  tipoVenta: SaleType;
+  motivo: string;
+  estadoDevolucion: SaleReturnStatus;
+  totalDevuelto: number;
+  impactoCredito: number;
+  impactoPago: number;
+  creadoPor: {
+    idUsuario: string;
+    nombreCompleto: string | null;
+    correo: string | null;
+  };
+  creadoEn: string;
+  anuladoEn: string | null;
+  motivoAnulacion: string | null;
+  detalles: SaleReturnDetail[];
+}
+
+export interface SaleReturnItemFormValues {
+  id_detalle_venta: string;
+  cantidad_devuelta: number;
+}
+
+export interface SaleReturnFormValues {
+  motivo: string;
+  detalles: SaleReturnItemFormValues[];
+}
+
+export interface CreateSaleReturnResult {
+  id_devolucion: string;
+  id_venta: string;
+  tipo_venta: SaleType;
+  estado_devolucion: 'ACTIVA';
+  total_devuelto: number;
+  impacto_credito: number;
+  impacto_pago: number;
+  items_devueltos: number;
+  movimientos_creados: number;
+}
