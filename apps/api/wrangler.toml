@@ -13,10 +13,8 @@ database_name = "norbe-t-viste"
 database_id = "local-norbe-t-viste"
 migrations_dir = "../../db/migrations"
 
-# Binding esperado para Cloudflare R2:
-# [[r2_buckets]]
-# binding = "BUCKET"
-# bucket_name = "NOMBRE_REAL_DEL_BUCKET"
-#
-# El bucket real se define al crear el recurso en Cloudflare. No se incluye un
-# nombre inventado para evitar subir configuracion falsa al repositorio.
+# Binding local/staging para Cloudflare R2. El bucket debe existir en la cuenta
+# real de Cloudflare antes de usar staging/remoto.
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "norbe-t-viste-dev-assets"
