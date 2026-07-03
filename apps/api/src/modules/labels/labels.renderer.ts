@@ -116,8 +116,8 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
     }
 
     .logo {
-      width: 17mm;
-      height: 17mm;
+      width: 21mm;
+      height: 21mm;
       position: relative;
       display: flex;
       align-items: center;

@@ -34,7 +34,6 @@ describe('labels html', () => {
     expect(html).toContain('grid-template-rows: 6mm 23mm 5mm');
     expect(html).toContain('grid-template-columns: 1fr 1fr');
     expect(html).toContain('width: 21mm');
-    expect(html).toContain('width: 17mm');
     expect(html).not.toContain('Escanea para consultar la variante');
   });
 
