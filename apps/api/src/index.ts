@@ -4,6 +4,7 @@ import { handleBrandingRoutes } from './modules/branding/branding.routes';
 import { handleCategoryRoutes } from './modules/categories/categories.routes';
 import { handleClientRoutes } from './modules/clients/clients.routes';
 import { handleCreditRoutes } from './modules/credits/credits.routes';
+import { handleDashboardRoutes } from './modules/dashboard/dashboard.routes';
 import { handleEntryLotRoutes } from './modules/entry-lots/entry-lots.routes';
 import { handleImageRoutes } from './modules/images/images.routes';
 import { handleInventoryRoutes } from './modules/inventory/inventory.routes';
@@ -11,6 +12,7 @@ import { handleLabelRoutes } from './modules/labels/labels.routes';
 import { handlePortfolioRoutes } from './modules/portfolio/portfolio.routes';
 import { handleProductRoutes } from './modules/products/products.routes';
 import { handleProviderRoutes } from './modules/providers/providers.routes';
+import { handleReportRoutes } from './modules/reports/reports.routes';
 import { handleReturnRoutes } from './modules/returns/returns.routes';
 import { handleSaleRoutes } from './modules/sales/sales.routes';
 import { handleUserRoutes } from './modules/users/users.routes';
@@ -20,6 +22,18 @@ import { errorResponse } from './shared/responses';
 import { handleHealthRoutes } from './routes/health.routes';
 
 async function handleRequest(request: Request, env: ApiEnv): Promise<Response> {
+  const dashboardResponse = await handleDashboardRoutes(request, env);
+
+  if (dashboardResponse) {
+    return dashboardResponse;
+  }
+
+  const reportResponse = await handleReportRoutes(request, env);
+
+  if (reportResponse) {
+    return reportResponse;
+  }
+
   const brandingResponse = await handleBrandingRoutes(request, env);
 
   if (brandingResponse) {

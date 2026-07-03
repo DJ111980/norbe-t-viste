@@ -14,7 +14,12 @@ const mocks = vi.hoisted(() => ({
   providers: new Map<string, ProviderForEntryLot>(),
   variants: new Map<string, VariantForEntryLotDetail>(),
   movementCalls: 0,
-  movementInputs: [] as Array<{ stockAntes: number; stockDespues: number; cantidad: number }>,
+  movementInputs: [] as Array<{
+    stockAntes: number;
+    stockDespues: number;
+    cantidad: number;
+    motivo?: string;
+  }>,
 }));
 
 vi.mock('./entry-lots.repository', () => ({
@@ -132,9 +137,39 @@ vi.mock('./entry-lots.repository', () => ({
       });
     }
   }),
+  cancelEntryLot: vi.fn(
+    async (_env: ApiEnv, idLote: string, userId: string, motivo: string, movements) => {
+      for (const movement of movements) {
+        const variant = mocks.variants.get(movement.idVariante);
+        if (variant && mocks.lots.get(idLote)?.estado_lote === 'CONFIRMADO') {
+          variant.stock_actual -= movement.cantidad;
+          mocks.movementCalls += 1;
+          mocks.movementInputs.push({
+            stockAntes: movement.stockAntes,
+            stockDespues: movement.stockDespues,
+            cantidad: movement.cantidad,
+            motivo: movement.motivo,
+          });
+        }
+      }
+
+      const lot = mocks.lots.get(idLote);
+      if (lot?.estado_lote === 'BORRADOR' || lot?.estado_lote === 'CONFIRMADO') {
+        mocks.lots.set(idLote, {
+          ...lot,
+          estado_lote: 'ANULADO',
+          anulado_por: userId,
+          anulado_en: '2026-07-02 10:00:00',
+          motivo_anulacion: motivo,
+          actualizado_por: userId,
+        });
+      }
+    },
+  ),
 }));
 
 const {
+  cancelEntryLot,
   confirmEntryLot,
   createEntryLot,
   createEntryLotDetail,
@@ -489,5 +524,94 @@ describe('entry lots service', () => {
     await expect(confirmEntryLot(env, adminAuth, 'lot_1')).rejects.toMatchObject({
       code: 'PRODUCT_INACTIVE',
     });
+  });
+
+  it('anula lote BORRADOR sin modificar stock ni crear movimientos', async () => {
+    const result = await cancelEntryLot(env, adminAuth, 'lot_1', {
+      motivo: 'Error al registrar el lote',
+    });
+
+    expect(result).toMatchObject({
+      id_lote: 'lot_1',
+      estado_lote: 'ANULADO',
+      detalles_procesados: 0,
+      movimientos_creados: 0,
+      total_unidades_reversadas: 0,
+    });
+    expect(mocks.lots.get('lot_1')?.estado_lote).toBe('ANULADO');
+    expect(mocks.lots.get('lot_1')?.anulado_por).toBe('usr_admin');
+    expect(mocks.lots.get('lot_1')?.motivo_anulacion).toBe('Error al registrar el lote');
+    expect(mocks.variants.get('var_1')?.stock_actual).toBe(7);
+    expect(mocks.movementCalls).toBe(0);
+  });
+
+  it('anula lote CONFIRMADO con stock suficiente y crea movimientos de reversa', async () => {
+    mocks.lots.set('lot_1', buildLot({ estado_lote: 'CONFIRMADO' }));
+    mocks.details.set('det_1', buildDetail({ id_detalle_lote: 'det_1', cantidad: 3 }));
+    mocks.details.set(
+      'det_2',
+      buildDetail({
+        id_detalle_lote: 'det_2',
+        id_variante: 'var_1',
+        cantidad: 2,
+      }),
+    );
+
+    const result = await cancelEntryLot(env, adminAuth, 'lot_1', {
+      motivo: 'Error al registrar el lote',
+    });
+
+    expect(result).toMatchObject({
+      estado_lote: 'ANULADO',
+      detalles_procesados: 2,
+      movimientos_creados: 2,
+      total_unidades_reversadas: 5,
+    });
+    expect(mocks.variants.get('var_1')?.stock_actual).toBe(2);
+    expect(mocks.movementInputs).toEqual([
+      {
+        stockAntes: 7,
+        stockDespues: 4,
+        cantidad: 3,
+        motivo: 'ANULACION_LOTE_ENTRADA: Error al registrar el lote',
+      },
+      {
+        stockAntes: 4,
+        stockDespues: 2,
+        cantidad: 2,
+        motivo: 'ANULACION_LOTE_ENTRADA: Error al registrar el lote',
+      },
+    ]);
+  });
+
+  it('bloquea anulacion de lote CONFIRMADO si el stock no alcanza y no modifica nada', async () => {
+    mocks.lots.set('lot_1', buildLot({ estado_lote: 'CONFIRMADO' }));
+    mocks.details.set('det_1', buildDetail({ cantidad: 8 }));
+
+    await expect(
+      cancelEntryLot(env, adminAuth, 'lot_1', {
+        motivo: 'Error al registrar el lote',
+      }),
+    ).rejects.toMatchObject({ code: 'LOTE_NO_ANULABLE_STOCK_INSUFICIENTE' });
+
+    expect(mocks.lots.get('lot_1')?.estado_lote).toBe('CONFIRMADO');
+    expect(mocks.variants.get('var_1')?.stock_actual).toBe(7);
+    expect(mocks.movementCalls).toBe(0);
+  });
+
+  it('rechaza anular lote inexistente o ya anulado', async () => {
+    await expect(
+      cancelEntryLot(env, adminAuth, 'missing', {
+        motivo: 'Error',
+      }),
+    ).rejects.toMatchObject({ code: 'ENTRY_LOT_NOT_FOUND' });
+
+    mocks.lots.set('lot_anulado', buildLot({ id_lote: 'lot_anulado', estado_lote: 'ANULADO' }));
+
+    await expect(
+      cancelEntryLot(env, adminAuth, 'lot_anulado', {
+        motivo: 'Error',
+      }),
+    ).rejects.toMatchObject({ code: 'LOTE_YA_ANULADO' });
   });
 });

@@ -169,10 +169,26 @@ export interface ConfirmEntryLotMovementInput {
   stockDespues: number;
 }
 
+export interface CancelEntryLotMovementInput extends ConfirmEntryLotMovementInput {
+  motivo: string;
+}
+
 export interface ConfirmEntryLotResult {
   id_lote: string;
   estado_lote: 'CONFIRMADO';
   detalles_procesados: number;
   movimientos_creados: number;
   total_unidades_ingresadas: number;
+}
+
+export interface CancelEntryLotInput {
+  motivo: string;
+}
+
+export interface CancelEntryLotResult {
+  id_lote: string;
+  estado_lote: 'ANULADO';
+  detalles_procesados: number;
+  movimientos_creados: number;
+  total_unidades_reversadas: number;
 }

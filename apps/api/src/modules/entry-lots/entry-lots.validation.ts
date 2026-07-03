@@ -1,5 +1,6 @@
 import { ApiError } from '../../shared/errors';
 import type {
+  CancelEntryLotInput,
   CreateEntryLotDetailInput,
   CreateEntryLotInput,
   EntryLotStatus,
@@ -249,6 +250,22 @@ export function validateUpdateEntryLotDetailInput(body: unknown): UpdateEntryLot
   }
 
   return input;
+}
+
+export function validateCancelEntryLotInput(body: unknown): CancelEntryLotInput {
+  const rawBody = body as { motivo?: unknown };
+
+  if (!rawBody || typeof rawBody !== 'object') {
+    throw new ApiError('INVALID_ENTRY_LOT_CANCEL', 'La anulacion del lote no es valida.', 400);
+  }
+
+  return {
+    motivo: normalizeRequiredText(
+      rawBody.motivo,
+      'INVALID_ENTRY_LOT_CANCEL_REASON',
+      'El motivo de anulacion es obligatorio.',
+    ),
+  };
 }
 
 export function validateListEntryLotsFilters(searchParams: URLSearchParams): ListEntryLotsFilters {

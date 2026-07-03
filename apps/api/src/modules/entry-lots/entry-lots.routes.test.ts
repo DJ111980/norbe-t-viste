@@ -44,6 +44,13 @@ vi.mock('./entry-lots.service', () => ({
     movimientos_creados: 1,
     total_unidades_ingresadas: 2,
   })),
+  cancelEntryLot: vi.fn(async () => ({
+    id_lote: 'lot_1',
+    estado_lote: 'ANULADO',
+    detalles_procesados: 1,
+    movimientos_creados: 1,
+    total_unidades_reversadas: 2,
+  })),
   createEntryLotDetail: vi.fn(async () => ({ idDetalleLote: 'det_1' })),
   updateEntryLotDetail: vi.fn(async () => ({ idDetalleLote: 'det_1' })),
   deleteEntryLotDetail: vi.fn(async () => ({ idDetalleLote: 'det_1', eliminado: true })),
@@ -182,6 +189,40 @@ describe('entry lots routes', () => {
     );
 
     expect(response?.status).toBe(200);
+  });
+
+  it('ADMINISTRADOR puede anular lote', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'ADMINISTRADOR';
+
+    const response = await handleEntryLotRoutes(
+      new Request('http://localhost/lotes-entrada/lot_1/anular', {
+        method: 'POST',
+        body: JSON.stringify({ motivo: 'Error al registrar el lote' }),
+      }),
+      {} as ApiEnv,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(await response?.json()).toMatchObject({
+      ok: true,
+      data: { anulacion: { estado_lote: 'ANULADO' } },
+    });
+  });
+
+  it('VENDEDOR no puede anular lote', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'VENDEDOR';
+
+    await expect(
+      handleEntryLotRoutes(
+        new Request('http://localhost/lotes-entrada/lot_1/anular', {
+          method: 'POST',
+          body: JSON.stringify({ motivo: 'Error' }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
   });
 
   it('VENDEDOR y usuario sin token no pueden confirmar lote', async () => {

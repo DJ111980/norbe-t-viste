@@ -4,6 +4,7 @@ import { ApiError } from '../../shared/errors';
 import { successResponse } from '../../shared/responses';
 import { ensureMethod, readJsonBody } from '../../shared/validation';
 import {
+  cancelEntryLot,
   createEntryLot,
   createEntryLotDetail,
   confirmEntryLot,
@@ -14,6 +15,7 @@ import {
   updateEntryLotDetail,
 } from './entry-lots.service';
 import {
+  validateCancelEntryLotInput,
   validateCreateEntryLotDetailInput,
   validateCreateEntryLotInput,
   validateListEntryLotsFilters,
@@ -93,6 +95,21 @@ export async function handleEntryLotRoutes(
 
       return successResponse({
         confirmacion: await confirmEntryLot(env, auth, lotPath.idLote),
+      });
+    }
+  }
+
+  if (lotPath.action === 'anular' && !lotPath.idDetalle) {
+    if (request.method === 'POST') {
+      requireRole(auth, ['ADMINISTRADOR']);
+
+      return successResponse({
+        anulacion: await cancelEntryLot(
+          env,
+          auth,
+          lotPath.idLote,
+          validateCancelEntryLotInput(await readJsonBody(request)),
+        ),
       });
     }
   }

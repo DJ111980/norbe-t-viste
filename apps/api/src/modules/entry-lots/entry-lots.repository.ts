@@ -3,6 +3,7 @@ import type {
   CreateEntryLotDetailInput,
   CreateEntryLotInput,
   ConfirmEntryLotMovementInput,
+  CancelEntryLotMovementInput,
   EntryLotDetailRecord,
   EntryLotRecord,
   ListEntryLotsFilters,
@@ -481,5 +482,90 @@ export async function confirmEntryLot(
   // D1 ejecuta batch como una unidad transaccional. Ademas cada sentencia queda
   // condicionada a que el lote siga en BORRADOR para reducir el riesgo de una
   // doble confirmacion en ejecuciones cercanas.
+  await env.DB.batch(statements);
+}
+
+export async function cancelEntryLot(
+  env: ApiEnv,
+  idLote: string,
+  userId: string,
+  motivo: string,
+  movements: CancelEntryLotMovementInput[],
+): Promise<void> {
+  const statements: D1PreparedStatement[] = [];
+
+  for (const movement of movements) {
+    statements.push(
+      env.DB.prepare(
+        `
+          UPDATE variantes_producto
+          SET stock_actual = stock_actual - ?,
+              actualizado_en = datetime('now')
+          WHERE id_variante = ?
+            AND stock_actual >= ?
+            AND EXISTS (
+              SELECT 1
+              FROM lotes_entrada
+              WHERE id_lote = ?
+                AND estado_lote = 'CONFIRMADO'
+            )
+        `,
+      ).bind(movement.cantidad, movement.idVariante, movement.cantidad, idLote),
+    );
+
+    statements.push(
+      env.DB.prepare(
+        `
+          INSERT INTO movimientos_inventario (
+            id_movimiento,
+            id_variante,
+            creado_por,
+            tipo_movimiento,
+            cantidad,
+            stock_antes,
+            stock_despues,
+            motivo,
+            referencia_tipo,
+            referencia_id,
+            creado_en
+          )
+          SELECT ?, ?, ?, 'AJUSTE_NEGATIVO', ?, ?, ?, ?, 'LOTE_ENTRADA', ?, datetime('now')
+          WHERE EXISTS (
+            SELECT 1
+            FROM lotes_entrada
+            WHERE id_lote = ?
+              AND estado_lote = 'CONFIRMADO'
+          )
+        `,
+      ).bind(
+        movement.idMovimiento,
+        movement.idVariante,
+        userId,
+        movement.cantidad,
+        movement.stockAntes,
+        movement.stockDespues,
+        movement.motivo,
+        idLote,
+        idLote,
+      ),
+    );
+  }
+
+  statements.push(
+    env.DB.prepare(
+      `
+        UPDATE lotes_entrada
+        SET estado_lote = 'ANULADO',
+            anulado_por = ?,
+            anulado_en = datetime('now'),
+            motivo_anulacion = ?,
+            actualizado_por = ?,
+            actualizado_en = datetime('now')
+        WHERE id_lote = ?
+          AND estado_lote IN ('BORRADOR', 'CONFIRMADO')
+      `,
+    ).bind(userId, motivo, userId, idLote),
+  );
+
   await env.DB.batch(statements);
 }

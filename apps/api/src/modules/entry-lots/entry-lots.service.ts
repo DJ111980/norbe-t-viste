@@ -8,6 +8,8 @@ import {
 } from './entry-lots.mapper';
 import * as entryLotsRepository from './entry-lots.repository';
 import type {
+  CancelEntryLotInput,
+  CancelEntryLotResult,
   CreateEntryLotDetailInput,
   CreateEntryLotInput,
   ConfirmEntryLotResult,
@@ -55,6 +57,12 @@ function assertConfirmableDraft(lot: EntryLotRecord): void {
 
   if (lot.estado_lote === 'ANULADO') {
     throw new ApiError('ENTRY_LOT_CANCELLED', 'No se puede confirmar un lote anulado.', 400);
+  }
+}
+
+function assertCancellableLot(lot: EntryLotRecord): void {
+  if (lot.estado_lote === 'ANULADO') {
+    throw new ApiError('LOTE_YA_ANULADO', 'El lote ya esta anulado.', 400);
   }
 }
 
@@ -318,5 +326,70 @@ export async function confirmEntryLot(
     detalles_procesados: details.length,
     movimientos_creados: movements.length,
     total_unidades_ingresadas: totalUnidades,
+  };
+}
+
+export async function cancelEntryLot(
+  env: ApiEnv,
+  auth: AuthContext,
+  idLote: string,
+  input: CancelEntryLotInput,
+): Promise<CancelEntryLotResult> {
+  const lot = await ensureEntryLot(env, idLote);
+  assertCancellableLot(lot);
+
+  if (lot.estado_lote === 'BORRADOR') {
+    await entryLotsRepository.cancelEntryLot(env, idLote, auth.user.id_usuario, input.motivo, []);
+
+    return {
+      id_lote: idLote,
+      estado_lote: 'ANULADO',
+      detalles_procesados: 0,
+      movimientos_creados: 0,
+      total_unidades_reversadas: 0,
+    };
+  }
+
+  const details = await entryLotsRepository.findEntryLotDetails(env, idLote);
+  const stockByVariant = new Map<string, number>();
+  const movements = details.map((detail) => {
+    const stockAntes = stockByVariant.get(detail.id_variante) ?? detail.stock_actual;
+    const stockDespues = stockAntes - detail.cantidad;
+
+    if (stockDespues < 0) {
+      throw new ApiError(
+        'LOTE_NO_ANULABLE_STOCK_INSUFICIENTE',
+        'No hay stock suficiente para reversar el lote completo.',
+        409,
+      );
+    }
+
+    stockByVariant.set(detail.id_variante, stockDespues);
+
+    return {
+      idMovimiento: createId('mov'),
+      idVariante: detail.id_variante,
+      cantidad: detail.cantidad,
+      stockAntes,
+      stockDespues,
+      motivo: `ANULACION_LOTE_ENTRADA: ${input.motivo}`,
+    };
+  });
+  const totalUnidades = details.reduce((total, detail) => total + detail.cantidad, 0);
+
+  await entryLotsRepository.cancelEntryLot(
+    env,
+    idLote,
+    auth.user.id_usuario,
+    input.motivo,
+    movements,
+  );
+
+  return {
+    id_lote: idLote,
+    estado_lote: 'ANULADO',
+    detalles_procesados: details.length,
+    movimientos_creados: movements.length,
+    total_unidades_reversadas: totalUnidades,
   };
 }
