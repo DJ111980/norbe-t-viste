@@ -5,8 +5,10 @@ import type {
   CancelSalePersistenceStatus,
   CreateCashSaleRepositoryInput,
   CreateCreditSaleRepositoryInput,
+  CreateMixedSaleRepositoryInput,
   CreditSalePersistenceStatus,
   ListSalesFilters,
+  MixedSalePersistenceStatus,
   SaleClientRecord,
   SaleDetailRecord,
   SaleDetailViewRecord,
@@ -575,6 +577,344 @@ export async function getCreditSalePersistenceStatus(
     saleExists: Boolean(row?.saleExists),
     creditExists: Boolean(row?.creditExists),
     paymentExists: Boolean(row?.paymentExists),
+    creditPaymentExists: Boolean(row?.creditPaymentExists),
+    creditAdjustmentExists: Boolean(row?.creditAdjustmentExists),
+    movementCount: row?.movementCount ?? 0,
+    detailsCount: row?.detailsCount ?? 0,
+    creditDetailsCount: row?.creditDetailsCount ?? 0,
+    stockMatchesCount: stockMatchesCount.filter((item) => Boolean(item?.stockMatches)).length,
+  };
+}
+
+export async function createMixedSale(
+  env: ApiEnv,
+  input: CreateMixedSaleRepositoryInput,
+): Promise<void> {
+  const statements: D1PreparedStatement[] = [
+    env.DB.prepare(
+      `
+        INSERT INTO ventas (
+          id_venta,
+          numero_venta,
+          id_cliente,
+          id_usuario,
+          tipo_venta,
+          subtotal,
+          descuento,
+          total,
+          valor_pagado_inicial,
+          saldo_pendiente,
+          estado_venta,
+          observaciones,
+          actualizado_por,
+          creado_en,
+          actualizado_en
+        ) VALUES (?, ?, ?, ?, 'MIXTA', ?, 0, ?, ?, ?, 'COMPLETADA', ?, ?, datetime('now'), datetime('now'))
+      `,
+    ).bind(
+      input.idVenta,
+      input.numeroVenta,
+      input.idCliente,
+      input.idUsuario,
+      input.subtotal,
+      input.total,
+      input.valorPagadoInicial,
+      input.saldoCredito,
+      input.observaciones,
+      input.idUsuario,
+    ),
+    env.DB.prepare(
+      `
+        INSERT INTO pagos_ventas (
+          id_pago_venta,
+          id_venta,
+          metodo_pago,
+          valor_pagado,
+          observaciones,
+          id_usuario,
+          estado_pago,
+          creado_en
+        )
+        SELECT ?, ?, ?, ?, 'Pago inicial de venta mixta', ?, 'ACTIVO', datetime('now')
+        WHERE EXISTS (
+          SELECT 1
+          FROM ventas
+          WHERE id_venta = ?
+            AND tipo_venta = 'MIXTA'
+            AND valor_pagado_inicial = ?
+        )
+      `,
+    ).bind(
+      input.idPagoVenta,
+      input.idVenta,
+      input.metodoPago,
+      input.valorPagadoInicial,
+      input.idUsuario,
+      input.idVenta,
+      input.valorPagadoInicial,
+    ),
+    env.DB.prepare(
+      `
+        INSERT INTO creditos_clientes (
+          id_credito,
+          id_cliente,
+          id_venta,
+          id_usuario,
+          origen_credito,
+          tipo_deuda_antigua,
+          descripcion_credito,
+          monto_inicial,
+          monto_abonado,
+          saldo_pendiente,
+          fecha_credito,
+          estado_credito,
+          observaciones,
+          actualizado_por,
+          creado_en,
+          actualizado_en
+        )
+        SELECT ?, ?, ?, ?, 'VENTA', NULL, ?, ?, 0, ?, datetime('now'), 'PENDIENTE', ?, ?, datetime('now'), datetime('now')
+        WHERE EXISTS (
+          SELECT 1
+          FROM ventas
+          WHERE id_venta = ?
+            AND tipo_venta = 'MIXTA'
+            AND saldo_pendiente = ?
+        )
+      `,
+    ).bind(
+      input.idCredito,
+      input.idCliente,
+      input.idVenta,
+      input.idUsuario,
+      'Saldo restante de venta mixta',
+      input.saldoCredito,
+      input.saldoCredito,
+      input.observaciones,
+      input.idUsuario,
+      input.idVenta,
+      input.saldoCredito,
+    ),
+  ];
+
+  for (const detail of input.detalles) {
+    statements.push(
+      env.DB.prepare(
+        `
+          INSERT INTO detalle_ventas (
+            id_detalle_venta,
+            id_venta,
+            id_variante,
+            codigo_qr,
+            nombre_producto,
+            sku,
+            talla,
+            color,
+            cantidad,
+            precio_unitario,
+            descuento,
+            subtotal,
+            creado_en
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, datetime('now'))
+        `,
+      ).bind(
+        detail.idDetalleVenta,
+        input.idVenta,
+        detail.idVariante,
+        detail.codigoQr,
+        detail.nombreProducto,
+        detail.sku,
+        detail.talla,
+        detail.color,
+        detail.cantidad,
+        detail.precioUnitario,
+        detail.subtotal,
+      ),
+    );
+
+    statements.push(
+      env.DB.prepare(
+        `
+          UPDATE variantes_producto
+          SET stock_actual = stock_actual - ?,
+              actualizado_en = datetime('now')
+          WHERE id_variante = ?
+            AND stock_actual >= ?
+        `,
+      ).bind(detail.cantidad, detail.idVariante, detail.cantidad),
+    );
+
+    statements.push(
+      env.DB.prepare(
+        `
+          INSERT INTO movimientos_inventario (
+            id_movimiento,
+            id_variante,
+            creado_por,
+            tipo_movimiento,
+            cantidad,
+            stock_antes,
+            stock_despues,
+            motivo,
+            referencia_tipo,
+            referencia_id,
+            creado_en
+          )
+          SELECT ?, ?, ?, 'VENTA', ?, ?, ?, 'Venta mixta', 'VENTA', ?, datetime('now')
+          WHERE EXISTS (
+            SELECT 1
+            FROM variantes_producto
+            WHERE id_variante = ?
+              AND stock_actual = ?
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM ventas
+            WHERE id_venta = ?
+              AND tipo_venta = 'MIXTA'
+          )
+        `,
+      ).bind(
+        detail.idMovimiento,
+        detail.idVariante,
+        input.idUsuario,
+        detail.cantidad,
+        detail.stockAntes,
+        detail.stockDespues,
+        input.idVenta,
+        detail.idVariante,
+        detail.stockDespues,
+        input.idVenta,
+      ),
+    );
+
+    statements.push(
+      env.DB.prepare(
+        `
+          INSERT INTO detalle_creditos (
+            id_detalle_credito,
+            id_credito,
+            id_variante,
+            nombre_producto,
+            sku,
+            talla,
+            color,
+            cantidad,
+            precio_unitario,
+            subtotal,
+            observaciones,
+            creado_en
+          )
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Detalle creado desde venta mixta', datetime('now')
+          WHERE EXISTS (
+            SELECT 1
+            FROM creditos_clientes
+            WHERE id_credito = ?
+              AND id_venta = ?
+              AND origen_credito = 'VENTA'
+          )
+        `,
+      ).bind(
+        `credet_${detail.idDetalleVenta}`,
+        input.idCredito,
+        detail.idVariante,
+        detail.nombreProducto,
+        detail.sku,
+        detail.talla,
+        detail.color,
+        detail.cantidad,
+        detail.precioUnitario,
+        detail.subtotal,
+        input.idCredito,
+        input.idVenta,
+      ),
+    );
+  }
+
+  // En MIXTA el pago inicial vive en pagos_ventas y no es abono al credito.
+  // El credito nace solo por el saldo restante; la anulacion de este flujo se
+  // implementara aparte porque debe coordinar pago, credito y stock.
+  await env.DB.batch(statements);
+}
+
+export async function getMixedSalePersistenceStatus(
+  env: ApiEnv,
+  idVenta: string,
+  idCredito: string,
+  expectedStocks: Array<{ idVariante: string; stockDespues: number }>,
+): Promise<MixedSalePersistenceStatus> {
+  const row = await env.DB.prepare(
+    `
+      SELECT
+        EXISTS(SELECT 1 FROM ventas WHERE id_venta = ? AND tipo_venta = 'MIXTA') AS saleExists,
+        (SELECT COUNT(*) FROM pagos_ventas WHERE id_venta = ? AND estado_pago = 'ACTIVO') AS paymentCount,
+        EXISTS(SELECT 1 FROM creditos_clientes WHERE id_credito = ? AND id_venta = ? AND origen_credito = 'VENTA') AS creditExists,
+        (SELECT monto_inicial FROM creditos_clientes WHERE id_credito = ?) AS creditInitialAmount,
+        (SELECT monto_abonado FROM creditos_clientes WHERE id_credito = ?) AS creditPaidAmount,
+        (SELECT saldo_pendiente FROM creditos_clientes WHERE id_credito = ?) AS creditBalance,
+        (SELECT estado_credito FROM creditos_clientes WHERE id_credito = ?) AS creditStatus,
+        EXISTS(SELECT 1 FROM abonos_creditos WHERE id_credito = ?) AS creditPaymentExists,
+        EXISTS(SELECT 1 FROM ajustes_creditos WHERE id_credito = ?) AS creditAdjustmentExists,
+        (SELECT COUNT(*) FROM movimientos_inventario WHERE referencia_tipo = 'VENTA' AND referencia_id = ?) AS movementCount,
+        (SELECT COUNT(*) FROM detalle_ventas WHERE id_venta = ?) AS detailsCount,
+        (SELECT COUNT(*) FROM detalle_creditos WHERE id_credito = ?) AS creditDetailsCount
+    `,
+  )
+    .bind(
+      idVenta,
+      idVenta,
+      idCredito,
+      idVenta,
+      idCredito,
+      idCredito,
+      idCredito,
+      idCredito,
+      idCredito,
+      idCredito,
+      idVenta,
+      idVenta,
+      idCredito,
+    )
+    .first<{
+      saleExists: number;
+      paymentCount: number;
+      creditExists: number;
+      creditInitialAmount: number | null;
+      creditPaidAmount: number | null;
+      creditBalance: number | null;
+      creditStatus: string | null;
+      creditPaymentExists: number;
+      creditAdjustmentExists: number;
+      movementCount: number;
+      detailsCount: number;
+      creditDetailsCount: number;
+    }>();
+
+  const stockMatchesCount = await Promise.all(
+    expectedStocks.map((stock) =>
+      env.DB.prepare(
+        `
+          SELECT EXISTS(
+            SELECT 1
+            FROM variantes_producto
+            WHERE id_variante = ?
+              AND stock_actual = ?
+          ) AS stockMatches
+        `,
+      )
+        .bind(stock.idVariante, stock.stockDespues)
+        .first<{ stockMatches: number }>(),
+    ),
+  );
+
+  return {
+    saleExists: Boolean(row?.saleExists),
+    paymentCount: row?.paymentCount ?? 0,
+    creditExists: Boolean(row?.creditExists),
+    creditInitialAmount: row?.creditInitialAmount ?? null,
+    creditPaidAmount: row?.creditPaidAmount ?? null,
+    creditBalance: row?.creditBalance ?? null,
+    creditStatus: row?.creditStatus ?? null,
     creditPaymentExists: Boolean(row?.creditPaymentExists),
     creditAdjustmentExists: Boolean(row?.creditAdjustmentExists),
     movementCount: row?.movementCount ?? 0,

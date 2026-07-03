@@ -89,25 +89,31 @@ export function validateCreateSaleInput(body: unknown): CreateSaleInput {
   const rawBody = body as {
     tipo_venta?: unknown;
     id_cliente?: unknown;
+    valor_pagado_inicial?: unknown;
     metodo_pago?: unknown;
     observaciones?: unknown;
     detalles?: unknown;
+    abonos?: unknown;
   };
 
   if (!rawBody || typeof rawBody !== 'object') {
     throw new ApiError('INVALID_SALE', 'La venta enviada no es valida.', 400);
   }
 
-  if (rawBody.tipo_venta === 'MIXTA') {
-    throw new ApiError(
-      'MIXED_SALE_NOT_ALLOWED',
-      'La venta mixta queda para una fase posterior.',
-      400,
-    );
+  if (
+    rawBody.tipo_venta !== 'CONTADO' &&
+    rawBody.tipo_venta !== 'CREDITO' &&
+    rawBody.tipo_venta !== 'MIXTA'
+  ) {
+    throw new ApiError('INVALID_SALE_TYPE', 'El tipo de venta no es valido.', 400);
   }
 
-  if (rawBody.tipo_venta !== 'CONTADO' && rawBody.tipo_venta !== 'CREDITO') {
-    throw new ApiError('INVALID_SALE_TYPE', 'El tipo de venta no es valido.', 400);
+  if (rawBody.abonos !== undefined) {
+    throw new ApiError(
+      'SALE_INSTALLMENTS_NOT_ALLOWED',
+      'La venta no debe incluir abonos en el cuerpo de la solicitud.',
+      400,
+    );
   }
 
   if (!Array.isArray(rawBody.detalles) || rawBody.detalles.length === 0) {
@@ -185,6 +191,25 @@ export function validateCreateSaleInput(body: unknown): CreateSaleInput {
 
   if (!PAYMENT_METHODS.includes(metodoPago as PaymentMethod)) {
     throw new ApiError('INVALID_PAYMENT_METHOD', 'El metodo de pago no es valido.', 400);
+  }
+
+  if (rawBody.tipo_venta === 'MIXTA') {
+    return {
+      tipoVenta: 'MIXTA',
+      idCliente: normalizeRequiredText(
+        rawBody.id_cliente,
+        'MIXED_SALE_CLIENT_REQUIRED',
+        'El cliente es obligatorio para una venta mixta.',
+      ),
+      valorPagadoInicial: parsePositiveInteger(
+        rawBody.valor_pagado_inicial,
+        'INVALID_MIXED_SALE_INITIAL_PAYMENT',
+        'El pago inicial de una venta mixta debe ser mayor que 0.',
+      ),
+      metodoPago: metodoPago as PaymentMethod,
+      observaciones: normalizeOptionalText(rawBody.observaciones),
+      detalles,
+    };
   }
 
   return {

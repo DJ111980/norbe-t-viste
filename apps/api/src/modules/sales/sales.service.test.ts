@@ -216,6 +216,111 @@ vi.mock('./sales.repository', () => ({
       ).length,
     }),
   ),
+  createMixedSale: vi.fn(async (_env: ApiEnv, input) => {
+    mocks.sales.push(
+      buildSale({
+        id_venta: input.idVenta,
+        numero_venta: input.numeroVenta,
+        id_cliente: input.idCliente,
+        id_usuario: input.idUsuario,
+        tipo_venta: 'MIXTA',
+        total: input.total,
+        subtotal: input.subtotal,
+        valor_pagado_inicial: input.valorPagadoInicial,
+        saldo_pendiente: input.saldoCredito,
+        cantidad_items: input.detalles.reduce(
+          (sum: number, detail: { cantidad: number }) => sum + detail.cantidad,
+          0,
+        ),
+      }),
+    );
+    mocks.payments.push(
+      buildPayment({
+        id_pago_venta: input.idPagoVenta,
+        id_venta: input.idVenta,
+        metodo_pago: input.metodoPago,
+        valor_pagado: input.valorPagadoInicial,
+      }),
+    );
+    mocks.credits.push({
+      id_credito: input.idCredito,
+      id_cliente: input.idCliente,
+      id_venta: input.idVenta,
+      origen_credito: 'VENTA',
+      monto_inicial: input.saldoCredito,
+      monto_abonado: 0,
+      saldo_pendiente: input.saldoCredito,
+      estado_credito: 'PENDIENTE',
+    });
+
+    for (const detail of input.detalles) {
+      const variant = mocks.variants.find((item) => item.id_variante === detail.idVariante);
+      if (!variant || variant.stock_actual < detail.cantidad) continue;
+
+      variant.stock_actual -= detail.cantidad;
+      mocks.details.push(
+        buildDetail({
+          id_detalle_venta: detail.idDetalleVenta,
+          id_venta: input.idVenta,
+          id_variante: detail.idVariante,
+          nombre_producto: detail.nombreProducto,
+          sku: detail.sku,
+          talla: detail.talla,
+          color: detail.color,
+          codigo_qr: detail.codigoQr,
+          cantidad: detail.cantidad,
+          precio_unitario: detail.precioUnitario,
+          subtotal: detail.subtotal,
+        }),
+      );
+      mocks.creditDetails.push({
+        id_credito: input.idCredito,
+        id_variante: detail.idVariante,
+        cantidad: detail.cantidad,
+        precio_unitario: detail.precioUnitario,
+        subtotal: detail.subtotal,
+      });
+      mocks.movements.push({
+        tipo_movimiento: 'VENTA',
+        stock_antes: detail.stockAntes,
+        stock_despues: detail.stockDespues,
+        referencia_tipo: 'VENTA',
+        referencia_id: input.idVenta,
+      });
+    }
+  }),
+  getMixedSalePersistenceStatus: vi.fn(
+    async (
+      _env: ApiEnv,
+      idVenta: string,
+      idCredito: string,
+      expectedStocks: Array<{ idVariante: string; stockDespues: number }>,
+    ) => {
+      const credit = mocks.credits.find((item) => item.id_credito === idCredito);
+
+      return {
+        saleExists: mocks.sales.some((sale) => sale.id_venta === idVenta),
+        paymentCount: mocks.payments.filter((payment) => payment.id_venta === idVenta).length,
+        creditExists: Boolean(credit?.id_venta === idVenta),
+        creditInitialAmount: credit?.monto_inicial ?? null,
+        creditPaidAmount: credit?.monto_abonado ?? null,
+        creditBalance: credit?.saldo_pendiente ?? null,
+        creditStatus: credit?.estado_credito ?? null,
+        creditPaymentExists: mocks.installments.length > 0,
+        creditAdjustmentExists: mocks.adjustments.length > 0,
+        movementCount: mocks.movements.filter((movement) => movement.referencia_id === idVenta)
+          .length,
+        detailsCount: mocks.details.filter((detail) => detail.id_venta === idVenta).length,
+        creditDetailsCount: mocks.creditDetails.filter((detail) => detail.id_credito === idCredito)
+          .length,
+        stockMatchesCount: expectedStocks.filter(
+          (stock) =>
+            mocks.variants.find((variant) => variant.id_variante === stock.idVariante)
+              ?.stock_actual === stock.stockDespues,
+        ).length,
+      };
+    },
+  ),
   listSales: vi.fn(async (_env: ApiEnv, filters: ListSalesFilters) => {
     mocks.lastListFilters = filters;
     return mocks.sales.filter((sale) => {
@@ -560,6 +665,121 @@ describe('sales service', () => {
     });
     expect(sale.pagos).toHaveLength(0);
     expect(sale.resumen.pagosRegistrados).toBe(0);
+  });
+
+  it('ADMINISTRADOR crea venta mixta con pago inicial y credito por saldo restante', async () => {
+    mocks.sales = [];
+    mocks.payments = [];
+    mocks.details = [];
+
+    const result = await createSale(env, adminAuth, {
+      tipoVenta: 'MIXTA',
+      idCliente: 'cli_1',
+      valorPagadoInicial: 40000,
+      metodoPago: 'EFECTIVO',
+      observaciones: 'Venta mixta',
+      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 100000 }],
+    });
+
+    expect(result).toMatchObject({
+      tipo_venta: 'MIXTA',
+      total: 100000,
+      valor_pagado_inicial: 40000,
+      saldo_pendiente: 60000,
+      estado_credito: 'PENDIENTE',
+      items_vendidos: 1,
+      movimientos_creados: 1,
+    });
+    expect(mocks.payments[0]).toMatchObject({
+      metodo_pago: 'EFECTIVO',
+      valor_pagado: 40000,
+      estado_pago: 'ACTIVO',
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      origen_credito: 'VENTA',
+      id_venta: result.id_venta,
+      monto_inicial: 60000,
+      monto_abonado: 0,
+      saldo_pendiente: 60000,
+      estado_credito: 'PENDIENTE',
+    });
+    expect(mocks.variants.find((variant) => variant.id_variante === 'var_1')?.stock_actual).toBe(2);
+    expect(mocks.movements[0]).toMatchObject({
+      tipo_movimiento: 'VENTA',
+      stock_antes: 3,
+      stock_despues: 2,
+      referencia_tipo: 'VENTA',
+    });
+    expect(mocks.installments).toHaveLength(0);
+    expect(mocks.adjustments).toHaveLength(0);
+    expect(mocks.images).toHaveLength(0);
+    expect(mocks.labels).toHaveLength(0);
+  });
+
+  it('VENDEDOR puede crear venta mixta', async () => {
+    mocks.sales = [];
+    mocks.payments = [];
+    mocks.details = [];
+
+    const result = await createSale(env, sellerAuth, {
+      tipoVenta: 'MIXTA',
+      idCliente: 'cli_1',
+      valorPagadoInicial: 30000,
+      metodoPago: 'NEQUI',
+      observaciones: null,
+      detalles: [{ idVariante: 'var_1', cantidad: 2 }],
+    });
+
+    expect(result).toMatchObject({
+      total: 100000,
+      valor_pagado_inicial: 30000,
+      saldo_pendiente: 70000,
+    });
+    expect(mocks.sales[0]?.id_usuario).toBe('usr_seller');
+    expect(mocks.credits[0]?.saldo_pendiente).toBe(70000);
+  });
+
+  it('venta mixta rechaza pago inicial mayor o igual al total', async () => {
+    await expect(
+      createSale(env, adminAuth, {
+        tipoVenta: 'MIXTA',
+        idCliente: 'cli_1',
+        valorPagadoInicial: 50000,
+        metodoPago: 'EFECTIVO',
+        observaciones: null,
+        detalles: [{ idVariante: 'var_1', cantidad: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'MIXED_SALE_INITIAL_PAYMENT_MUST_BE_LESS_THAN_TOTAL' });
+  });
+
+  it('GET de venta mixta refleja pago inicial y saldo pendiente', async () => {
+    mocks.sales = [];
+    mocks.payments = [];
+    mocks.details = [];
+
+    const result = await createSale(env, adminAuth, {
+      tipoVenta: 'MIXTA',
+      idCliente: 'cli_1',
+      valorPagadoInicial: 40000,
+      metodoPago: 'TRANSFERENCIA',
+      observaciones: 'Venta mixta',
+      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 100000 }],
+    });
+
+    const sale = await getSaleById(env, adminAuth, result.id_venta);
+    const payments = await listSalePayments(env, adminAuth, result.id_venta);
+
+    expect(sale).toMatchObject({
+      tipoVenta: 'MIXTA',
+      total: 100000,
+      valorPagadoInicial: 40000,
+      saldoPendiente: 60000,
+    });
+    expect(payments).toHaveLength(1);
+    expect(payments[0]).toMatchObject({
+      metodoPago: 'TRANSFERENCIA',
+      monto: 40000,
+    });
   });
 
   it('valida cliente activo si viene informado', async () => {

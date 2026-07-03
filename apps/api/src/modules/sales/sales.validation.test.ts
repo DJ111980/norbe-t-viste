@@ -41,15 +41,27 @@ describe('sales validation', () => {
     });
   });
 
-  it('rechaza MIXTA en esta fase y pago enviado en venta a credito', () => {
-    expect(() =>
-      validateCreateSaleInput({
-        tipo_venta: 'MIXTA',
-        metodo_pago: 'EFECTIVO',
-        detalles: [{ id_variante: 'var_1', cantidad: 1 }],
-      }),
-    ).toThrowError(expect.objectContaining({ code: 'MIXED_SALE_NOT_ALLOWED' }));
+  it('valida venta mixta con pago inicial', () => {
+    const input = validateCreateSaleInput({
+      tipo_venta: 'MIXTA',
+      id_cliente: 'cli_1',
+      valor_pagado_inicial: 40000,
+      metodo_pago: 'EFECTIVO',
+      observaciones: ' Venta mixta ',
+      detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 100000 }],
+    });
 
+    expect(input).toEqual({
+      tipoVenta: 'MIXTA',
+      idCliente: 'cli_1',
+      valorPagadoInicial: 40000,
+      metodoPago: 'EFECTIVO',
+      observaciones: 'Venta mixta',
+      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 100000 }],
+    });
+  });
+
+  it('rechaza pago enviado en credito y body invalido de mixta', () => {
     expect(() =>
       validateCreateSaleInput({
         tipo_venta: 'CREDITO',
@@ -65,6 +77,55 @@ describe('sales validation', () => {
         detalles: [{ id_variante: 'var_1', cantidad: 1 }],
       }),
     ).toThrowError(expect.objectContaining({ code: 'CREDIT_SALE_CLIENT_REQUIRED' }));
+
+    expect(() =>
+      validateCreateSaleInput({
+        tipo_venta: 'MIXTA',
+        valor_pagado_inicial: 40000,
+        metodo_pago: 'EFECTIVO',
+        detalles: [{ id_variante: 'var_1', cantidad: 1 }],
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'MIXED_SALE_CLIENT_REQUIRED' }));
+
+    expect(() =>
+      validateCreateSaleInput({
+        tipo_venta: 'MIXTA',
+        id_cliente: 'cli_1',
+        valor_pagado_inicial: 0,
+        metodo_pago: 'EFECTIVO',
+        detalles: [{ id_variante: 'var_1', cantidad: 1 }],
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_MIXED_SALE_INITIAL_PAYMENT' }));
+
+    expect(() =>
+      validateCreateSaleInput({
+        tipo_venta: 'MIXTA',
+        id_cliente: 'cli_1',
+        valor_pagado_inicial: 10000,
+        detalles: [{ id_variante: 'var_1', cantidad: 1 }],
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'PAYMENT_METHOD_REQUIRED' }));
+
+    expect(() =>
+      validateCreateSaleInput({
+        tipo_venta: 'MIXTA',
+        id_cliente: 'cli_1',
+        valor_pagado_inicial: 10000,
+        metodo_pago: 'BITCOIN',
+        detalles: [{ id_variante: 'var_1', cantidad: 1 }],
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_PAYMENT_METHOD' }));
+
+    expect(() =>
+      validateCreateSaleInput({
+        tipo_venta: 'MIXTA',
+        id_cliente: 'cli_1',
+        valor_pagado_inicial: 10000,
+        metodo_pago: 'EFECTIVO',
+        abonos: [{ valor: 1000 }],
+        detalles: [{ id_variante: 'var_1', cantidad: 1 }],
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'SALE_INSTALLMENTS_NOT_ALLOWED' }));
   });
 
   it('rechaza venta sin detalles', () => {

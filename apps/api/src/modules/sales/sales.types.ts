@@ -24,7 +24,16 @@ export interface CreateCreditSaleInput {
   detalles: CreateCashSaleDetailInput[];
 }
 
-export type CreateSaleInput = CreateCashSaleInput | CreateCreditSaleInput;
+export interface CreateMixedSaleInput {
+  tipoVenta: 'MIXTA';
+  idCliente: string;
+  valorPagadoInicial: number;
+  metodoPago: PaymentMethod;
+  observaciones: string | null;
+  detalles: CreateCashSaleDetailInput[];
+}
+
+export type CreateSaleInput = CreateCashSaleInput | CreateCreditSaleInput | CreateMixedSaleInput;
 
 export interface CancelCashSaleInput {
   motivoAnulacion: string;
@@ -236,6 +245,22 @@ export interface CreateCreditSaleRepositoryInput {
   detalles: SaleDetailToCreate[];
 }
 
+export interface CreateMixedSaleRepositoryInput {
+  idVenta: string;
+  numeroVenta: string;
+  idPagoVenta: string;
+  idCredito: string;
+  idCliente: string;
+  idUsuario: string;
+  metodoPago: PaymentMethod;
+  observaciones: string | null;
+  subtotal: number;
+  total: number;
+  valorPagadoInicial: number;
+  saldoCredito: number;
+  detalles: SaleDetailToCreate[];
+}
+
 export interface CashSalePersistenceStatus {
   saleExists: boolean;
   paymentExists: boolean;
@@ -247,6 +272,22 @@ export interface CreditSalePersistenceStatus {
   saleExists: boolean;
   creditExists: boolean;
   paymentExists: boolean;
+  creditPaymentExists: boolean;
+  creditAdjustmentExists: boolean;
+  movementCount: number;
+  detailsCount: number;
+  creditDetailsCount: number;
+  stockMatchesCount: number;
+}
+
+export interface MixedSalePersistenceStatus {
+  saleExists: boolean;
+  paymentCount: number;
+  creditExists: boolean;
+  creditInitialAmount: number | null;
+  creditPaidAmount: number | null;
+  creditBalance: number | null;
+  creditStatus: string | null;
   creditPaymentExists: boolean;
   creditAdjustmentExists: boolean;
   movementCount: number;
@@ -305,7 +346,23 @@ export interface CreateCreditSaleResult {
   movimientos_creados: number;
 }
 
-export type CreateSaleResult = CreateCashSaleResult | CreateCreditSaleResult;
+export interface CreateMixedSaleResult {
+  id_venta: string;
+  numero_venta: string;
+  tipo_venta: 'MIXTA';
+  estado_venta: 'COMPLETADA';
+  total: number;
+  valor_pagado_inicial: number;
+  saldo_pendiente: number;
+  id_pago: string;
+  id_credito: string;
+  estado_credito: 'PENDIENTE';
+  items_vendidos: number;
+  movimientos_creados: number;
+}
+
+export type CreateSaleResult =
+  CreateCashSaleResult | CreateCreditSaleResult | CreateMixedSaleResult;
 
 export interface CancelCashSaleResult {
   id_venta: string;

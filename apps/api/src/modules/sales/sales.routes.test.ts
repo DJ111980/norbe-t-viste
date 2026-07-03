@@ -81,8 +81,10 @@ vi.mock('./sales.service', () => ({
     estado_venta: 'COMPLETADA',
     total: 50000,
     saldo_pendiente: input.tipoVenta === 'CREDITO' ? 50000 : 0,
-    id_credito: input.tipoVenta === 'CREDITO' ? 'cre_1' : undefined,
-    estado_credito: input.tipoVenta === 'CREDITO' ? 'PENDIENTE' : undefined,
+    valor_pagado_inicial: input.tipoVenta === 'MIXTA' ? input.valorPagadoInicial : undefined,
+    id_pago: input.tipoVenta === 'MIXTA' ? 'pag_1' : undefined,
+    id_credito: input.tipoVenta === 'CONTADO' ? undefined : 'cre_1',
+    estado_credito: input.tipoVenta === 'CONTADO' ? undefined : 'PENDIENTE',
     items_vendidos: 1,
     movimientos_creados: 1,
     pago:
@@ -161,6 +163,43 @@ describe('sales routes', () => {
             tipo_venta: 'CREDITO',
             id_cliente: 'cli_1',
             detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000 }],
+          }),
+          {} as ApiEnv,
+        )
+      )?.status,
+    ).toBe(201);
+  });
+
+  it('ADMINISTRADOR y VENDEDOR pueden crear venta mixta', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'ADMINISTRADOR';
+
+    expect(
+      (
+        await handleSaleRoutes(
+          buildRequest({
+            tipo_venta: 'MIXTA',
+            id_cliente: 'cli_1',
+            valor_pagado_inicial: 40000,
+            metodo_pago: 'EFECTIVO',
+            detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 100000 }],
+          }),
+          {} as ApiEnv,
+        )
+      )?.status,
+    ).toBe(201);
+
+    mocks.role = 'VENDEDOR';
+
+    expect(
+      (
+        await handleSaleRoutes(
+          buildRequest({
+            tipo_venta: 'MIXTA',
+            id_cliente: 'cli_1',
+            valor_pagado_inicial: 40000,
+            metodo_pago: 'NEQUI',
+            detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 100000 }],
           }),
           {} as ApiEnv,
         )

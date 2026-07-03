@@ -15,6 +15,7 @@ import type {
   CreateCashSaleResult,
   CreateCreditSaleRepositoryInput,
   CreateCreditSaleResult,
+  CreateMixedSaleResult,
   CreateSaleInput,
   CreateSaleResult,
   SaleDetailToCreate,
@@ -119,10 +120,12 @@ export async function createSale(
     if (client.estado !== 'ACTIVO') {
       throw new ApiError('CLIENT_INACTIVE', 'No se puede vender a un cliente inactivo.', 400);
     }
-  } else if (input.tipoVenta === 'CREDITO') {
+  } else if (input.tipoVenta === 'CREDITO' || input.tipoVenta === 'MIXTA') {
     throw new ApiError(
-      'CREDIT_SALE_CLIENT_REQUIRED',
-      'El cliente es obligatorio para una venta a credito.',
+      input.tipoVenta === 'CREDITO' ? 'CREDIT_SALE_CLIENT_REQUIRED' : 'MIXED_SALE_CLIENT_REQUIRED',
+      input.tipoVenta === 'CREDITO'
+        ? 'El cliente es obligatorio para una venta a credito.'
+        : 'El cliente es obligatorio para una venta mixta.',
       400,
     );
   }
@@ -145,6 +148,26 @@ export async function createSale(
     return createCreditSaleFromPreparedInput(env, {
       ...saleInput,
       idCliente: input.idCliente,
+    });
+  }
+
+  if (input.tipoVenta === 'MIXTA') {
+    if (input.valorPagadoInicial >= total) {
+      throw new ApiError(
+        'MIXED_SALE_INITIAL_PAYMENT_MUST_BE_LESS_THAN_TOTAL',
+        'El pago inicial debe ser menor que el total. Si paga todo, usa venta de contado.',
+        400,
+      );
+    }
+
+    return createMixedSaleFromPreparedInput(env, {
+      ...saleInput,
+      idPagoVenta: createId('pagven'),
+      idCredito: createId('cre'),
+      idCliente: input.idCliente,
+      metodoPago: input.metodoPago,
+      valorPagadoInicial: input.valorPagadoInicial,
+      saldoCredito: total - input.valorPagadoInicial,
     });
   }
 
@@ -186,6 +209,63 @@ export async function createSale(
       valor_pagado: total,
     },
   });
+}
+
+async function createMixedSaleFromPreparedInput(
+  env: ApiEnv,
+  saleInput: Parameters<typeof salesRepository.createMixedSale>[1],
+): Promise<CreateMixedSaleResult> {
+  // MIXTA descuenta stock completo porque la mercancia sale de la tienda en el
+  // momento de la venta. El pago inicial se registra en pagos_ventas; no es un
+  // abono al credito, ya que el credito nace solo por el saldo restante.
+  await salesRepository.createMixedSale(env, saleInput);
+
+  const status = await salesRepository.getMixedSalePersistenceStatus(
+    env,
+    saleInput.idVenta,
+    saleInput.idCredito,
+    saleInput.detalles.map((detail) => ({
+      idVariante: detail.idVariante,
+      stockDespues: detail.stockDespues,
+    })),
+  );
+
+  if (
+    !status.saleExists ||
+    status.paymentCount !== 1 ||
+    !status.creditExists ||
+    status.creditInitialAmount !== saleInput.saldoCredito ||
+    status.creditPaidAmount !== 0 ||
+    status.creditBalance !== saleInput.saldoCredito ||
+    status.creditStatus !== 'PENDIENTE' ||
+    status.creditPaymentExists ||
+    status.creditAdjustmentExists ||
+    status.detailsCount !== saleInput.detalles.length ||
+    status.creditDetailsCount !== saleInput.detalles.length ||
+    status.movementCount !== saleInput.detalles.length ||
+    status.stockMatchesCount !== saleInput.detalles.length
+  ) {
+    throw new ApiError(
+      'MIXED_SALE_NOT_APPLIED',
+      'No se pudo completar la venta mixta de forma consistente.',
+      409,
+    );
+  }
+
+  return {
+    id_venta: saleInput.idVenta,
+    numero_venta: saleInput.numeroVenta,
+    tipo_venta: 'MIXTA',
+    estado_venta: 'COMPLETADA',
+    total: saleInput.total,
+    valor_pagado_inicial: saleInput.valorPagadoInicial,
+    saldo_pendiente: saleInput.saldoCredito,
+    id_pago: saleInput.idPagoVenta,
+    id_credito: saleInput.idCredito,
+    estado_credito: 'PENDIENTE',
+    items_vendidos: saleInput.detalles.reduce((sum, detail) => sum + detail.cantidad, 0),
+    movimientos_creados: saleInput.detalles.length,
+  };
 }
 
 async function createCreditSaleFromPreparedInput(
