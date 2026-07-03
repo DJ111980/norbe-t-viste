@@ -21,19 +21,18 @@ function renderVariantLabelMarkup(label: PrintableVariantLabel): string {
   const visibleSize = escapeHtml(label.talla);
 
   return `<main class="label" aria-label="Etiqueta QR de variante">
-    <section class="brand">
-      <div class="title">NORBE T VISTE</div>
+    <header class="title">NORBE T VISTE</header>
+    <section class="visuals" aria-label="Logo y codigo QR">
       <div class="logo" aria-label="Logo">
         <span class="logo-fallback">LOGO</span>
         <img class="logo-image" src="${NORBE_LABEL_LOGO_DATA_URI}" alt="NORBE T VISTE" onerror="this.remove()">
       </div>
+      <div class="qr" aria-label="Codigo QR">${label.qrSvg}</div>
     </section>
-    <section class="qr" aria-label="Codigo QR">${label.qrSvg}</section>
-    <section class="details">
-      <div class="code">${visibleCode}</div>
+    <section class="details" aria-label="Datos visibles de variante">
       <div class="size">${visibleSize}</div>
+      <div class="code">${visibleCode}</div>
     </section>
-    <div class="footer">Escanea para consultar la variante</div>
   </main>`;
 }
 
@@ -86,25 +85,20 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
       height: 40mm;
       padding: 3mm;
       display: grid;
-      grid-template-columns: 22mm 1fr;
-      grid-template-rows: auto 1fr auto;
-      gap: 1.8mm 3mm;
+      grid-template-columns: 1fr;
+      grid-template-rows: 6mm 23mm 5mm;
+      row-gap: 1.5mm;
       overflow: hidden;
       border: 0.2mm solid #111111;
       break-inside: avoid;
       page-break-inside: avoid;
     }
 
-    .brand {
-      grid-column: 1 / -1;
+    .title {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 2mm;
-      min-width: 0;
-    }
-
-    .title {
+      justify-content: center;
+      text-align: center;
       font-size: 10pt;
       font-weight: 700;
       line-height: 1;
@@ -112,10 +106,18 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
       white-space: nowrap;
     }
 
+    .visuals {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 4mm;
+      align-items: center;
+      justify-items: center;
+      min-width: 0;
+    }
+
     .logo {
-      min-width: 14mm;
-      height: 7mm;
-      border: 0.2mm solid #111111;
+      width: 17mm;
+      height: 17mm;
       position: relative;
       display: flex;
       align-items: center;
@@ -128,11 +130,10 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
 
     .logo-image {
       position: absolute;
-      inset: 0.4mm;
-      width: calc(100% - 0.8mm);
-      height: calc(100% - 0.8mm);
+      inset: 0;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
-      background: #ffffff;
     }
 
     .logo-fallback {
@@ -141,46 +142,44 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
     }
 
     .qr {
-      width: 22mm;
-      height: 22mm;
+      width: 21mm;
+      height: 21mm;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
     .qr svg {
-      width: 22mm;
-      height: 22mm;
+      width: 21mm;
+      height: 21mm;
       display: block;
     }
 
     .details {
       min-width: 0;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 2mm;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 4mm;
+      align-items: center;
+      justify-items: center;
     }
 
     .code {
-      font-size: 8pt;
+      max-width: 24mm;
+      font-size: 7pt;
       font-weight: 700;
       line-height: 1.1;
+      text-align: center;
       overflow-wrap: anywhere;
     }
 
     .size {
+      max-width: 24mm;
       font-size: 9pt;
       font-weight: 700;
       line-height: 1.1;
-      overflow-wrap: anywhere;
-    }
-
-    .footer {
-      grid-column: 1 / -1;
-      font-size: 5.5pt;
-      line-height: 1;
       text-align: center;
+      overflow-wrap: anywhere;
     }
 
     @media print {

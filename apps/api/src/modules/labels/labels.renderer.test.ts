@@ -28,6 +28,14 @@ describe('labels html', () => {
     expect(html).toContain('<svg viewBox="0 0 21 21">');
     expect(html).toContain('NTV-VAR-000001');
     expect(html).toContain('TALLA M');
+    expect(html).toContain('<header class="title">NORBE T VISTE</header>');
+    expect(html).toContain('<section class="visuals"');
+    expect(html).toContain('<section class="details"');
+    expect(html).toContain('grid-template-rows: 6mm 23mm 5mm');
+    expect(html).toContain('grid-template-columns: 1fr 1fr');
+    expect(html).toContain('width: 21mm');
+    expect(html).toContain('width: 17mm');
+    expect(html).not.toContain('Escanea para consultar la variante');
   });
 
   it('no expone precio, stock, proveedor, descripcion ni datos de cliente', () => {
@@ -80,6 +88,8 @@ describe('labels html', () => {
     expect(html).toContain('<title>NORBE T VISTE - Etiquetas QR</title>');
     expect(html).toContain('class="labels-grid"');
     expect(html.match(/class="label"/g)).toHaveLength(2);
+    expect(html.match(/class="visuals"/g)).toHaveLength(2);
+    expect(html.match(/class="details"/g)).toHaveLength(2);
     expect(html.match(/class="logo-image"/g)).toHaveLength(2);
     expect(html).toContain('src="data:image/png;base64,');
     expect(html.match(/<svg/g)).toHaveLength(2);
@@ -91,6 +101,7 @@ describe('labels html', () => {
     expect(html).toContain('width: 60mm');
     expect(html).toContain('height: 40mm');
     expect(html).toContain('@media print');
+    expect(html).not.toContain('Escanea para consultar la variante');
     expect(html.toLowerCase()).not.toContain('precio');
     expect(html.toLowerCase()).not.toContain('stock');
     expect(html.toLowerCase()).not.toContain('proveedor');
