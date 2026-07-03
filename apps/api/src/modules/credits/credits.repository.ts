@@ -1,10 +1,12 @@
 import type { ApiEnv } from '../../config/env';
 import type {
+  CreateCreditPaymentRepositoryInput,
   CreateOldDebtInput,
   CreditAdjustmentRecord,
   CreditClientRecord,
   CreditDetailRecord,
   CreditDetailViewRecord,
+  CreditPaymentPersistenceStatus,
   CreditPaymentRecord,
   CreditRecord,
   CreditSaleRecord,
@@ -329,4 +331,112 @@ export async function createOldDebtCredit(
     .run();
 
   return (await findCreditById(env, idCredito)) as CreditRecord;
+}
+
+export async function createCreditPayment(
+  env: ApiEnv,
+  input: CreateCreditPaymentRepositoryInput,
+): Promise<void> {
+  // El abono y el saldo del credito se actualizan en el mismo batch para evitar
+  // registrar pagos sin reflejar la cartera. La guarda de saldo impide sobreabonos
+  // si dos solicitudes intentan pagar el mismo credito al mismo tiempo.
+  await env.DB.batch([
+    env.DB.prepare(
+      `
+        UPDATE creditos_clientes
+        SET
+          monto_abonado = monto_abonado + ?,
+          saldo_pendiente = saldo_pendiente - ?,
+          estado_credito = ?,
+          actualizado_por = ?,
+          actualizado_en = datetime('now')
+        WHERE id_credito = ?
+          AND saldo_pendiente >= ?
+          AND estado_credito NOT IN ('ANULADO', 'PAGADO')
+      `,
+    ).bind(
+      input.valorAbono,
+      input.valorAbono,
+      input.estadoCredito,
+      input.idUsuario,
+      input.idCredito,
+      input.valorAbono,
+    ),
+    env.DB.prepare(
+      `
+        INSERT INTO abonos_creditos (
+          id_abono,
+          id_credito,
+          id_cliente,
+          id_usuario,
+          valor_abono,
+          metodo_pago,
+          referencia_pago,
+          fecha_abono,
+          observaciones,
+          estado_abono,
+          creado_en
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, 'ACTIVO', datetime('now')
+        WHERE EXISTS (
+          SELECT 1
+          FROM creditos_clientes
+          WHERE id_credito = ?
+            AND saldo_pendiente = ?
+            AND estado_credito = ?
+        )
+      `,
+    ).bind(
+      input.idAbono,
+      input.idCredito,
+      input.idCliente,
+      input.idUsuario,
+      input.valorAbono,
+      input.metodoPago,
+      input.referenciaPago,
+      input.observaciones,
+      input.idCredito,
+      input.saldoNuevo,
+      input.estadoCredito,
+    ),
+  ]);
+}
+
+export async function getCreditPaymentPersistenceStatus(
+  env: ApiEnv,
+  idCredito: string,
+  idAbono: string,
+): Promise<CreditPaymentPersistenceStatus> {
+  const status = await env.DB.prepare(
+    `
+      SELECT
+        cr.saldo_pendiente AS creditSaldoPendiente,
+        cr.monto_abonado AS creditMontoAbonado,
+        cr.estado_credito AS creditEstado,
+        EXISTS (
+          SELECT 1
+          FROM abonos_creditos a
+          WHERE a.id_abono = ?
+            AND a.id_credito = cr.id_credito
+            AND a.estado_abono = 'ACTIVO'
+        ) AS paymentExists
+      FROM creditos_clientes cr
+      WHERE cr.id_credito = ?
+      LIMIT 1
+    `,
+  )
+    .bind(idAbono, idCredito)
+    .first<{
+      creditSaldoPendiente: number | null;
+      creditMontoAbonado: number | null;
+      creditEstado: CreditPaymentPersistenceStatus['creditEstado'];
+      paymentExists: number;
+    }>();
+
+  return {
+    creditSaldoPendiente: status?.creditSaldoPendiente ?? null,
+    creditMontoAbonado: status?.creditMontoAbonado ?? null,
+    creditEstado: status?.creditEstado ?? null,
+    paymentExists: Boolean(status?.paymentExists),
+  };
 }

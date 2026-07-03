@@ -126,6 +126,29 @@ export interface CreateOldDebtInput {
   tipoDeudaAntigua: OldDebtType;
 }
 
+export interface CreateCreditPaymentInput {
+  valorAbono: number;
+  metodoPago: PaymentMethod;
+  referenciaPago: string | null;
+  observaciones: string | null;
+}
+
+export interface CreateCreditPaymentRepositoryInput extends CreateCreditPaymentInput {
+  idAbono: string;
+  idCredito: string;
+  idCliente: string;
+  idUsuario: string;
+  saldoNuevo: number;
+  estadoCredito: Extract<CreditStatus, 'PARCIAL' | 'PAGADO'>;
+}
+
+export interface CreditPaymentPersistenceStatus {
+  creditSaldoPendiente: number | null;
+  creditMontoAbonado: number | null;
+  creditEstado: CreditStatus | null;
+  paymentExists: boolean;
+}
+
 export interface PublicCreditSummary {
   idCredito: string;
   origenCredito: CreditOrigin;
@@ -171,4 +194,13 @@ export interface CreateOldDebtResult {
   monto_abonado: 0;
   saldo_pendiente: number;
   estado_credito: 'PENDIENTE';
+}
+
+export interface CreateCreditPaymentResult {
+  id_credito: string;
+  id_abono: string;
+  valor_abono: number;
+  saldo_anterior: number;
+  saldo_nuevo: number;
+  estado_credito: Extract<CreditStatus, 'PARCIAL' | 'PAGADO'>;
 }

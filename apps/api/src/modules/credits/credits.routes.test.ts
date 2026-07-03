@@ -42,6 +42,14 @@ vi.mock('./credits.service', () => ({
     saldo_pendiente: 150000,
     estado_credito: 'PENDIENTE',
   })),
+  createCreditPayment: vi.fn(async () => ({
+    id_credito: 'cre_1',
+    id_abono: 'abo_1',
+    valor_abono: 50000,
+    saldo_anterior: 150000,
+    saldo_nuevo: 100000,
+    estado_credito: 'PARCIAL',
+  })),
 }));
 
 describe('credits routes', () => {
@@ -158,6 +166,61 @@ describe('credits routes', () => {
             monto_inicial: 150000,
             descripcion: 'Deuda vieja',
             tipo_deuda_antigua: 'SOLO_MONTO',
+          }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'AUTH_REQUIRED', status: 401 });
+  });
+
+  it('ADMINISTRADOR y VENDEDOR pueden registrar abonos a credito', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'ADMINISTRADOR';
+
+    expect(
+      (
+        await handleCreditRoutes(
+          new Request('http://localhost/creditos/cre_1/abonos', {
+            method: 'POST',
+            body: JSON.stringify({
+              valor_abono: 50000,
+              metodo_pago: 'EFECTIVO',
+            }),
+          }),
+          {} as ApiEnv,
+        )
+      )?.status,
+    ).toBe(201);
+
+    mocks.role = 'VENDEDOR';
+
+    expect(
+      (
+        await handleCreditRoutes(
+          new Request('http://localhost/creditos/cre_1/abonos', {
+            method: 'POST',
+            body: JSON.stringify({
+              valor_abono: 50000,
+              metodo_pago: 'NEQUI',
+            }),
+          }),
+          {} as ApiEnv,
+        )
+      )?.status,
+    ).toBe(201);
+  });
+
+  it('usuario sin token no puede registrar abonos', async () => {
+    mocks.authenticated = false;
+    mocks.role = 'VENDEDOR';
+
+    await expect(
+      handleCreditRoutes(
+        new Request('http://localhost/creditos/cre_1/abonos', {
+          method: 'POST',
+          body: JSON.stringify({
+            valor_abono: 50000,
+            metodo_pago: 'EFECTIVO',
           }),
         }),
         {} as ApiEnv,

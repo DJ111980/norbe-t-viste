@@ -3,19 +3,26 @@ import { requireAuth, requireRole } from '../../middleware/auth.middleware';
 import { ApiError } from '../../shared/errors';
 import { successResponse } from '../../shared/responses';
 import { ensureMethod, readJsonBody } from '../../shared/validation';
-import { createOldDebt, getCreditById, listClientCredits, listCredits } from './credits.service';
 import {
+  createCreditPayment,
+  createOldDebt,
+  getCreditById,
+  listClientCredits,
+  listCredits,
+} from './credits.service';
+import {
+  validateCreateCreditPaymentInput,
   validateCreateOldDebtInput,
   validateListClientCreditsFilters,
   validateListCreditsFilters,
 } from './credits.validation';
 
-function matchCreditPath(pathname: string): { idCredito: string } | null {
-  const match = pathname.match(/^\/creditos\/([^/]+)$/);
+function matchCreditPath(pathname: string): { idCredito: string; action: string | null } | null {
+  const match = pathname.match(/^\/creditos\/([^/]+)(?:\/([^/]+))?$/);
 
   if (!match || match[1] === 'deuda-antigua') return null;
 
-  return { idCredito: decodeURIComponent(match[1]) };
+  return { idCredito: decodeURIComponent(match[1]), action: match[2] ?? null };
 }
 
 function matchClientCreditsPath(pathname: string): { idCliente: string } | null {
@@ -78,13 +85,31 @@ export async function handleCreditRoutes(request: Request, env: ApiEnv): Promise
   if (creditPath) {
     requireRole(auth, ['ADMINISTRADOR', 'VENDEDOR']);
 
-    if (request.method === 'GET') {
+    if (creditPath.action === 'abonos') {
+      if (request.method === 'POST') {
+        return successResponse(
+          {
+            abono: await createCreditPayment(
+              env,
+              auth,
+              creditPath.idCredito,
+              validateCreateCreditPaymentInput(await readJsonBody(request)),
+            ),
+          },
+          201,
+        );
+      }
+
+      ensureMethod(request, 'POST');
+    }
+
+    if (creditPath.action === null && request.method === 'GET') {
       return successResponse({
         credito: await getCreditById(env, creditPath.idCredito),
       });
     }
 
-    ensureMethod(request, 'GET');
+    ensureMethod(request, creditPath.action === null ? 'GET' : 'POST');
   }
 
   if (clientCreditsPath) {

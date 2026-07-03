@@ -4,6 +4,7 @@ import type { AuthContext } from '../../middleware/auth.middleware';
 import type {
   CreditClientRecord,
   CreditDetailViewRecord,
+  CreditPaymentRecord,
   CreditRecord,
   ListClientCreditsFilters,
   ListCreditsFilters,
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   clients: [] as CreditClientRecord[],
   credits: [] as CreditRecord[],
   details: [] as unknown[],
-  payments: [] as unknown[],
+  payments: [] as CreditPaymentRecord[],
   adjustments: [] as unknown[],
   sales: [] as unknown[],
   inventoryMovements: [] as unknown[],
@@ -81,6 +82,10 @@ vi.mock('./credits.repository', () => ({
       return mocks.credits.filter((credit) => credit.id_cliente === idCliente);
     },
   ),
+  findCreditById: vi.fn(async (_env: ApiEnv, idCredito: string) => {
+    const credit = mocks.credits.find((item) => item.id_credito === idCredito);
+    return credit ? { ...credit } : null;
+  }),
   getCreditDetailView: vi.fn(async (_env: ApiEnv, idCredito: string) => {
     const credit = mocks.credits.find((item) => item.id_credito === idCredito);
     if (!credit) return null;
@@ -88,7 +93,7 @@ vi.mock('./credits.repository', () => ({
       ...credit,
       venta: null,
       detalles: [],
-      abonos: [],
+      abonos: mocks.payments.filter((payment) => payment.id_credito === idCredito),
       ajustes: [],
     } satisfies CreditDetailViewRecord;
   }),
@@ -112,13 +117,53 @@ vi.mock('./credits.repository', () => ({
     mocks.credits.push(credit);
     return credit;
   }),
+  createCreditPayment: vi.fn(async (_env: ApiEnv, input) => {
+    const credit = mocks.credits.find((item) => item.id_credito === input.idCredito);
+    if (!credit) return;
+
+    credit.monto_abonado += input.valorAbono;
+    credit.saldo_pendiente -= input.valorAbono;
+    credit.estado_credito = input.estadoCredito;
+    credit.actualizado_por = input.idUsuario;
+
+    mocks.payments.push({
+      id_abono: input.idAbono,
+      id_credito: input.idCredito,
+      id_cliente: input.idCliente,
+      id_usuario: input.idUsuario,
+      valor_abono: input.valorAbono,
+      metodo_pago: input.metodoPago,
+      referencia_pago: input.referenciaPago,
+      fecha_abono: '2026-07-02',
+      observaciones: input.observaciones,
+      creado_en: '2026-07-02',
+      estado_abono: 'ACTIVO',
+      anulado_en: null,
+      motivo_anulacion: null,
+      usuario_nombre: 'Usuario',
+    });
+  }),
+  getCreditPaymentPersistenceStatus: vi.fn(
+    async (_env: ApiEnv, idCredito: string, idAbono: string) => {
+      const credit = mocks.credits.find((item) => item.id_credito === idCredito);
+      const payment = mocks.payments.find((item) => item.id_abono === idAbono);
+
+      return {
+        creditSaldoPendiente: credit?.saldo_pendiente ?? null,
+        creditMontoAbonado: credit?.monto_abonado ?? null,
+        creditEstado: credit?.estado_credito ?? null,
+        paymentExists: Boolean(payment),
+      };
+    },
+  ),
 }));
 
-const { createOldDebt, getCreditById, listClientCredits, listCredits } =
+const { createCreditPayment, createOldDebt, getCreditById, listClientCredits, listCredits } =
   await import('./credits.service');
 
 const env = {} as ApiEnv;
 const adminAuth = { user: { id_usuario: 'usr_admin', rol: 'ADMINISTRADOR' } } as AuthContext;
+const sellerAuth = { user: { id_usuario: 'usr_vendedor', rol: 'VENDEDOR' } } as AuthContext;
 
 describe('credits service', () => {
   beforeEach(() => {
@@ -232,5 +277,123 @@ describe('credits service', () => {
         tipoDeudaAntigua: 'SOLO_MONTO',
       }),
     ).rejects.toMatchObject({ code: 'CLIENT_INACTIVE' });
+  });
+
+  it('ADMINISTRADOR registra abono parcial y actualiza cartera sin tocar ventas ni inventario', async () => {
+    const result = await createCreditPayment(env, adminAuth, 'cre_1', {
+      valorAbono: 50000,
+      metodoPago: 'EFECTIVO',
+      referenciaPago: null,
+      observaciones: 'Abono en caja',
+    });
+
+    expect(result).toMatchObject({
+      id_credito: 'cre_1',
+      valor_abono: 50000,
+      saldo_anterior: 150000,
+      saldo_nuevo: 100000,
+      estado_credito: 'PARCIAL',
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      monto_abonado: 50000,
+      saldo_pendiente: 100000,
+      estado_credito: 'PARCIAL',
+      actualizado_por: 'usr_admin',
+    });
+    expect(mocks.payments[0]).toMatchObject({
+      id_credito: 'cre_1',
+      id_usuario: 'usr_admin',
+      valor_abono: 50000,
+      metodo_pago: 'EFECTIVO',
+      estado_abono: 'ACTIVO',
+    });
+    expect(mocks.sales).toHaveLength(0);
+    expect(mocks.inventoryMovements).toHaveLength(0);
+  });
+
+  it('VENDEDOR registra abono total y marca credito como pagado', async () => {
+    const result = await createCreditPayment(env, sellerAuth, 'cre_1', {
+      valorAbono: 150000,
+      metodoPago: 'NEQUI',
+      referenciaPago: 'REF-1',
+      observaciones: null,
+    });
+
+    expect(result).toMatchObject({
+      saldo_nuevo: 0,
+      estado_credito: 'PAGADO',
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      monto_abonado: 150000,
+      saldo_pendiente: 0,
+      estado_credito: 'PAGADO',
+      actualizado_por: 'usr_vendedor',
+    });
+  });
+
+  it('rechaza abono a credito inexistente, anulado o pagado', async () => {
+    await expect(
+      createCreditPayment(env, adminAuth, 'missing', {
+        valorAbono: 1000,
+        metodoPago: 'EFECTIVO',
+        referenciaPago: null,
+        observaciones: null,
+      }),
+    ).rejects.toMatchObject({ code: 'CREDIT_NOT_FOUND' });
+
+    mocks.credits[0] = buildCredit({ estado_credito: 'ANULADO' });
+    await expect(
+      createCreditPayment(env, adminAuth, 'cre_1', {
+        valorAbono: 1000,
+        metodoPago: 'EFECTIVO',
+        referenciaPago: null,
+        observaciones: null,
+      }),
+    ).rejects.toMatchObject({ code: 'CREDIT_CANCELLED' });
+
+    mocks.credits[0] = buildCredit({ estado_credito: 'PAGADO', saldo_pendiente: 0 });
+    await expect(
+      createCreditPayment(env, adminAuth, 'cre_1', {
+        valorAbono: 1000,
+        metodoPago: 'EFECTIVO',
+        referenciaPago: null,
+        observaciones: null,
+      }),
+    ).rejects.toMatchObject({ code: 'CREDIT_ALREADY_PAID' });
+  });
+
+  it('rechaza abono mayor al saldo pendiente', async () => {
+    await expect(
+      createCreditPayment(env, adminAuth, 'cre_1', {
+        valorAbono: 150001,
+        metodoPago: 'EFECTIVO',
+        referenciaPago: null,
+        observaciones: null,
+      }),
+    ).rejects.toMatchObject({ code: 'CREDIT_PAYMENT_EXCEEDS_BALANCE' });
+  });
+
+  it('consulta credito y listado despues de registrar abono', async () => {
+    await createCreditPayment(env, adminAuth, 'cre_1', {
+      valorAbono: 50000,
+      metodoPago: 'TRANSFERENCIA',
+      referenciaPago: null,
+      observaciones: null,
+    });
+
+    const detail = await getCreditById(env, 'cre_1');
+    const list = await listClientCredits(env, 'cli_1', { limit: 50, offset: 0 });
+
+    expect(detail.resumen).toMatchObject({
+      montoAbonado: 50000,
+      saldoPendiente: 100000,
+      estadoCredito: 'PARCIAL',
+    });
+    expect(detail.abonos).toHaveLength(1);
+    expect(list[0]).toMatchObject({
+      montoAbonado: 50000,
+      saldoPendiente: 100000,
+      estadoCredito: 'PARCIAL',
+    });
   });
 });

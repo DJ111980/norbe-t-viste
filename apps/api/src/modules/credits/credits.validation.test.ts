@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  validateCreateCreditPaymentInput,
   validateCreateOldDebtInput,
   validateListClientCreditsFilters,
   validateListCreditsFilters,
@@ -109,5 +110,53 @@ describe('credits validation', () => {
         tipo_deuda_antigua: 'OTRA',
       }),
     ).toThrowError(expect.objectContaining({ code: 'INVALID_OLD_DEBT_TYPE' }));
+  });
+
+  it('valida abono de credito', () => {
+    const input = validateCreateCreditPaymentInput({
+      valor_abono: 50000,
+      metodo_pago: ' EFECTIVO ',
+      referencia_pago: ' Caja 1 ',
+      observaciones: ' Pago parcial ',
+    });
+
+    expect(input).toEqual({
+      valorAbono: 50000,
+      metodoPago: 'EFECTIVO',
+      referenciaPago: 'Caja 1',
+      observaciones: 'Pago parcial',
+    });
+  });
+
+  it('normaliza textos opcionales vacios del abono', () => {
+    const input = validateCreateCreditPaymentInput({
+      valor_abono: 50000,
+      metodo_pago: 'NEQUI',
+      referencia_pago: ' ',
+      observaciones: '',
+    });
+
+    expect(input).toMatchObject({
+      referenciaPago: null,
+      observaciones: null,
+    });
+  });
+
+  it('rechaza abono de credito invalido', () => {
+    expect(() => validateCreateCreditPaymentInput(null)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_CREDIT_PAYMENT' }),
+    );
+
+    expect(() =>
+      validateCreateCreditPaymentInput({ valor_abono: 0, metodo_pago: 'EFECTIVO' }),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CREDIT_PAYMENT_AMOUNT' }));
+
+    expect(() => validateCreateCreditPaymentInput({ valor_abono: 1000 })).toThrowError(
+      expect.objectContaining({ code: 'PAYMENT_METHOD_REQUIRED' }),
+    );
+
+    expect(() =>
+      validateCreateCreditPaymentInput({ valor_abono: 1000, metodo_pago: 'CHEQUE' }),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_PAYMENT_METHOD' }));
   });
 });

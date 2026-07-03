@@ -1,16 +1,26 @@
 import { ApiError } from '../../shared/errors';
 import type {
+  CreateCreditPaymentInput,
   CreateOldDebtInput,
   CreditOrigin,
   CreditStatus,
   ListClientCreditsFilters,
   ListCreditsFilters,
   OldDebtType,
+  PaymentMethod,
 } from './credits.types';
 
 const CREDIT_STATUSES: CreditStatus[] = ['PENDIENTE', 'PARCIAL', 'PAGADO', 'VENCIDO', 'ANULADO'];
 const CREDIT_ORIGINS: CreditOrigin[] = ['VENTA', 'DEUDA_ANTIGUA', 'AJUSTE_MANUAL'];
 const OLD_DEBT_TYPES: OldDebtType[] = ['SOLO_MONTO', 'CON_PRODUCTOS'];
+const PAYMENT_METHODS: PaymentMethod[] = [
+  'EFECTIVO',
+  'TARJETA',
+  'TRANSFERENCIA',
+  'NEQUI',
+  'DAVIPLATA',
+  'OTRO',
+];
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
@@ -37,6 +47,12 @@ function parsePositiveInteger(value: unknown, code: string, message: string): nu
   }
 
   return parsed;
+}
+
+function normalizeOptionalText(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  return normalized ? normalized : null;
 }
 
 function parseNumberParam(value: string | null, fallback: number, max?: number): number {
@@ -146,5 +162,39 @@ export function validateCreateOldDebtInput(body: unknown): CreateOldDebtInput {
       'La descripcion de la deuda antigua es obligatoria.',
     ),
     tipoDeudaAntigua: tipoDeudaAntigua as OldDebtType,
+  };
+}
+
+export function validateCreateCreditPaymentInput(body: unknown): CreateCreditPaymentInput {
+  const rawBody = body as {
+    valor_abono?: unknown;
+    metodo_pago?: unknown;
+    referencia_pago?: unknown;
+    observaciones?: unknown;
+  };
+
+  if (!rawBody || typeof rawBody !== 'object') {
+    throw new ApiError('INVALID_CREDIT_PAYMENT', 'El abono enviado no es valido.', 400);
+  }
+
+  const metodoPago = normalizeRequiredText(
+    rawBody.metodo_pago,
+    'PAYMENT_METHOD_REQUIRED',
+    'El metodo de pago es obligatorio.',
+  );
+
+  if (!PAYMENT_METHODS.includes(metodoPago as PaymentMethod)) {
+    throw new ApiError('INVALID_PAYMENT_METHOD', 'El metodo de pago no es valido.', 400);
+  }
+
+  return {
+    valorAbono: parsePositiveInteger(
+      rawBody.valor_abono,
+      'INVALID_CREDIT_PAYMENT_AMOUNT',
+      'El valor del abono debe ser mayor que 0.',
+    ),
+    metodoPago: metodoPago as PaymentMethod,
+    referenciaPago: normalizeOptionalText(rawBody.referencia_pago),
+    observaciones: normalizeOptionalText(rawBody.observaciones),
   };
 }
