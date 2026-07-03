@@ -7,6 +7,7 @@ import type {
   CreateSaleReturnInput,
   CreateSaleReturnResult,
   PublicSaleReturn,
+  ReturnCreditRecord,
   SaleReturnDetailToCreate,
 } from './returns.types';
 
@@ -26,10 +27,10 @@ export async function createSaleReturn(
     throw new ApiError('VENTA_NO_ENCONTRADA', 'La venta no existe.', 404);
   }
 
-  if (sale.tipo_venta !== 'CONTADO') {
+  if (sale.tipo_venta === 'MIXTA') {
     throw new ApiError(
-      'DEVOLUCION_SOLO_CONTADO_POR_AHORA',
-      'Por ahora solo se permiten devoluciones de ventas de contado.',
+      'DEVOLUCION_MIXTA_NO_IMPLEMENTADA',
+      'Las devoluciones de ventas mixtas aun no estan implementadas.',
       400,
     );
   }
@@ -98,17 +99,22 @@ export async function createSaleReturn(
     0,
   );
   const sideEffectsBefore = await returnsRepository.countSaleSideEffects(env, idVenta);
+  const creditUpdate =
+    sale.tipo_venta === 'CREDITO'
+      ? await buildCreditReturnUpdate(env, idVenta, totalDevuelto)
+      : undefined;
 
   await returnsRepository.createSaleReturn(env, {
     idDevolucion,
     idVenta,
-    tipoVenta: 'CONTADO',
+    tipoVenta: sale.tipo_venta,
     motivo: input.motivo,
     totalDevuelto,
-    impactoCredito: 0,
-    impactoPago: totalDevuelto,
+    impactoCredito: sale.tipo_venta === 'CREDITO' ? totalDevuelto : 0,
+    impactoPago: sale.tipo_venta === 'CONTADO' ? totalDevuelto : 0,
     creadoPor: auth.user.id_usuario,
     detalles: detailsToCreate,
+    creditUpdate,
   });
 
   const persistence = await returnsRepository.getSaleReturnPersistenceStatus(
@@ -130,7 +136,11 @@ export async function createSaleReturn(
     persistence.paymentCount !== sideEffectsBefore.paymentCount ||
     persistence.creditCount !== sideEffectsBefore.creditCount ||
     persistence.creditPaymentCount !== sideEffectsBefore.creditPaymentCount ||
-    persistence.creditAdjustmentCount !== sideEffectsBefore.creditAdjustmentCount
+    persistence.creditAdjustmentCount !== sideEffectsBefore.creditAdjustmentCount ||
+    (creditUpdate &&
+      (persistence.creditSaldoPendiente !== creditUpdate.saldoDespues ||
+        persistence.creditMontoAbonado !== creditUpdate.montoAbonado ||
+        persistence.creditEstado !== creditUpdate.estadoCredito))
   ) {
     throw new ApiError(
       'DEVOLUCION_INCONSISTENTE',
@@ -142,11 +152,11 @@ export async function createSaleReturn(
   return {
     id_devolucion: idDevolucion,
     id_venta: idVenta,
-    tipo_venta: 'CONTADO',
+    tipo_venta: sale.tipo_venta,
     estado_devolucion: 'ACTIVA',
     total_devuelto: totalDevuelto,
-    impacto_credito: 0,
-    impacto_pago: totalDevuelto,
+    impacto_credito: sale.tipo_venta === 'CREDITO' ? totalDevuelto : 0,
+    impacto_pago: sale.tipo_venta === 'CONTADO' ? totalDevuelto : 0,
     items_devueltos: detailsToCreate.length,
     movimientos_creados: detailsToCreate.length,
   };
@@ -161,6 +171,92 @@ export async function listSaleReturns(env: ApiEnv, idVenta: string): Promise<Pub
 
   const returns = await returnsRepository.listSaleReturns(env, idVenta);
   return returns.map(toPublicSaleReturn);
+}
+
+async function buildCreditReturnUpdate(
+  env: ApiEnv,
+  idVenta: string,
+  totalDevuelto: number,
+): Promise<NonNullable<Parameters<typeof returnsRepository.createSaleReturn>[1]['creditUpdate']>> {
+  const credits = await returnsRepository.listCreditsForReturn(env, idVenta);
+
+  if (credits.length === 0) {
+    throw new ApiError(
+      'CREDITO_ASOCIADO_NO_ENCONTRADO',
+      'La venta a credito no tiene un credito asociado.',
+      400,
+    );
+  }
+
+  if (credits.length > 1) {
+    throw new ApiError(
+      'CREDITO_ASOCIADO_INCONSISTENTE',
+      'La venta a credito tiene mas de un credito asociado.',
+      409,
+    );
+  }
+
+  const credit = credits[0] as ReturnCreditRecord;
+
+  if (credit.origen_credito !== 'VENTA') {
+    throw new ApiError(
+      'CREDITO_ASOCIADO_INCONSISTENTE',
+      'El credito asociado no corresponde a una venta.',
+      409,
+    );
+  }
+
+  if (credit.estado_credito === 'ANULADO') {
+    throw new ApiError(
+      'CREDITO_ANULADO_NO_DEVOLUBLE',
+      'No se puede devolver automaticamente una venta con credito anulado.',
+      400,
+    );
+  }
+
+  const activity = await returnsRepository.countCreditActivityForReturn(env, credit.id_credito);
+
+  if (activity.paymentsCount > 0) {
+    throw new ApiError(
+      'CREDITO_CON_ABONOS_NO_DEVOLUBLE',
+      'No se puede devolver automaticamente una venta a credito con abonos.',
+      400,
+    );
+  }
+
+  if (activity.adjustmentsCount > 0) {
+    throw new ApiError(
+      'CREDITO_CON_AJUSTES_NO_DEVOLUBLE',
+      'No se puede devolver automaticamente una venta a credito con ajustes.',
+      400,
+    );
+  }
+
+  if (totalDevuelto > credit.saldo_pendiente) {
+    throw new ApiError(
+      'DEVOLUCION_EXCEDE_SALDO_CREDITO',
+      'El valor devuelto excede el saldo pendiente del credito.',
+      400,
+    );
+  }
+
+  const saldoDespues = credit.saldo_pendiente - totalDevuelto;
+
+  return {
+    idCredito: credit.id_credito,
+    saldoAntes: credit.saldo_pendiente,
+    saldoDespues,
+    montoAbonado: credit.monto_abonado,
+    estadoCredito: resolveCreditStatusAfterReturn(saldoDespues, credit.monto_abonado),
+  };
+}
+
+function resolveCreditStatusAfterReturn(
+  saldoDespues: number,
+  montoAbonado: number,
+): ReturnCreditRecord['estado_credito'] {
+  if (saldoDespues === 0) return 'PAGADO';
+  return montoAbonado > 0 ? 'PARCIAL' : 'PENDIENTE';
 }
 
 function mergeRequestedDetails(

@@ -1,6 +1,8 @@
 import type { ApiEnv } from '../../config/env';
 import type {
   CreateSaleReturnRepositoryInput,
+  ReturnCreditActivityCounts,
+  ReturnCreditRecord,
   ReturnSaleDetailAvailabilityRecord,
   ReturnSaleRecord,
   SaleReturnDetailRecord,
@@ -104,6 +106,49 @@ export async function countSaleSideEffects(
   };
 }
 
+export async function listCreditsForReturn(
+  env: ApiEnv,
+  idVenta: string,
+): Promise<ReturnCreditRecord[]> {
+  const result = await env.DB.prepare(
+    `
+      SELECT
+        id_credito,
+        id_venta,
+        origen_credito,
+        estado_credito,
+        saldo_pendiente,
+        monto_abonado
+      FROM creditos_clientes
+      WHERE id_venta = ?
+    `,
+  )
+    .bind(idVenta)
+    .all<ReturnCreditRecord>();
+
+  return result.results ?? [];
+}
+
+export async function countCreditActivityForReturn(
+  env: ApiEnv,
+  idCredito: string,
+): Promise<ReturnCreditActivityCounts> {
+  const row = await env.DB.prepare(
+    `
+      SELECT
+        (SELECT COUNT(*) FROM abonos_creditos WHERE id_credito = ?) AS paymentsCount,
+        (SELECT COUNT(*) FROM ajustes_creditos WHERE id_credito = ?) AS adjustmentsCount
+    `,
+  )
+    .bind(idCredito, idCredito)
+    .first<ReturnCreditActivityCounts>();
+
+  return {
+    paymentsCount: row?.paymentsCount ?? 0,
+    adjustmentsCount: row?.adjustmentsCount ?? 0,
+  };
+}
+
 export async function createSaleReturn(
   env: ApiEnv,
   input: CreateSaleReturnRepositoryInput,
@@ -122,13 +167,15 @@ export async function createSaleReturn(
           impacto_pago,
           creado_por,
           creado_en
-        ) VALUES (?, ?, 'CONTADO', ?, 'ACTIVA', ?, 0, ?, ?, datetime('now'))
+        ) VALUES (?, ?, ?, ?, 'ACTIVA', ?, ?, ?, ?, datetime('now'))
       `,
     ).bind(
       input.idDevolucion,
       input.idVenta,
+      input.tipoVenta,
       input.motivo,
       input.totalDevuelto,
+      input.impactoCredito,
       input.impactoPago,
       input.creadoPor,
     ),
@@ -136,6 +183,47 @@ export async function createSaleReturn(
 
   for (const detail of input.detalles) {
     addDetailStatements(statements, env, input, detail);
+  }
+
+  if (input.creditUpdate) {
+    statements.push(
+      env.DB.prepare(
+        `
+          UPDATE creditos_clientes
+          SET
+            saldo_pendiente = ?,
+            estado_credito = ?,
+            actualizado_por = ?,
+            actualizado_en = datetime('now')
+          WHERE id_credito = ?
+            AND id_venta = ?
+            AND origen_credito = 'VENTA'
+            AND estado_credito != 'ANULADO'
+            AND saldo_pendiente = ?
+            AND monto_abonado = ?
+            AND NOT EXISTS (
+              SELECT 1
+              FROM abonos_creditos
+              WHERE id_credito = ?
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM ajustes_creditos
+              WHERE id_credito = ?
+            )
+        `,
+      ).bind(
+        input.creditUpdate.saldoDespues,
+        input.creditUpdate.estadoCredito,
+        input.creadoPor,
+        input.creditUpdate.idCredito,
+        input.idVenta,
+        input.creditUpdate.saldoAntes,
+        input.creditUpdate.montoAbonado,
+        input.creditUpdate.idCredito,
+        input.creditUpdate.idCredito,
+      ),
+    );
   }
 
   await env.DB.batch(statements);
@@ -294,6 +382,9 @@ export async function getSaleReturnPersistenceStatus(
         (SELECT estado_venta FROM ventas WHERE id_venta = ?) AS saleStatus,
         (SELECT COUNT(*) FROM pagos_ventas WHERE id_venta = ?) AS paymentCount,
         (SELECT COUNT(*) FROM creditos_clientes WHERE id_venta = ?) AS creditCount,
+        (SELECT saldo_pendiente FROM creditos_clientes WHERE id_venta = ? LIMIT 1) AS creditSaldoPendiente,
+        (SELECT monto_abonado FROM creditos_clientes WHERE id_venta = ? LIMIT 1) AS creditMontoAbonado,
+        (SELECT estado_credito FROM creditos_clientes WHERE id_venta = ? LIMIT 1) AS creditEstado,
         (
           SELECT COUNT(*)
           FROM abonos_creditos a
@@ -318,6 +409,9 @@ export async function getSaleReturnPersistenceStatus(
       idVenta,
       idVenta,
       idVenta,
+      idVenta,
+      idVenta,
+      idVenta,
     )
     .first<{
       returnExists: number;
@@ -326,6 +420,9 @@ export async function getSaleReturnPersistenceStatus(
       saleStatus: SaleReturnPersistenceStatus['saleStatus'];
       paymentCount: number;
       creditCount: number;
+      creditSaldoPendiente: number | null;
+      creditMontoAbonado: number | null;
+      creditEstado: SaleReturnPersistenceStatus['creditEstado'];
       creditPaymentCount: number;
       creditAdjustmentCount: number;
     }>();
@@ -355,6 +452,9 @@ export async function getSaleReturnPersistenceStatus(
     saleStatus: row?.saleStatus ?? null,
     paymentCount: row?.paymentCount ?? 0,
     creditCount: row?.creditCount ?? 0,
+    creditSaldoPendiente: row?.creditSaldoPendiente ?? null,
+    creditMontoAbonado: row?.creditMontoAbonado ?? null,
+    creditEstado: row?.creditEstado ?? null,
     creditPaymentCount: row?.creditPaymentCount ?? 0,
     creditAdjustmentCount: row?.creditAdjustmentCount ?? 0,
   };

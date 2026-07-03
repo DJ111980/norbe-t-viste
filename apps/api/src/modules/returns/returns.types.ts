@@ -26,6 +26,20 @@ export interface ReturnSaleDetailAvailabilityRecord {
   stock_actual: number;
 }
 
+export interface ReturnCreditRecord {
+  id_credito: string;
+  id_venta: string;
+  origen_credito: 'VENTA' | 'DEUDA_ANTIGUA' | 'AJUSTE_MANUAL';
+  estado_credito: 'PENDIENTE' | 'PARCIAL' | 'PAGADO' | 'VENCIDO' | 'ANULADO';
+  saldo_pendiente: number;
+  monto_abonado: number;
+}
+
+export interface ReturnCreditActivityCounts {
+  paymentsCount: number;
+  adjustmentsCount: number;
+}
+
 export interface SaleReturnDetailToCreate {
   idDetalleDevolucion: string;
   idDetalleVenta: string;
@@ -41,13 +55,20 @@ export interface SaleReturnDetailToCreate {
 export interface CreateSaleReturnRepositoryInput {
   idDevolucion: string;
   idVenta: string;
-  tipoVenta: 'CONTADO';
+  tipoVenta: Extract<SaleType, 'CONTADO' | 'CREDITO'>;
   motivo: string;
   totalDevuelto: number;
-  impactoCredito: 0;
+  impactoCredito: number;
   impactoPago: number;
   creadoPor: string;
   detalles: SaleReturnDetailToCreate[];
+  creditUpdate?: {
+    idCredito: string;
+    saldoAntes: number;
+    saldoDespues: number;
+    montoAbonado: number;
+    estadoCredito: ReturnCreditRecord['estado_credito'];
+  };
 }
 
 export interface SaleReturnPersistenceStatus {
@@ -60,6 +81,9 @@ export interface SaleReturnPersistenceStatus {
   creditCount: number;
   creditPaymentCount: number;
   creditAdjustmentCount: number;
+  creditSaldoPendiente: number | null;
+  creditMontoAbonado: number | null;
+  creditEstado: ReturnCreditRecord['estado_credito'] | null;
 }
 
 export interface SaleReturnRecord {
@@ -101,10 +125,10 @@ export interface SaleReturnViewRecord extends SaleReturnRecord {
 export interface CreateSaleReturnResult {
   id_devolucion: string;
   id_venta: string;
-  tipo_venta: 'CONTADO';
+  tipo_venta: Extract<SaleType, 'CONTADO' | 'CREDITO'>;
   estado_devolucion: 'ACTIVA';
   total_devuelto: number;
-  impacto_credito: 0;
+  impacto_credito: number;
   impacto_pago: number;
   items_devueltos: number;
   movimientos_creados: number;

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiEnv } from '../../config/env';
 import type { AuthContext } from '../../middleware/auth.middleware';
 import type {
+  ReturnCreditRecord,
   ReturnSaleDetailAvailabilityRecord,
   ReturnSaleRecord,
   SaleReturnDetailRecord,
@@ -23,7 +24,7 @@ const mocks = vi.hoisted(() => ({
     stock_despues: number;
   }>,
   payments: [] as unknown[],
-  credits: [] as unknown[],
+  credits: [] as ReturnCreditRecord[],
   creditPayments: [] as unknown[],
   creditAdjustments: [] as unknown[],
 }));
@@ -38,6 +39,11 @@ vi.mock('./returns.repository', () => ({
     creditCount: mocks.credits.length,
     creditPaymentCount: mocks.creditPayments.length,
     creditAdjustmentCount: mocks.creditAdjustments.length,
+  })),
+  listCreditsForReturn: vi.fn(async () => mocks.credits),
+  countCreditActivityForReturn: vi.fn(async () => ({
+    paymentsCount: mocks.creditPayments.length,
+    adjustmentsCount: mocks.creditAdjustments.length,
   })),
   createSaleReturn: vi.fn(async (_env: ApiEnv, input) => {
     const returnDetails: SaleReturnDetailRecord[] = [];
@@ -75,14 +81,32 @@ vi.mock('./returns.repository', () => ({
       });
     }
 
+    if (input.creditUpdate) {
+      const credit = mocks.credits.find((item) => item.id_credito === input.creditUpdate.idCredito);
+
+      if (
+        !credit ||
+        credit.estado_credito === 'ANULADO' ||
+        credit.saldo_pendiente !== input.creditUpdate.saldoAntes ||
+        credit.monto_abonado !== input.creditUpdate.montoAbonado ||
+        mocks.creditPayments.length > 0 ||
+        mocks.creditAdjustments.length > 0
+      ) {
+        return;
+      }
+
+      credit.saldo_pendiente = input.creditUpdate.saldoDespues;
+      credit.estado_credito = input.creditUpdate.estadoCredito;
+    }
+
     mocks.returns.push({
       id_devolucion: input.idDevolucion,
       id_venta: input.idVenta,
-      tipo_venta: 'CONTADO',
+      tipo_venta: input.tipoVenta,
       motivo: input.motivo,
       estado_devolucion: 'ACTIVA',
       total_devuelto: input.totalDevuelto,
-      impacto_credito: 0,
+      impacto_credito: input.impactoCredito,
       impacto_pago: input.impactoPago,
       creado_por: input.creadoPor,
       creado_en: '2026-07-03',
@@ -112,6 +136,9 @@ vi.mock('./returns.repository', () => ({
         saleStatus: mocks.sale?.id_venta === idVenta ? mocks.sale.estado_venta : null,
         paymentCount: mocks.payments.length,
         creditCount: mocks.credits.length,
+        creditSaldoPendiente: mocks.credits[0]?.saldo_pendiente ?? null,
+        creditMontoAbonado: mocks.credits[0]?.monto_abonado ?? null,
+        creditEstado: mocks.credits[0]?.estado_credito ?? null,
         creditPaymentCount: mocks.creditPayments.length,
         creditAdjustmentCount: mocks.creditAdjustments.length,
       };
@@ -145,6 +172,18 @@ function buildDetail(
     precio_unitario: 50000,
     cantidad_devuelta_activa: 0,
     stock_actual: 3,
+    ...overrides,
+  };
+}
+
+function buildCredit(overrides: Partial<ReturnCreditRecord> = {}): ReturnCreditRecord {
+  return {
+    id_credito: 'cre_1',
+    id_venta: 'ven_1',
+    origen_credito: 'VENTA',
+    estado_credito: 'PENDIENTE',
+    saldo_pendiente: 150000,
+    monto_abonado: 0,
     ...overrides,
   };
 }
@@ -197,6 +236,62 @@ describe('returns service', () => {
     expect(mocks.sale?.estado_venta).toBe('COMPLETADA');
   });
 
+  it('ADMINISTRADOR registra devolucion parcial CREDITO y reduce saldo pendiente', async () => {
+    mocks.sale = buildSale({ tipo_venta: 'CREDITO' });
+    mocks.credits = [buildCredit()];
+
+    const result = await createSaleReturn(env, adminAuth, 'ven_1', {
+      motivo: 'Cliente devuelve una prenda comprada a credito',
+      detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+    });
+
+    expect(result).toMatchObject({
+      id_venta: 'ven_1',
+      tipo_venta: 'CREDITO',
+      total_devuelto: 50000,
+      impacto_credito: 50000,
+      impacto_pago: 0,
+      items_devueltos: 1,
+      movimientos_creados: 1,
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      saldo_pendiente: 100000,
+      monto_abonado: 0,
+      estado_credito: 'PENDIENTE',
+    });
+    expect(mocks.movements[0]).toMatchObject({
+      tipo_movimiento: 'DEVOLUCION',
+      referencia_tipo: 'DEVOLUCION',
+      referencia_id: result.id_devolucion,
+    });
+    expect(mocks.payments).toHaveLength(1);
+    expect(mocks.creditPayments).toHaveLength(0);
+    expect(mocks.creditAdjustments).toHaveLength(0);
+    expect(mocks.sale?.estado_venta).toBe('COMPLETADA');
+  });
+
+  it('devolucion CREDITO puede dejar credito PAGADO sin modificar monto_abonado', async () => {
+    mocks.sale = buildSale({ tipo_venta: 'CREDITO' });
+    mocks.credits = [buildCredit({ saldo_pendiente: 50000, monto_abonado: 0 })];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Cliente devuelve una prenda',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).resolves.toMatchObject({
+      tipo_venta: 'CREDITO',
+      impacto_credito: 50000,
+      impacto_pago: 0,
+    });
+
+    expect(mocks.credits[0]).toMatchObject({
+      saldo_pendiente: 0,
+      monto_abonado: 0,
+      estado_credito: 'PAGADO',
+    });
+  });
+
   it('GET lista devoluciones sin modificar stock', async () => {
     await createSaleReturn(env, adminAuth, 'ven_1', {
       motivo: 'Cliente devuelve una prenda',
@@ -213,7 +308,7 @@ describe('returns service', () => {
     expect(mocks.details[0]?.stock_actual).toBe(stockDespues);
   });
 
-  it('rechaza venta inexistente, no CONTADO o anulada', async () => {
+  it('rechaza venta inexistente, MIXTA o anulada', async () => {
     mocks.sale = null;
     await expect(
       createSaleReturn(env, adminAuth, 'missing', {
@@ -222,21 +317,13 @@ describe('returns service', () => {
       }),
     ).rejects.toMatchObject({ code: 'VENTA_NO_ENCONTRADA' });
 
-    mocks.sale = buildSale({ tipo_venta: 'CREDITO' });
-    await expect(
-      createSaleReturn(env, adminAuth, 'ven_1', {
-        motivo: 'Error',
-        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
-      }),
-    ).rejects.toMatchObject({ code: 'DEVOLUCION_SOLO_CONTADO_POR_AHORA' });
-
     mocks.sale = buildSale({ tipo_venta: 'MIXTA' });
     await expect(
       createSaleReturn(env, adminAuth, 'ven_1', {
         motivo: 'Error',
         detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
       }),
-    ).rejects.toMatchObject({ code: 'DEVOLUCION_SOLO_CONTADO_POR_AHORA' });
+    ).rejects.toMatchObject({ code: 'DEVOLUCION_MIXTA_NO_IMPLEMENTADA' });
 
     mocks.sale = buildSale({ estado_venta: 'ANULADA' });
     await expect(
@@ -245,6 +332,69 @@ describe('returns service', () => {
         detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
       }),
     ).rejects.toMatchObject({ code: 'VENTA_ANULADA_NO_DEVOLUBLE' });
+  });
+
+  it('rechaza CREDITO sin credito asociado o con multiples creditos', async () => {
+    mocks.sale = buildSale({ tipo_venta: 'CREDITO' });
+    mocks.credits = [];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CREDITO_ASOCIADO_NO_ENCONTRADO' });
+
+    mocks.credits = [buildCredit(), buildCredit({ id_credito: 'cre_2' })];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CREDITO_ASOCIADO_INCONSISTENTE' });
+  });
+
+  it('rechaza CREDITO con credito anulado, abonos, ajustes o saldo insuficiente', async () => {
+    mocks.sale = buildSale({ tipo_venta: 'CREDITO' });
+    mocks.credits = [buildCredit({ estado_credito: 'ANULADO' })];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CREDITO_ANULADO_NO_DEVOLUBLE' });
+
+    mocks.credits = [buildCredit()];
+    mocks.creditPayments = [{ id_abono: 'abo_1', estado_abono: 'ANULADO' }];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CREDITO_CON_ABONOS_NO_DEVOLUBLE' });
+
+    mocks.creditPayments = [];
+    mocks.creditAdjustments = [{ id_ajuste: 'aju_1' }];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CREDITO_CON_AJUSTES_NO_DEVOLUBLE' });
+
+    mocks.creditAdjustments = [];
+    mocks.credits = [buildCredit({ saldo_pendiente: 20000 })];
+
+    await expect(
+      createSaleReturn(env, adminAuth, 'ven_1', {
+        motivo: 'Error',
+        detalles: [{ idDetalleVenta: 'det_1', cantidadDevuelta: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'DEVOLUCION_EXCEDE_SALDO_CREDITO' });
   });
 
   it('rechaza detalle ajeno, variante historica inexistente o exceso de cantidad', async () => {
