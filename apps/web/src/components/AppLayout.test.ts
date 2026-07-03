@@ -17,5 +17,6 @@ describe('AppLayout navigation', () => {
 
     expect(paths).toContain('/inventario');
     expect(paths).toContain('/lotes-entrada');
+    expect(paths).toContain('/ventas');
   });
 });

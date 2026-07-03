@@ -11,6 +11,7 @@ import { ClientsPage } from './pages/ClientsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { ProvidersPage } from './pages/ProvidersPage';
+import { SalesPage } from './pages/SalesPage';
 import { VariantsPage } from './pages/VariantsPage';
 import { useRoute } from './routing/useRoute';
 
@@ -113,6 +114,10 @@ function renderProtectedPage(
 
   if (path === '/lotes-entrada') {
     return <EntryLotsPage onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/ventas') {
+    return <SalesPage onSessionExpired={onSessionExpired} />;
   }
 
   if (path === '/usuarios' && role !== 'ADMINISTRADOR') {

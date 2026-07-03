@@ -358,3 +358,92 @@ export interface EntryLotDetailFormValues {
   cantidad_etiquetas_qr: number;
   observaciones: string;
 }
+
+export type SaleType = 'CONTADO' | 'CREDITO' | 'MIXTA';
+export type SaleStatus = 'COMPLETADA' | 'ANULADA';
+export type PaymentMethod =
+  'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'NEQUI' | 'DAVIPLATA' | 'OTRO';
+
+export interface SaleSummary {
+  idVenta: string;
+  numeroVenta: string;
+  tipoVenta: SaleType;
+  estadoVenta: SaleStatus;
+  total: number;
+  saldoPendiente: number;
+  cliente: {
+    idCliente: string;
+    nombreCompleto: string | null;
+  } | null;
+  vendedor: {
+    idUsuario: string;
+    nombreCompleto: string;
+    correo: string;
+  };
+  creadoEn: string;
+  cantidadItems: number;
+}
+
+export interface SaleLine {
+  idDetalle: string;
+  idVariante: string;
+  nombreProducto: string;
+  sku: string;
+  codigoQr: string;
+  talla: string | null;
+  color: string | null;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+}
+
+export interface SalePayment {
+  idPago: string;
+  idVenta: string;
+  metodoPago: PaymentMethod;
+  monto: number;
+  estadoPago: 'ACTIVO' | 'ANULADO';
+  usuario: {
+    idUsuario: string;
+    nombreCompleto: string | null;
+    correo: string | null;
+  } | null;
+  creadoEn: string;
+  anuladoEn: string | null;
+  motivoAnulacion: string | null;
+}
+
+export interface SaleDetail extends SaleSummary {
+  subtotal: number;
+  descuento: number;
+  valorPagadoInicial: number;
+  observaciones: string | null;
+  anuladoEn: string | null;
+  motivoAnulacion: string | null;
+  actualizadoEn: string;
+  detalles: SaleLine[];
+  pagos: SalePayment[];
+  resumen: {
+    subtotal: number;
+    descuento: number;
+    total: number;
+    saldoPendiente: number;
+    cantidadItems: number;
+    pagosRegistrados: number;
+  };
+}
+
+export interface SaleItemFormValues {
+  id_variante: string;
+  cantidad: number;
+  precio_unitario: number;
+}
+
+export interface SaleFormValues {
+  tipo_venta: SaleType;
+  id_cliente: string;
+  metodo_pago: PaymentMethod;
+  valor_pagado_inicial: number;
+  observaciones: string;
+  detalles: SaleItemFormValues[];
+}

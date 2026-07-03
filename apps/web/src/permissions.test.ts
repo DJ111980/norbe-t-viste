@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   canChangeClientStatus,
+  canCancelSales,
   canManageCategories,
   canManageEntryLots,
   canManageInventory,
@@ -37,5 +38,10 @@ describe('crud permissions', () => {
     expect(canManageEntryLots('ADMINISTRADOR')).toBe(true);
     expect(canManageInventory('VENDEDOR')).toBe(false);
     expect(canManageEntryLots('VENDEDOR')).toBe(false);
+  });
+
+  it('solo ADMINISTRADOR anula ventas', () => {
+    expect(canCancelSales('ADMINISTRADOR')).toBe(true);
+    expect(canCancelSales('VENDEDOR')).toBe(false);
   });
 });

@@ -27,3 +27,7 @@ export function canManageInventory(role: UserRole): boolean {
 export function canManageEntryLots(role: UserRole): boolean {
   return role === 'ADMINISTRADOR';
 }
+
+export function canCancelSales(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}
