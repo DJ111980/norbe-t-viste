@@ -2,6 +2,9 @@ name = "norbe-t-viste-api"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
+[vars]
+CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+
 # Vinculacion local para desarrollo con D1. El database_id es un marcador local;
 # cuando se cree la base remota en Cloudflare debe reemplazarse por el ID real.
 [[d1_databases]]

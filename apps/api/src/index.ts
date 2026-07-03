@@ -17,6 +17,7 @@ import { handleReturnRoutes } from './modules/returns/returns.routes';
 import { handleSaleRoutes } from './modules/sales/sales.routes';
 import { handleUserRoutes } from './modules/users/users.routes';
 import { handleVariantRoutes } from './modules/variants/variants.routes';
+import { applyCorsHeaders, handleCorsPreflight } from './shared/cors';
 import { ApiError, normalizeApiError } from './shared/errors';
 import { errorResponse } from './shared/responses';
 import { handleHealthRoutes } from './routes/health.routes';
@@ -141,12 +142,18 @@ async function handleRequest(request: Request, env: ApiEnv): Promise<Response> {
 
 export default {
   async fetch(request, env): Promise<Response> {
+    const preflightResponse = handleCorsPreflight(request, env);
+
+    if (preflightResponse) {
+      return preflightResponse;
+    }
+
     try {
-      return await handleRequest(request, env);
+      return applyCorsHeaders(await handleRequest(request, env), request, env);
     } catch (error) {
       // Centralizar errores desde el inicio evita que cada modulo de negocio invente
       // su propio formato de fallo cuando agreguemos autenticacion, ventas o creditos.
-      return errorResponse(normalizeApiError(error));
+      return applyCorsHeaders(errorResponse(normalizeApiError(error)), request, env);
     }
   },
 } satisfies ExportedHandler<ApiEnv>;
