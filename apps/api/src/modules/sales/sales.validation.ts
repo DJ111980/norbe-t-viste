@@ -2,6 +2,7 @@ import { ApiError } from '../../shared/errors';
 import type {
   CancelCashSaleInput,
   CreateCashSaleInput,
+  CreateSaleInput,
   ListSalesFilters,
   PaymentMethod,
   SaleStatus,
@@ -84,7 +85,7 @@ function parseDateParam(value: string | null, code: string): string | undefined 
   return normalized;
 }
 
-export function validateCreateCashSaleInput(body: unknown): CreateCashSaleInput {
+export function validateCreateSaleInput(body: unknown): CreateSaleInput {
   const rawBody = body as {
     tipo_venta?: unknown;
     id_cliente?: unknown;
@@ -97,12 +98,83 @@ export function validateCreateCashSaleInput(body: unknown): CreateCashSaleInput 
     throw new ApiError('INVALID_SALE', 'La venta enviada no es valida.', 400);
   }
 
-  if (rawBody.tipo_venta !== 'CONTADO') {
+  if (rawBody.tipo_venta === 'MIXTA') {
     throw new ApiError(
-      'ONLY_CASH_SALE_ALLOWED',
-      'Por ahora solo se permite venta de contado.',
+      'MIXED_SALE_NOT_ALLOWED',
+      'La venta mixta queda para una fase posterior.',
       400,
     );
+  }
+
+  if (rawBody.tipo_venta !== 'CONTADO' && rawBody.tipo_venta !== 'CREDITO') {
+    throw new ApiError('INVALID_SALE_TYPE', 'El tipo de venta no es valido.', 400);
+  }
+
+  if (!Array.isArray(rawBody.detalles) || rawBody.detalles.length === 0) {
+    throw new ApiError('SALE_DETAILS_REQUIRED', 'La venta debe tener al menos un detalle.', 400);
+  }
+
+  const seenVariants = new Set<string>();
+  const detalles = rawBody.detalles.map((rawDetail, index) => {
+    if (!rawDetail || typeof rawDetail !== 'object') {
+      throw new ApiError('INVALID_SALE_DETAIL', 'Cada detalle debe ser un objeto valido.', 400);
+    }
+
+    const detail = rawDetail as {
+      id_variante?: unknown;
+      cantidad?: unknown;
+      precio_unitario?: unknown;
+    };
+    const idVariante = normalizeRequiredText(
+      detail.id_variante,
+      'SALE_VARIANT_REQUIRED',
+      `La variante del item ${index + 1} es obligatoria.`,
+    );
+
+    if (seenVariants.has(idVariante)) {
+      throw new ApiError(
+        'DUPLICATED_SALE_VARIANT',
+        'No se puede repetir la misma variante en una venta.',
+        400,
+      );
+    }
+
+    seenVariants.add(idVariante);
+
+    return {
+      idVariante,
+      cantidad: parsePositiveInteger(
+        detail.cantidad,
+        'INVALID_SALE_QUANTITY',
+        'La cantidad vendida debe ser mayor que 0.',
+      ),
+      precioUnitario: parseOptionalPositiveInteger(
+        detail.precio_unitario,
+        'INVALID_SALE_UNIT_PRICE',
+        'El precio unitario debe ser mayor que 0.',
+      ),
+    };
+  });
+
+  if (rawBody.tipo_venta === 'CREDITO') {
+    if (rawBody.metodo_pago !== undefined && rawBody.metodo_pago !== null) {
+      throw new ApiError(
+        'CREDIT_SALE_PAYMENT_NOT_ALLOWED',
+        'La venta a credito no debe incluir metodo de pago inicial.',
+        400,
+      );
+    }
+
+    return {
+      tipoVenta: 'CREDITO',
+      idCliente: normalizeRequiredText(
+        rawBody.id_cliente,
+        'CREDIT_SALE_CLIENT_REQUIRED',
+        'El cliente es obligatorio para una venta a credito.',
+      ),
+      observaciones: normalizeOptionalText(rawBody.observaciones),
+      detalles,
+    };
   }
 
   const metodoPago = normalizeRequiredText(
@@ -115,59 +187,18 @@ export function validateCreateCashSaleInput(body: unknown): CreateCashSaleInput 
     throw new ApiError('INVALID_PAYMENT_METHOD', 'El metodo de pago no es valido.', 400);
   }
 
-  if (!Array.isArray(rawBody.detalles) || rawBody.detalles.length === 0) {
-    throw new ApiError('SALE_DETAILS_REQUIRED', 'La venta debe tener al menos un detalle.', 400);
-  }
-
-  const seenVariants = new Set<string>();
-
   return {
     tipoVenta: 'CONTADO',
     idCliente: normalizeOptionalText(rawBody.id_cliente),
     metodoPago: metodoPago as PaymentMethod,
     observaciones: normalizeOptionalText(rawBody.observaciones),
-    detalles: rawBody.detalles.map((rawDetail, index) => {
-      if (!rawDetail || typeof rawDetail !== 'object') {
-        throw new ApiError('INVALID_SALE_DETAIL', 'Cada detalle debe ser un objeto valido.', 400);
-      }
-
-      const detail = rawDetail as {
-        id_variante?: unknown;
-        cantidad?: unknown;
-        precio_unitario?: unknown;
-      };
-      const idVariante = normalizeRequiredText(
-        detail.id_variante,
-        'SALE_VARIANT_REQUIRED',
-        `La variante del item ${index + 1} es obligatoria.`,
-      );
-
-      if (seenVariants.has(idVariante)) {
-        throw new ApiError(
-          'DUPLICATED_SALE_VARIANT',
-          'No se puede repetir la misma variante en una venta de contado.',
-          400,
-        );
-      }
-
-      seenVariants.add(idVariante);
-
-      return {
-        idVariante,
-        cantidad: parsePositiveInteger(
-          detail.cantidad,
-          'INVALID_SALE_QUANTITY',
-          'La cantidad vendida debe ser mayor que 0.',
-        ),
-        precioUnitario: parseOptionalPositiveInteger(
-          detail.precio_unitario,
-          'INVALID_SALE_UNIT_PRICE',
-          'El precio unitario debe ser mayor que 0.',
-        ),
-      };
-    }),
+    detalles,
   };
 }
+
+export const validateCreateCashSaleInput = validateCreateSaleInput as (
+  body: unknown,
+) => CreateCashSaleInput;
 
 export function validateCancelCashSaleInput(body: unknown): CancelCashSaleInput {
   const rawBody = body as { motivo_anulacion?: unknown };

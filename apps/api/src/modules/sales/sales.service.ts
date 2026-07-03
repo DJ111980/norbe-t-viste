@@ -13,6 +13,10 @@ import type {
   CancelCashSaleResult,
   CreateCashSaleInput,
   CreateCashSaleResult,
+  CreateCreditSaleRepositoryInput,
+  CreateCreditSaleResult,
+  CreateSaleInput,
+  CreateSaleResult,
   SaleDetailToCreate,
 } from './sales.types';
 import type {
@@ -37,18 +41,13 @@ export async function createCashSale(
   auth: AuthContext,
   input: CreateCashSaleInput,
 ): Promise<CreateCashSaleResult> {
-  if (input.idCliente) {
-    const client = await salesRepository.findClientForSale(env, input.idCliente);
+  return createSale(env, auth, input) as Promise<CreateCashSaleResult>;
+}
 
-    if (!client) {
-      throw new ApiError('CLIENT_NOT_FOUND', 'El cliente no existe.', 404);
-    }
-
-    if (client.estado !== 'ACTIVO') {
-      throw new ApiError('CLIENT_INACTIVE', 'No se puede vender a un cliente inactivo.', 400);
-    }
-  }
-
+async function buildSaleDetails(
+  env: ApiEnv,
+  input: CreateSaleInput,
+): Promise<{ detalles: SaleDetailToCreate[]; total: number }> {
   const detalles: SaleDetailToCreate[] = [];
   let total = 0;
 
@@ -102,24 +101,61 @@ export async function createCashSale(
     });
   }
 
+  return { detalles, total };
+}
+
+export async function createSale(
+  env: ApiEnv,
+  auth: AuthContext,
+  input: CreateSaleInput,
+): Promise<CreateSaleResult> {
+  if (input.idCliente) {
+    const client = await salesRepository.findClientForSale(env, input.idCliente);
+
+    if (!client) {
+      throw new ApiError('CLIENT_NOT_FOUND', 'El cliente no existe.', 404);
+    }
+
+    if (client.estado !== 'ACTIVO') {
+      throw new ApiError('CLIENT_INACTIVE', 'No se puede vender a un cliente inactivo.', 400);
+    }
+  } else if (input.tipoVenta === 'CREDITO') {
+    throw new ApiError(
+      'CREDIT_SALE_CLIENT_REQUIRED',
+      'El cliente es obligatorio para una venta a credito.',
+      400,
+    );
+  }
+
+  const { detalles, total } = await buildSaleDetails(env, input);
+
   const idVenta = createId('ven');
   const saleInput = {
     idVenta,
     numeroVenta: createSaleNumber(),
     idCliente: input.idCliente,
     idUsuario: auth.user.id_usuario,
-    metodoPago: input.metodoPago,
     observaciones: input.observaciones,
     subtotal: total,
     total,
-    idPagoVenta: createId('pagven'),
     detalles,
   };
+
+  if (input.tipoVenta === 'CREDITO') {
+    return createCreditSaleFromPreparedInput(env, {
+      ...saleInput,
+      idCliente: input.idCliente,
+    });
+  }
 
   // Esta primera fase implementa solo contado: no crea credito ni abono. El
   // detalle congela precio y datos basicos para que cambios futuros del catalogo
   // no alteren el historial de la venta.
-  await salesRepository.createCashSale(env, saleInput);
+  await salesRepository.createCashSale(env, {
+    ...saleInput,
+    metodoPago: input.metodoPago,
+    idPagoVenta: createId('pagven'),
+  });
 
   const status = await salesRepository.getCashSalePersistenceStatus(env, idVenta);
 
@@ -150,6 +186,63 @@ export async function createCashSale(
       valor_pagado: total,
     },
   });
+}
+
+async function createCreditSaleFromPreparedInput(
+  env: ApiEnv,
+  saleInput: Omit<CreateCreditSaleRepositoryInput, 'idCredito'>,
+): Promise<CreateCreditSaleResult> {
+  const idCredito = createId('cre');
+
+  // La venta a credito crea credito porque el producto sale hoy, pero el dinero
+  // queda pendiente. No crea pago_venta ni abono: los cobros se registran luego
+  // desde cartera. MIXTA y anulacion con credito quedan para fases posteriores
+  // porque combinan pagos iniciales, saldos y reversos de inventario/cartera.
+  await salesRepository.createCreditSale(env, {
+    ...saleInput,
+    idCredito,
+  });
+
+  const status = await salesRepository.getCreditSalePersistenceStatus(
+    env,
+    saleInput.idVenta,
+    idCredito,
+    saleInput.detalles.map((detail) => ({
+      idVariante: detail.idVariante,
+      stockDespues: detail.stockDespues,
+    })),
+  );
+
+  if (
+    !status.saleExists ||
+    !status.creditExists ||
+    status.paymentExists ||
+    status.creditPaymentExists ||
+    status.creditAdjustmentExists ||
+    status.detailsCount !== saleInput.detalles.length ||
+    status.creditDetailsCount !== saleInput.detalles.length ||
+    status.movementCount !== saleInput.detalles.length ||
+    status.stockMatchesCount !== saleInput.detalles.length
+  ) {
+    throw new ApiError(
+      'CREDIT_SALE_NOT_APPLIED',
+      'No se pudo completar la venta a credito de forma consistente.',
+      409,
+    );
+  }
+
+  return {
+    id_venta: saleInput.idVenta,
+    numero_venta: saleInput.numeroVenta,
+    tipo_venta: 'CREDITO',
+    estado_venta: 'COMPLETADA',
+    total: saleInput.total,
+    saldo_pendiente: saleInput.total,
+    id_credito: idCredito,
+    estado_credito: 'PENDIENTE',
+    items_vendidos: saleInput.detalles.reduce((sum, detail) => sum + detail.cantidad, 0),
+    movimientos_creados: saleInput.detalles.length,
+  };
 }
 
 export async function listSales(

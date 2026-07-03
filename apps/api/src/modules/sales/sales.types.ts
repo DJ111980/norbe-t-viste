@@ -17,6 +17,15 @@ export interface CreateCashSaleInput {
   detalles: CreateCashSaleDetailInput[];
 }
 
+export interface CreateCreditSaleInput {
+  tipoVenta: 'CREDITO';
+  idCliente: string;
+  observaciones: string | null;
+  detalles: CreateCashSaleDetailInput[];
+}
+
+export type CreateSaleInput = CreateCashSaleInput | CreateCreditSaleInput;
+
 export interface CancelCashSaleInput {
   motivoAnulacion: string;
 }
@@ -215,11 +224,35 @@ export interface CreateCashSaleRepositoryInput {
   detalles: SaleDetailToCreate[];
 }
 
+export interface CreateCreditSaleRepositoryInput {
+  idVenta: string;
+  numeroVenta: string;
+  idCredito: string;
+  idCliente: string;
+  idUsuario: string;
+  observaciones: string | null;
+  subtotal: number;
+  total: number;
+  detalles: SaleDetailToCreate[];
+}
+
 export interface CashSalePersistenceStatus {
   saleExists: boolean;
   paymentExists: boolean;
   movementCount: number;
   detailsCount: number;
+}
+
+export interface CreditSalePersistenceStatus {
+  saleExists: boolean;
+  creditExists: boolean;
+  paymentExists: boolean;
+  creditPaymentExists: boolean;
+  creditAdjustmentExists: boolean;
+  movementCount: number;
+  detailsCount: number;
+  creditDetailsCount: number;
+  stockMatchesCount: number;
 }
 
 export interface CancelSaleMovementInput {
@@ -258,6 +291,21 @@ export interface CreateCashSaleResult {
     valor_pagado: number;
   };
 }
+
+export interface CreateCreditSaleResult {
+  id_venta: string;
+  numero_venta: string;
+  tipo_venta: 'CREDITO';
+  estado_venta: 'COMPLETADA';
+  total: number;
+  saldo_pendiente: number;
+  id_credito: string;
+  estado_credito: 'PENDIENTE';
+  items_vendidos: number;
+  movimientos_creados: number;
+}
+
+export type CreateSaleResult = CreateCashSaleResult | CreateCreditSaleResult;
 
 export interface CancelCashSaleResult {
   id_venta: string;

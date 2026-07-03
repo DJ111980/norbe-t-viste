@@ -74,19 +74,24 @@ vi.mock('./sales.service', () => ({
     },
   })),
   listSalePayments: vi.fn(async () => []),
-  createCashSale: vi.fn(async () => ({
+  createSale: vi.fn(async (_env, _auth, input) => ({
     id_venta: 'ven_1',
     numero_venta: 'VTA-20260702-ABC',
-    tipo_venta: 'CONTADO',
+    tipo_venta: input.tipoVenta,
     estado_venta: 'COMPLETADA',
     total: 50000,
-    saldo_pendiente: 0,
+    saldo_pendiente: input.tipoVenta === 'CREDITO' ? 50000 : 0,
+    id_credito: input.tipoVenta === 'CREDITO' ? 'cre_1' : undefined,
+    estado_credito: input.tipoVenta === 'CREDITO' ? 'PENDIENTE' : undefined,
     items_vendidos: 1,
     movimientos_creados: 1,
-    pago: {
-      metodo_pago: 'EFECTIVO',
-      valor_pagado: 50000,
-    },
+    pago:
+      input.tipoVenta === 'CONTADO'
+        ? {
+            metodo_pago: 'EFECTIVO',
+            valor_pagado: 50000,
+          }
+        : undefined,
   })),
 }));
 
@@ -128,6 +133,39 @@ describe('sales routes', () => {
     );
 
     expect(response?.status).toBe(201);
+  });
+
+  it('ADMINISTRADOR y VENDEDOR pueden crear venta a credito', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'ADMINISTRADOR';
+
+    expect(
+      (
+        await handleSaleRoutes(
+          buildRequest({
+            tipo_venta: 'CREDITO',
+            id_cliente: 'cli_1',
+            detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000 }],
+          }),
+          {} as ApiEnv,
+        )
+      )?.status,
+    ).toBe(201);
+
+    mocks.role = 'VENDEDOR';
+
+    expect(
+      (
+        await handleSaleRoutes(
+          buildRequest({
+            tipo_venta: 'CREDITO',
+            id_cliente: 'cli_1',
+            detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000 }],
+          }),
+          {} as ApiEnv,
+        )
+      )?.status,
+    ).toBe(201);
   });
 
   it('sin token no puede crear venta', async () => {

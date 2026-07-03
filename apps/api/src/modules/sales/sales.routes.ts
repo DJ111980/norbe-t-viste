@@ -5,14 +5,14 @@ import { successResponse } from '../../shared/responses';
 import { ensureMethod, readJsonBody } from '../../shared/validation';
 import {
   cancelCashSale,
-  createCashSale,
+  createSale,
   getSaleById,
   listSalePayments,
   listSales,
 } from './sales.service';
 import {
   validateCancelCashSaleInput,
-  validateCreateCashSaleInput,
+  validateCreateSaleInput,
   validateListSalesFilters,
 } from './sales.validation';
 
@@ -43,11 +43,11 @@ export async function handleSaleRoutes(request: Request, env: ApiEnv): Promise<R
     }
 
     if (request.method === 'POST') {
-      const input = validateCreateCashSaleInput(await readJsonBody(request));
+      const input = validateCreateSaleInput(await readJsonBody(request));
 
       return successResponse(
         {
-          venta: await createCashSale(env, auth, input),
+          venta: await createSale(env, auth, input),
         },
         201,
       );

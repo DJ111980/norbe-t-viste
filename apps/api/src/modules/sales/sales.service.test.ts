@@ -23,8 +23,25 @@ const mocks = vi.hoisted(() => ({
     referencia_tipo: string;
     referencia_id: string;
   }>,
-  credits: [] as unknown[],
+  credits: [] as Array<{
+    id_credito: string;
+    id_cliente: string;
+    id_venta: string;
+    origen_credito: string;
+    monto_inicial: number;
+    monto_abonado: number;
+    saldo_pendiente: number;
+    estado_credito: string;
+  }>,
+  creditDetails: [] as Array<{
+    id_credito: string;
+    id_variante: string;
+    cantidad: number;
+    precio_unitario: number;
+    subtotal: number;
+  }>,
   installments: [] as unknown[],
+  adjustments: [] as unknown[],
   labels: [] as unknown[],
   images: [] as unknown[],
   failPersistence: false,
@@ -108,6 +125,97 @@ vi.mock('./sales.repository', () => ({
     movementCount: mocks.movements.filter((movement) => movement.referencia_id === idVenta).length,
     detailsCount: mocks.details.filter((detail) => detail.id_venta === idVenta).length,
   })),
+  createCreditSale: vi.fn(async (_env: ApiEnv, input) => {
+    mocks.sales.push(
+      buildSale({
+        id_venta: input.idVenta,
+        numero_venta: input.numeroVenta,
+        id_cliente: input.idCliente,
+        id_usuario: input.idUsuario,
+        tipo_venta: 'CREDITO',
+        total: input.total,
+        subtotal: input.subtotal,
+        valor_pagado_inicial: 0,
+        saldo_pendiente: input.total,
+        cantidad_items: input.detalles.reduce(
+          (sum: number, detail: { cantidad: number }) => sum + detail.cantidad,
+          0,
+        ),
+      }),
+    );
+    mocks.credits.push({
+      id_credito: input.idCredito,
+      id_cliente: input.idCliente,
+      id_venta: input.idVenta,
+      origen_credito: 'VENTA',
+      monto_inicial: input.total,
+      monto_abonado: 0,
+      saldo_pendiente: input.total,
+      estado_credito: 'PENDIENTE',
+    });
+
+    for (const detail of input.detalles) {
+      const variant = mocks.variants.find((item) => item.id_variante === detail.idVariante);
+      if (!variant || variant.stock_actual < detail.cantidad) continue;
+
+      variant.stock_actual -= detail.cantidad;
+      mocks.details.push(
+        buildDetail({
+          id_detalle_venta: detail.idDetalleVenta,
+          id_venta: input.idVenta,
+          id_variante: detail.idVariante,
+          nombre_producto: detail.nombreProducto,
+          sku: detail.sku,
+          talla: detail.talla,
+          color: detail.color,
+          codigo_qr: detail.codigoQr,
+          cantidad: detail.cantidad,
+          precio_unitario: detail.precioUnitario,
+          subtotal: detail.subtotal,
+        }),
+      );
+      mocks.creditDetails.push({
+        id_credito: input.idCredito,
+        id_variante: detail.idVariante,
+        cantidad: detail.cantidad,
+        precio_unitario: detail.precioUnitario,
+        subtotal: detail.subtotal,
+      });
+      mocks.movements.push({
+        tipo_movimiento: 'VENTA',
+        stock_antes: detail.stockAntes,
+        stock_despues: detail.stockDespues,
+        referencia_tipo: 'VENTA',
+        referencia_id: input.idVenta,
+      });
+    }
+  }),
+  getCreditSalePersistenceStatus: vi.fn(
+    async (
+      _env: ApiEnv,
+      idVenta: string,
+      idCredito: string,
+      expectedStocks: Array<{ idVariante: string; stockDespues: number }>,
+    ) => ({
+      saleExists: mocks.sales.some((sale) => sale.id_venta === idVenta),
+      creditExists: mocks.credits.some(
+        (credit) => credit.id_credito === idCredito && credit.id_venta === idVenta,
+      ),
+      paymentExists: mocks.payments.some((payment) => payment.id_venta === idVenta),
+      creditPaymentExists: mocks.installments.length > 0,
+      creditAdjustmentExists: mocks.adjustments.length > 0,
+      movementCount: mocks.movements.filter((movement) => movement.referencia_id === idVenta)
+        .length,
+      detailsCount: mocks.details.filter((detail) => detail.id_venta === idVenta).length,
+      creditDetailsCount: mocks.creditDetails.filter((detail) => detail.id_credito === idCredito)
+        .length,
+      stockMatchesCount: expectedStocks.filter(
+        (stock) =>
+          mocks.variants.find((variant) => variant.id_variante === stock.idVariante)
+            ?.stock_actual === stock.stockDespues,
+      ).length,
+    }),
+  ),
   listSales: vi.fn(async (_env: ApiEnv, filters: ListSalesFilters) => {
     mocks.lastListFilters = filters;
     return mocks.sales.filter((sale) => {
@@ -181,7 +289,7 @@ vi.mock('./sales.repository', () => ({
   })),
 }));
 
-const { cancelCashSale, createCashSale, getSaleById, listSalePayments, listSales } =
+const { cancelCashSale, createCashSale, createSale, getSaleById, listSalePayments, listSales } =
   await import('./sales.service');
 
 const env = {} as ApiEnv;
@@ -281,7 +389,9 @@ describe('sales service', () => {
     mocks.details = [buildDetail()];
     mocks.movements = [];
     mocks.credits = [];
+    mocks.creditDetails = [];
     mocks.installments = [];
+    mocks.adjustments = [];
     mocks.labels = [];
     mocks.images = [];
     mocks.failPersistence = false;
@@ -338,6 +448,118 @@ describe('sales service', () => {
 
     expect(result.total).toBe(100000);
     expect(mocks.variants.find((variant) => variant.id_variante === 'var_1')?.stock_actual).toBe(1);
+  });
+
+  it('ADMINISTRADOR crea venta a credito, descuenta stock y crea credito sin pago ni abono', async () => {
+    mocks.sales = [];
+    mocks.payments = [];
+    mocks.details = [];
+
+    const result = await createSale(env, adminAuth, {
+      tipoVenta: 'CREDITO',
+      idCliente: 'cli_1',
+      observaciones: 'Venta a credito',
+      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 50000 }],
+    });
+
+    expect(result).toMatchObject({
+      tipo_venta: 'CREDITO',
+      estado_venta: 'COMPLETADA',
+      total: 50000,
+      saldo_pendiente: 50000,
+      estado_credito: 'PENDIENTE',
+      items_vendidos: 1,
+      movimientos_creados: 1,
+    });
+    expect(mocks.sales[0]).toMatchObject({
+      tipo_venta: 'CREDITO',
+      valor_pagado_inicial: 0,
+      saldo_pendiente: 50000,
+    });
+    expect(mocks.variants.find((variant) => variant.id_variante === 'var_1')?.stock_actual).toBe(2);
+    expect(mocks.movements[0]).toMatchObject({
+      tipo_movimiento: 'VENTA',
+      stock_antes: 3,
+      stock_despues: 2,
+      referencia_tipo: 'VENTA',
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      origen_credito: 'VENTA',
+      id_venta: result.id_venta,
+      monto_inicial: 50000,
+      monto_abonado: 0,
+      saldo_pendiente: 50000,
+      estado_credito: 'PENDIENTE',
+    });
+    expect(mocks.creditDetails).toHaveLength(1);
+    expect(mocks.payments).toHaveLength(0);
+    expect(mocks.installments).toHaveLength(0);
+    expect(mocks.adjustments).toHaveLength(0);
+    expect(mocks.images).toHaveLength(0);
+    expect(mocks.labels).toHaveLength(0);
+  });
+
+  it('VENDEDOR puede crear venta a credito', async () => {
+    mocks.sales = [];
+    mocks.payments = [];
+    mocks.details = [];
+
+    const result = await createSale(env, sellerAuth, {
+      tipoVenta: 'CREDITO',
+      idCliente: 'cli_1',
+      observaciones: null,
+      detalles: [{ idVariante: 'var_1', cantidad: 2 }],
+    });
+
+    expect(result.total).toBe(100000);
+    expect(mocks.sales[0]?.id_usuario).toBe('usr_seller');
+    expect(mocks.credits[0]?.saldo_pendiente).toBe(100000);
+    expect(mocks.variants.find((variant) => variant.id_variante === 'var_1')?.stock_actual).toBe(1);
+  });
+
+  it('venta a credito exige cliente activo', async () => {
+    await expect(
+      createSale(env, adminAuth, {
+        tipoVenta: 'CREDITO',
+        idCliente: 'missing',
+        observaciones: null,
+        detalles: [{ idVariante: 'var_1', cantidad: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CLIENT_NOT_FOUND' });
+
+    mocks.clients = [{ id_cliente: 'cli_1', estado: 'INACTIVO' }];
+
+    await expect(
+      createSale(env, adminAuth, {
+        tipoVenta: 'CREDITO',
+        idCliente: 'cli_1',
+        observaciones: null,
+        detalles: [{ idVariante: 'var_1', cantidad: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'CLIENT_INACTIVE' });
+  });
+
+  it('GET de venta refleja venta a credito sin pagos', async () => {
+    mocks.sales = [];
+    mocks.payments = [];
+    mocks.details = [];
+
+    const result = await createSale(env, adminAuth, {
+      tipoVenta: 'CREDITO',
+      idCliente: 'cli_1',
+      observaciones: 'Venta a credito',
+      detalles: [{ idVariante: 'var_1', cantidad: 1 }],
+    });
+
+    const sale = await getSaleById(env, adminAuth, result.id_venta);
+
+    expect(sale).toMatchObject({
+      tipoVenta: 'CREDITO',
+      saldoPendiente: 50000,
+      valorPagadoInicial: 0,
+    });
+    expect(sale.pagos).toHaveLength(0);
+    expect(sale.resumen.pagosRegistrados).toBe(0);
   });
 
   it('valida cliente activo si viene informado', async () => {

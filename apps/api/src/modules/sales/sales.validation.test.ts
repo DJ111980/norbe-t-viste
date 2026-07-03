@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   validateCancelCashSaleInput,
   validateCreateCashSaleInput,
+  validateCreateSaleInput,
   validateListSalesFilters,
 } from './sales.validation';
 
@@ -24,22 +25,46 @@ describe('sales validation', () => {
     });
   });
 
-  it('rechaza tipo CREDITO y MIXTA en esta fase', () => {
-    expect(() =>
-      validateCreateCashSaleInput({
-        tipo_venta: 'CREDITO',
-        metodo_pago: 'EFECTIVO',
-        detalles: [{ id_variante: 'var_1', cantidad: 1 }],
-      }),
-    ).toThrowError(expect.objectContaining({ code: 'ONLY_CASH_SALE_ALLOWED' }));
+  it('valida venta a credito con cliente obligatorio y sin metodo de pago', () => {
+    const input = validateCreateSaleInput({
+      tipo_venta: 'CREDITO',
+      id_cliente: 'cli_1',
+      observaciones: ' Venta a credito ',
+      detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000 }],
+    });
 
+    expect(input).toEqual({
+      tipoVenta: 'CREDITO',
+      idCliente: 'cli_1',
+      observaciones: 'Venta a credito',
+      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 50000 }],
+    });
+  });
+
+  it('rechaza MIXTA en esta fase y pago enviado en venta a credito', () => {
     expect(() =>
-      validateCreateCashSaleInput({
+      validateCreateSaleInput({
         tipo_venta: 'MIXTA',
         metodo_pago: 'EFECTIVO',
         detalles: [{ id_variante: 'var_1', cantidad: 1 }],
       }),
-    ).toThrowError(expect.objectContaining({ code: 'ONLY_CASH_SALE_ALLOWED' }));
+    ).toThrowError(expect.objectContaining({ code: 'MIXED_SALE_NOT_ALLOWED' }));
+
+    expect(() =>
+      validateCreateSaleInput({
+        tipo_venta: 'CREDITO',
+        id_cliente: 'cli_1',
+        metodo_pago: 'EFECTIVO',
+        detalles: [{ id_variante: 'var_1', cantidad: 1 }],
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'CREDIT_SALE_PAYMENT_NOT_ALLOWED' }));
+
+    expect(() =>
+      validateCreateSaleInput({
+        tipo_venta: 'CREDITO',
+        detalles: [{ id_variante: 'var_1', cantidad: 1 }],
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'CREDIT_SALE_CLIENT_REQUIRED' }));
   });
 
   it('rechaza venta sin detalles', () => {
