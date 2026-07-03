@@ -7,6 +7,7 @@ import { handleCreditRoutes } from './modules/credits/credits.routes';
 import { handleEntryLotRoutes } from './modules/entry-lots/entry-lots.routes';
 import { handleImageRoutes } from './modules/images/images.routes';
 import { handleInventoryRoutes } from './modules/inventory/inventory.routes';
+import { handleLabelRoutes } from './modules/labels/labels.routes';
 import { handlePortfolioRoutes } from './modules/portfolio/portfolio.routes';
 import { handleProductRoutes } from './modules/products/products.routes';
 import { handleProviderRoutes } from './modules/providers/providers.routes';
@@ -47,6 +48,12 @@ async function handleRequest(request: Request, env: ApiEnv): Promise<Response> {
 
   if (returnResponse) {
     return returnResponse;
+  }
+
+  const labelResponse = await handleLabelRoutes(request, env);
+
+  if (labelResponse) {
+    return labelResponse;
   }
 
   const saleResponse = await handleSaleRoutes(request, env);
