@@ -205,3 +205,156 @@ export interface ImageMetadata {
   key: string;
   origen: 'PRODUCTO' | 'VARIANTE';
 }
+
+export type InventoryMovementType =
+  | 'LOTE_ENTRADA'
+  | 'INVENTARIO_INICIAL'
+  | 'AJUSTE_POSITIVO'
+  | 'AJUSTE_NEGATIVO'
+  | 'VENTA'
+  | 'ANULACION_VENTA'
+  | 'DEVOLUCION';
+
+export type InventoryReferenceType =
+  | 'LOTE_ENTRADA'
+  | 'INVENTARIO_INICIAL'
+  | 'AJUSTE_INVENTARIO'
+  | 'VENTA'
+  | 'ANULACION_VENTA'
+  | 'DEVOLUCION';
+
+export interface InventoryVariant {
+  idVariante: string;
+  producto: {
+    idProducto: string;
+    nombreProducto: string;
+    estadoProducto: ProductStatus;
+    categoria: {
+      idCategoria: string;
+      nombreCategoria: string | null;
+    } | null;
+  };
+  sku: string;
+  codigoQr: string;
+  talla: string | null;
+  color: string | null;
+  precioCompraReferencia?: number;
+  precioVenta: number;
+  stockActual: number;
+  stockMinimo: number;
+  stockBajo: boolean;
+  sinStock: boolean;
+  estado: VariantStatus;
+}
+
+export interface InventoryMovement {
+  idMovimiento: string;
+  tipoMovimiento: InventoryMovementType;
+  cantidad: number;
+  stockAntes: number;
+  stockDespues: number;
+  referenciaTipo: InventoryReferenceType | null;
+  referenciaId: string | null;
+  motivo: string | null;
+  creadoPor: string;
+  creadoEn: string;
+  variante: {
+    idVariante: string;
+    sku: string;
+    codigoQr: string;
+    talla: string | null;
+    color: string | null;
+  };
+  producto: {
+    idProducto: string;
+    nombreProducto: string;
+  };
+}
+
+export interface InitialInventoryFormValues {
+  id_variante: string;
+  cantidad_inicial: number;
+  motivo: string;
+}
+
+export interface InventoryAdjustmentFormValues {
+  id_variante: string;
+  tipo_ajuste: 'AJUSTE_POSITIVO' | 'AJUSTE_NEGATIVO';
+  cantidad: number;
+  motivo: string;
+}
+
+export type EntryLotStatus = 'BORRADOR' | 'CONFIRMADO' | 'ANULADO';
+
+export interface EntryLotSummary {
+  idLote: string;
+  idProveedor: string | null;
+  nombreProveedor: string | null;
+  numeroLote: string;
+  numeroFactura: string | null;
+  fechaLote: string;
+  estadoLote: EntryLotStatus;
+  observaciones: string | null;
+  cantidadDetalles: number;
+  totalEstimado: number | null;
+  creadoPor: string;
+  actualizadoPor: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
+}
+
+export interface EntryLotDetail {
+  idDetalleLote: string;
+  variante: {
+    idVariante: string;
+    sku: string;
+    codigoQr: string;
+    talla: string | null;
+    color: string | null;
+    stockActual: number;
+    estado: VariantStatus;
+  };
+  producto: {
+    idProducto: string;
+    nombreProducto: string;
+    estado: ProductStatus;
+  };
+  cantidad: number;
+  costoUnitario?: number;
+  subtotal?: number;
+  precioVentaSugerido: number;
+  cantidadEtiquetasQr: number;
+  observaciones: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
+}
+
+export interface EntryLot extends EntryLotSummary {
+  proveedor: {
+    idProveedor: string;
+    nombreProveedor: string;
+    estado: CommonStatus;
+  } | null;
+  confirmadoPor: string | null;
+  confirmadoEn: string | null;
+  anuladoPor: string | null;
+  anuladoEn: string | null;
+  motivoAnulacion: string | null;
+  detalles: EntryLotDetail[];
+}
+
+export interface EntryLotFormValues {
+  id_proveedor: string;
+  numero_factura: string;
+  fecha_lote: string;
+  observaciones: string;
+}
+
+export interface EntryLotDetailFormValues {
+  id_variante: string;
+  cantidad: number;
+  costo_unitario: number;
+  precio_venta_sugerido: number;
+  cantidad_etiquetas_qr: number;
+  observaciones: string;
+}

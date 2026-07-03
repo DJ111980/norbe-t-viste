@@ -4,6 +4,8 @@ import { useAuth } from './auth/auth-context';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { EntryLotsPage } from './pages/EntryLotsPage';
+import { InventoryPage } from './pages/InventoryPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
@@ -103,6 +105,14 @@ function renderProtectedPage(
 
   if (path === '/variantes') {
     return <VariantsPage onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/inventario') {
+    return <InventoryPage onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/lotes-entrada') {
+    return <EntryLotsPage onSessionExpired={onSessionExpired} />;
   }
 
   if (path === '/usuarios' && role !== 'ADMINISTRADOR') {

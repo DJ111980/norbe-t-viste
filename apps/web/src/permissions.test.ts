@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   canChangeClientStatus,
   canManageCategories,
+  canManageEntryLots,
+  canManageInventory,
   canManageProducts,
   canManageProviders,
   canManageVariants,
@@ -28,5 +30,12 @@ describe('crud permissions', () => {
     expect(canManageVariants('ADMINISTRADOR')).toBe(true);
     expect(canManageProducts('VENDEDOR')).toBe(false);
     expect(canManageVariants('VENDEDOR')).toBe(false);
+  });
+
+  it('solo ADMINISTRADOR administra inventario y lotes', () => {
+    expect(canManageInventory('ADMINISTRADOR')).toBe(true);
+    expect(canManageEntryLots('ADMINISTRADOR')).toBe(true);
+    expect(canManageInventory('VENDEDOR')).toBe(false);
+    expect(canManageEntryLots('VENDEDOR')).toBe(false);
   });
 });

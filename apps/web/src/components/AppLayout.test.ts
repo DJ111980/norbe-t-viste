@@ -11,4 +11,11 @@ describe('AppLayout navigation', () => {
       true,
     );
   });
+
+  it('incluye inventario y lotes de entrada en la navegacion', () => {
+    const paths = getVisibleNavItems('ADMINISTRADOR').map((item) => item.path);
+
+    expect(paths).toContain('/inventario');
+    expect(paths).toContain('/lotes-entrada');
+  });
 });

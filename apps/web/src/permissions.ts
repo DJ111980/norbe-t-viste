@@ -19,3 +19,11 @@ export function canManageProducts(role: UserRole): boolean {
 export function canManageVariants(role: UserRole): boolean {
   return role === 'ADMINISTRADOR';
 }
+
+export function canManageInventory(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}
+
+export function canManageEntryLots(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}

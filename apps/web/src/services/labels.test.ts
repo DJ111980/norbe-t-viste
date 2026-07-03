@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getVariantLabelPreview, openPrintableHtml } from './labels';
+import { getEntryLotLabelPreview, getVariantLabelPreview, openPrintableHtml } from './labels';
 import { apiTextRequest } from '../lib/api';
 
 vi.mock('../lib/api', () => ({
@@ -13,6 +13,14 @@ describe('labels service', () => {
     await getVariantLabelPreview('token', 'var_1');
 
     expect(apiTextRequest).toHaveBeenCalledWith('/etiquetas/variantes/var_1/preview', 'token');
+  });
+
+  it('usa endpoint de etiquetas desde lote de entrada', async () => {
+    vi.mocked(apiTextRequest).mockResolvedValueOnce('<html></html>');
+
+    await getEntryLotLabelPreview('token', 'lot_1');
+
+    expect(apiTextRequest).toHaveBeenCalledWith('/etiquetas/lotes-entrada/lot_1/preview', 'token');
   });
 
   it('abre HTML imprimible en una nueva pestana', () => {
