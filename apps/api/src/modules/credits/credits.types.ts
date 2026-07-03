@@ -133,6 +133,13 @@ export interface CreateCreditPaymentInput {
   observaciones: string | null;
 }
 
+export interface CreateCreditAdjustmentInput {
+  tipoAjuste: Extract<CreditAdjustmentType, 'AUMENTO' | 'DESCUENTO' | 'CORRECCION'>;
+  valorAjuste?: number;
+  saldoFinal?: number;
+  motivo: string;
+}
+
 export interface CreateCreditPaymentRepositoryInput extends CreateCreditPaymentInput {
   idAbono: string;
   idCredito: string;
@@ -142,11 +149,31 @@ export interface CreateCreditPaymentRepositoryInput extends CreateCreditPaymentI
   estadoCredito: Extract<CreditStatus, 'PARCIAL' | 'PAGADO'>;
 }
 
+export interface CreateCreditAdjustmentRepositoryInput {
+  idAjuste: string;
+  idCredito: string;
+  idUsuario: string;
+  tipoAjuste: Extract<CreditAdjustmentType, 'AUMENTO' | 'DESCUENTO' | 'CORRECCION'>;
+  valorAjuste: number;
+  saldoAntes: number;
+  saldoDespues: number;
+  motivo: string;
+  montoAbonadoActual: number;
+  estadoCredito: Extract<CreditStatus, 'PENDIENTE' | 'PARCIAL' | 'PAGADO'>;
+}
+
 export interface CreditPaymentPersistenceStatus {
   creditSaldoPendiente: number | null;
   creditMontoAbonado: number | null;
   creditEstado: CreditStatus | null;
   paymentExists: boolean;
+}
+
+export interface CreditAdjustmentPersistenceStatus {
+  creditSaldoPendiente: number | null;
+  creditMontoAbonado: number | null;
+  creditEstado: CreditStatus | null;
+  adjustmentExists: boolean;
 }
 
 export interface PublicCreditSummary {
@@ -203,4 +230,14 @@ export interface CreateCreditPaymentResult {
   saldo_anterior: number;
   saldo_nuevo: number;
   estado_credito: Extract<CreditStatus, 'PARCIAL' | 'PAGADO'>;
+}
+
+export interface CreateCreditAdjustmentResult {
+  id_credito: string;
+  id_ajuste: string;
+  tipo_ajuste: Extract<CreditAdjustmentType, 'AUMENTO' | 'DESCUENTO' | 'CORRECCION'>;
+  valor_ajuste: number;
+  saldo_antes: number;
+  saldo_despues: number;
+  estado_credito: Extract<CreditStatus, 'PENDIENTE' | 'PARCIAL' | 'PAGADO'>;
 }

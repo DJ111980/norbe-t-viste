@@ -50,6 +50,15 @@ vi.mock('./credits.service', () => ({
     saldo_nuevo: 100000,
     estado_credito: 'PARCIAL',
   })),
+  createCreditAdjustment: vi.fn(async () => ({
+    id_credito: 'cre_1',
+    id_ajuste: 'aju_1',
+    tipo_ajuste: 'DESCUENTO',
+    valor_ajuste: 10000,
+    saldo_antes: 150000,
+    saldo_despues: 140000,
+    estado_credito: 'PENDIENTE',
+  })),
 }));
 
 describe('credits routes', () => {
@@ -221,6 +230,60 @@ describe('credits routes', () => {
           body: JSON.stringify({
             valor_abono: 50000,
             metodo_pago: 'EFECTIVO',
+          }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'AUTH_REQUIRED', status: 401 });
+  });
+
+  it('solo ADMINISTRADOR puede registrar ajustes de credito', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'ADMINISTRADOR';
+
+    const response = await handleCreditRoutes(
+      new Request('http://localhost/creditos/cre_1/ajustes', {
+        method: 'POST',
+        body: JSON.stringify({
+          tipo_ajuste: 'DESCUENTO',
+          valor_ajuste: 10000,
+          motivo: 'Descuento autorizado',
+        }),
+      }),
+      {} as ApiEnv,
+    );
+
+    expect(response?.status).toBe(201);
+
+    mocks.role = 'VENDEDOR';
+
+    await expect(
+      handleCreditRoutes(
+        new Request('http://localhost/creditos/cre_1/ajustes', {
+          method: 'POST',
+          body: JSON.stringify({
+            tipo_ajuste: 'DESCUENTO',
+            valor_ajuste: 10000,
+            motivo: 'Descuento autorizado',
+          }),
+        }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+  });
+
+  it('usuario sin token no puede registrar ajustes', async () => {
+    mocks.authenticated = false;
+    mocks.role = 'ADMINISTRADOR';
+
+    await expect(
+      handleCreditRoutes(
+        new Request('http://localhost/creditos/cre_1/ajustes', {
+          method: 'POST',
+          body: JSON.stringify({
+            tipo_ajuste: 'AUMENTO',
+            valor_ajuste: 10000,
+            motivo: 'Correccion',
           }),
         }),
         {} as ApiEnv,

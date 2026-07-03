@@ -1,7 +1,9 @@
 import { ApiError } from '../../shared/errors';
 import type {
+  CreateCreditAdjustmentInput,
   CreateCreditPaymentInput,
   CreateOldDebtInput,
+  CreditAdjustmentType,
   CreditOrigin,
   CreditStatus,
   ListClientCreditsFilters,
@@ -13,6 +15,11 @@ import type {
 const CREDIT_STATUSES: CreditStatus[] = ['PENDIENTE', 'PARCIAL', 'PAGADO', 'VENCIDO', 'ANULADO'];
 const CREDIT_ORIGINS: CreditOrigin[] = ['VENTA', 'DEUDA_ANTIGUA', 'AJUSTE_MANUAL'];
 const OLD_DEBT_TYPES: OldDebtType[] = ['SOLO_MONTO', 'CON_PRODUCTOS'];
+const MANUAL_ADJUSTMENT_TYPES: CreateCreditAdjustmentInput['tipoAjuste'][] = [
+  'AUMENTO',
+  'DESCUENTO',
+  'CORRECCION',
+];
 const PAYMENT_METHODS: PaymentMethod[] = [
   'EFECTIVO',
   'TARJETA',
@@ -43,6 +50,16 @@ function parsePositiveInteger(value: unknown, code: string, message: string): nu
   const parsed = Number(value);
 
   if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new ApiError(code, message, 400);
+  }
+
+  return parsed;
+}
+
+function parseNonNegativeInteger(value: unknown, code: string, message: string): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
     throw new ApiError(code, message, 400);
   }
 
@@ -196,5 +213,56 @@ export function validateCreateCreditPaymentInput(body: unknown): CreateCreditPay
     metodoPago: metodoPago as PaymentMethod,
     referenciaPago: normalizeOptionalText(rawBody.referencia_pago),
     observaciones: normalizeOptionalText(rawBody.observaciones),
+  };
+}
+
+export function validateCreateCreditAdjustmentInput(body: unknown): CreateCreditAdjustmentInput {
+  const rawBody = body as {
+    tipo_ajuste?: unknown;
+    valor_ajuste?: unknown;
+    saldo_final?: unknown;
+    motivo?: unknown;
+  };
+
+  if (!rawBody || typeof rawBody !== 'object') {
+    throw new ApiError('INVALID_CREDIT_ADJUSTMENT', 'El ajuste enviado no es valido.', 400);
+  }
+
+  const tipoAjuste = normalizeRequiredText(
+    rawBody.tipo_ajuste,
+    'CREDIT_ADJUSTMENT_TYPE_REQUIRED',
+    'El tipo de ajuste es obligatorio.',
+  );
+
+  if (!MANUAL_ADJUSTMENT_TYPES.includes(tipoAjuste as CreateCreditAdjustmentInput['tipoAjuste'])) {
+    throw new ApiError('INVALID_CREDIT_ADJUSTMENT_TYPE', 'El tipo de ajuste no es valido.', 400);
+  }
+
+  const motivo = normalizeRequiredText(
+    rawBody.motivo,
+    'CREDIT_ADJUSTMENT_REASON_REQUIRED',
+    'El motivo del ajuste es obligatorio.',
+  );
+
+  if (tipoAjuste === 'CORRECCION') {
+    return {
+      tipoAjuste,
+      saldoFinal: parseNonNegativeInteger(
+        rawBody.saldo_final,
+        'INVALID_CREDIT_ADJUSTMENT_FINAL_BALANCE',
+        'El saldo final debe ser mayor o igual que 0.',
+      ),
+      motivo,
+    };
+  }
+
+  return {
+    tipoAjuste: tipoAjuste as Extract<CreditAdjustmentType, 'AUMENTO' | 'DESCUENTO'>,
+    valorAjuste: parsePositiveInteger(
+      rawBody.valor_ajuste,
+      'INVALID_CREDIT_ADJUSTMENT_AMOUNT',
+      'El valor del ajuste debe ser mayor que 0.',
+    ),
+    motivo,
   };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  validateCreateCreditAdjustmentInput,
   validateCreateCreditPaymentInput,
   validateCreateOldDebtInput,
   validateListClientCreditsFilters,
@@ -158,5 +159,94 @@ describe('credits validation', () => {
     expect(() =>
       validateCreateCreditPaymentInput({ valor_abono: 1000, metodo_pago: 'CHEQUE' }),
     ).toThrowError(expect.objectContaining({ code: 'INVALID_PAYMENT_METHOD' }));
+  });
+
+  it('valida ajuste AUMENTO y DESCUENTO', () => {
+    expect(
+      validateCreateCreditAdjustmentInput({
+        tipo_ajuste: 'AUMENTO',
+        valor_ajuste: 20000,
+        motivo: ' Correccion por saldo faltante ',
+      }),
+    ).toEqual({
+      tipoAjuste: 'AUMENTO',
+      valorAjuste: 20000,
+      motivo: 'Correccion por saldo faltante',
+    });
+
+    expect(
+      validateCreateCreditAdjustmentInput({
+        tipo_ajuste: 'DESCUENTO',
+        valor_ajuste: 10000,
+        motivo: 'Descuento autorizado',
+      }),
+    ).toMatchObject({
+      tipoAjuste: 'DESCUENTO',
+      valorAjuste: 10000,
+    });
+  });
+
+  it('valida ajuste CORRECCION con saldo final', () => {
+    expect(
+      validateCreateCreditAdjustmentInput({
+        tipo_ajuste: 'CORRECCION',
+        saldo_final: 0,
+        motivo: 'Correccion manual',
+      }),
+    ).toEqual({
+      tipoAjuste: 'CORRECCION',
+      saldoFinal: 0,
+      motivo: 'Correccion manual',
+    });
+  });
+
+  it('rechaza ajuste invalido', () => {
+    expect(() => validateCreateCreditAdjustmentInput(null)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_CREDIT_ADJUSTMENT' }),
+    );
+
+    expect(() => validateCreateCreditAdjustmentInput({})).toThrowError(
+      expect.objectContaining({ code: 'CREDIT_ADJUSTMENT_TYPE_REQUIRED' }),
+    );
+
+    expect(() =>
+      validateCreateCreditAdjustmentInput({
+        tipo_ajuste: 'ANULACION',
+        valor_ajuste: 1000,
+        motivo: 'x',
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CREDIT_ADJUSTMENT_TYPE' }));
+
+    expect(() =>
+      validateCreateCreditAdjustmentInput({
+        tipo_ajuste: 'AUMENTO',
+        valor_ajuste: 1000,
+        motivo: ' ',
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'CREDIT_ADJUSTMENT_REASON_REQUIRED' }));
+
+    expect(() =>
+      validateCreateCreditAdjustmentInput({
+        tipo_ajuste: 'AUMENTO',
+        valor_ajuste: 0,
+        motivo: 'x',
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CREDIT_ADJUSTMENT_AMOUNT' }));
+
+    expect(() =>
+      validateCreateCreditAdjustmentInput({
+        tipo_ajuste: 'DESCUENTO',
+        valor_ajuste: -1,
+        motivo: 'x',
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CREDIT_ADJUSTMENT_AMOUNT' }));
+
+    expect(() =>
+      validateCreateCreditAdjustmentInput({
+        tipo_ajuste: 'CORRECCION',
+        saldo_final: -1,
+        motivo: 'x',
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CREDIT_ADJUSTMENT_FINAL_BALANCE' }));
   });
 });

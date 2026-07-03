@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiEnv } from '../../config/env';
 import type { AuthContext } from '../../middleware/auth.middleware';
 import type {
+  CreditAdjustmentRecord,
   CreditClientRecord,
   CreditDetailViewRecord,
   CreditPaymentRecord,
@@ -15,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   credits: [] as CreditRecord[],
   details: [] as unknown[],
   payments: [] as CreditPaymentRecord[],
-  adjustments: [] as unknown[],
+  adjustments: [] as CreditAdjustmentRecord[],
   sales: [] as unknown[],
   inventoryMovements: [] as unknown[],
   lastListFilters: undefined as ListCreditsFilters | undefined,
@@ -94,7 +95,7 @@ vi.mock('./credits.repository', () => ({
       venta: null,
       detalles: [],
       abonos: mocks.payments.filter((payment) => payment.id_credito === idCredito),
-      ajustes: [],
+      ajustes: mocks.adjustments.filter((adjustment) => adjustment.id_credito === idCredito),
     } satisfies CreditDetailViewRecord;
   }),
   createOldDebtCredit: vi.fn(async (_env: ApiEnv, idCredito: string, input, userId: string) => {
@@ -156,10 +157,50 @@ vi.mock('./credits.repository', () => ({
       };
     },
   ),
+  createCreditAdjustment: vi.fn(async (_env: ApiEnv, input) => {
+    const credit = mocks.credits.find((item) => item.id_credito === input.idCredito);
+    if (!credit) return;
+
+    credit.saldo_pendiente = input.saldoDespues;
+    credit.estado_credito = input.estadoCredito;
+    credit.actualizado_por = input.idUsuario;
+
+    mocks.adjustments.push({
+      id_ajuste: input.idAjuste,
+      id_credito: input.idCredito,
+      id_usuario: input.idUsuario,
+      tipo_ajuste: input.tipoAjuste,
+      valor_ajuste: input.valorAjuste,
+      saldo_antes: input.saldoAntes,
+      saldo_despues: input.saldoDespues,
+      motivo: input.motivo,
+      creado_en: '2026-07-02',
+      usuario_nombre: 'Usuario',
+    });
+  }),
+  getCreditAdjustmentPersistenceStatus: vi.fn(
+    async (_env: ApiEnv, idCredito: string, idAjuste: string) => {
+      const credit = mocks.credits.find((item) => item.id_credito === idCredito);
+      const adjustment = mocks.adjustments.find((item) => item.id_ajuste === idAjuste);
+
+      return {
+        creditSaldoPendiente: credit?.saldo_pendiente ?? null,
+        creditMontoAbonado: credit?.monto_abonado ?? null,
+        creditEstado: credit?.estado_credito ?? null,
+        adjustmentExists: Boolean(adjustment),
+      };
+    },
+  ),
 }));
 
-const { createCreditPayment, createOldDebt, getCreditById, listClientCredits, listCredits } =
-  await import('./credits.service');
+const {
+  createCreditAdjustment,
+  createCreditPayment,
+  createOldDebt,
+  getCreditById,
+  listClientCredits,
+  listCredits,
+} = await import('./credits.service');
 
 const env = {} as ApiEnv;
 const adminAuth = { user: { id_usuario: 'usr_admin', rol: 'ADMINISTRADOR' } } as AuthContext;
@@ -395,5 +436,170 @@ describe('credits service', () => {
       saldoPendiente: 100000,
       estadoCredito: 'PARCIAL',
     });
+  });
+
+  it('ADMINISTRADOR registra ajuste AUMENTO sin modificar monto abonado ni mover inventario', async () => {
+    const result = await createCreditAdjustment(env, adminAuth, 'cre_1', {
+      tipoAjuste: 'AUMENTO',
+      valorAjuste: 20000,
+      motivo: 'Correccion por saldo faltante',
+    });
+
+    expect(result).toMatchObject({
+      id_credito: 'cre_1',
+      tipo_ajuste: 'AUMENTO',
+      valor_ajuste: 20000,
+      saldo_antes: 150000,
+      saldo_despues: 170000,
+      estado_credito: 'PENDIENTE',
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      monto_abonado: 0,
+      saldo_pendiente: 170000,
+      estado_credito: 'PENDIENTE',
+      actualizado_por: 'usr_admin',
+    });
+    expect(mocks.adjustments[0]).toMatchObject({
+      id_credito: 'cre_1',
+      id_usuario: 'usr_admin',
+      saldo_antes: 150000,
+      saldo_despues: 170000,
+    });
+    expect(mocks.payments).toHaveLength(0);
+    expect(mocks.sales).toHaveLength(0);
+    expect(mocks.inventoryMovements).toHaveLength(0);
+  });
+
+  it('ADMINISTRADOR registra ajuste DESCUENTO y puede dejar credito pagado', async () => {
+    const result = await createCreditAdjustment(env, adminAuth, 'cre_1', {
+      tipoAjuste: 'DESCUENTO',
+      valorAjuste: 150000,
+      motivo: 'Descuento autorizado',
+    });
+
+    expect(result).toMatchObject({
+      tipo_ajuste: 'DESCUENTO',
+      valor_ajuste: 150000,
+      saldo_antes: 150000,
+      saldo_despues: 0,
+      estado_credito: 'PAGADO',
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      monto_abonado: 0,
+      saldo_pendiente: 0,
+      estado_credito: 'PAGADO',
+    });
+  });
+
+  it('ADMINISTRADOR registra ajuste CORRECCION y guarda diferencia absoluta', async () => {
+    const result = await createCreditAdjustment(env, adminAuth, 'cre_1', {
+      tipoAjuste: 'CORRECCION',
+      saldoFinal: 50000,
+      motivo: 'Correccion manual de cartera',
+    });
+
+    expect(result).toMatchObject({
+      tipo_ajuste: 'CORRECCION',
+      valor_ajuste: 100000,
+      saldo_antes: 150000,
+      saldo_despues: 50000,
+      estado_credito: 'PENDIENTE',
+    });
+    expect(mocks.adjustments[0]).toMatchObject({
+      valor_ajuste: 100000,
+      saldo_antes: 150000,
+      saldo_despues: 50000,
+    });
+  });
+
+  it('ajuste con saldo mayor a 0 marca PARCIAL cuando ya hay monto abonado', async () => {
+    mocks.credits[0] = buildCredit({
+      monto_abonado: 50000,
+      saldo_pendiente: 100000,
+      estado_credito: 'PARCIAL',
+    });
+
+    const result = await createCreditAdjustment(env, adminAuth, 'cre_1', {
+      tipoAjuste: 'AUMENTO',
+      valorAjuste: 10000,
+      motivo: 'Ajuste de saldo',
+    });
+
+    expect(result).toMatchObject({
+      saldo_despues: 110000,
+      estado_credito: 'PARCIAL',
+    });
+    expect(mocks.credits[0].monto_abonado).toBe(50000);
+  });
+
+  it('AUMENTO puede reabrir credito pagado', async () => {
+    mocks.credits[0] = buildCredit({
+      estado_credito: 'PAGADO',
+      monto_abonado: 150000,
+      saldo_pendiente: 0,
+    });
+
+    const result = await createCreditAdjustment(env, adminAuth, 'cre_1', {
+      tipoAjuste: 'AUMENTO',
+      valorAjuste: 20000,
+      motivo: 'Reapertura por correccion',
+    });
+
+    expect(result).toMatchObject({
+      saldo_antes: 0,
+      saldo_despues: 20000,
+      estado_credito: 'PARCIAL',
+    });
+  });
+
+  it('rechaza ajuste a credito inexistente o anulado', async () => {
+    await expect(
+      createCreditAdjustment(env, adminAuth, 'missing', {
+        tipoAjuste: 'AUMENTO',
+        valorAjuste: 1000,
+        motivo: 'x',
+      }),
+    ).rejects.toMatchObject({ code: 'CREDIT_NOT_FOUND' });
+
+    mocks.credits[0] = buildCredit({ estado_credito: 'ANULADO' });
+
+    await expect(
+      createCreditAdjustment(env, adminAuth, 'cre_1', {
+        tipoAjuste: 'AUMENTO',
+        valorAjuste: 1000,
+        motivo: 'x',
+      }),
+    ).rejects.toMatchObject({ code: 'CREDIT_CANCELLED' });
+  });
+
+  it('rechaza DESCUENTO mayor al saldo pendiente', async () => {
+    await expect(
+      createCreditAdjustment(env, adminAuth, 'cre_1', {
+        tipoAjuste: 'DESCUENTO',
+        valorAjuste: 150001,
+        motivo: 'x',
+      }),
+    ).rejects.toMatchObject({ code: 'CREDIT_ADJUSTMENT_EXCEEDS_BALANCE' });
+  });
+
+  it('GET credito y listados reflejan ajuste aplicado', async () => {
+    await createCreditAdjustment(env, adminAuth, 'cre_1', {
+      tipoAjuste: 'DESCUENTO',
+      valorAjuste: 50000,
+      motivo: 'Descuento autorizado',
+    });
+
+    const detail = await getCreditById(env, 'cre_1');
+    const clientCredits = await listClientCredits(env, 'cli_1', { limit: 50, offset: 0 });
+    const allCredits = await listCredits(env, { limit: 50, offset: 0 });
+
+    expect(detail.resumen).toMatchObject({
+      montoAbonado: 0,
+      saldoPendiente: 100000,
+      estadoCredito: 'PENDIENTE',
+    });
+    expect(detail.ajustes).toHaveLength(1);
+    expect(clientCredits[0]).toMatchObject({ saldoPendiente: 100000 });
+    expect(allCredits[0]).toMatchObject({ saldoPendiente: 100000 });
   });
 });

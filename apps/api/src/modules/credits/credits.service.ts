@@ -4,6 +4,8 @@ import { ApiError } from '../../shared/errors';
 import { toOldDebtResult, toPublicCreditDetail, toPublicCreditSummary } from './credits.mapper';
 import * as creditsRepository from './credits.repository';
 import type {
+  CreateCreditAdjustmentInput,
+  CreateCreditAdjustmentResult,
   CreateCreditPaymentInput,
   CreateCreditPaymentResult,
   CreateOldDebtInput,
@@ -16,6 +18,14 @@ import type {
 
 function createId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID()}`;
+}
+
+function resolveCreditStatusAfterBalance(
+  saldoDespues: number,
+  montoAbonado: number,
+): Extract<CreateCreditAdjustmentResult['estado_credito'], 'PENDIENTE' | 'PARCIAL' | 'PAGADO'> {
+  if (saldoDespues === 0) return 'PAGADO';
+  return montoAbonado > 0 ? 'PARCIAL' : 'PENDIENTE';
 }
 
 export async function listCredits(
@@ -155,6 +165,101 @@ export async function createCreditPayment(
     valor_abono: input.valorAbono,
     saldo_anterior: credit.saldo_pendiente,
     saldo_nuevo: saldoNuevo,
+    estado_credito: estadoCredito,
+  };
+}
+
+export async function createCreditAdjustment(
+  env: ApiEnv,
+  auth: AuthContext,
+  idCredito: string,
+  input: CreateCreditAdjustmentInput,
+): Promise<CreateCreditAdjustmentResult> {
+  const credit = await creditsRepository.findCreditById(env, idCredito);
+
+  if (!credit) {
+    throw new ApiError('CREDIT_NOT_FOUND', 'El credito no existe.', 404);
+  }
+
+  if (credit.estado_credito === 'ANULADO') {
+    throw new ApiError('CREDIT_CANCELLED', 'No se puede ajustar un credito anulado.', 400);
+  }
+
+  let saldoDespues: number;
+  let valorAjuste: number;
+
+  if (input.tipoAjuste === 'AUMENTO') {
+    valorAjuste = input.valorAjuste as number;
+    saldoDespues = credit.saldo_pendiente + valorAjuste;
+  } else if (input.tipoAjuste === 'DESCUENTO') {
+    valorAjuste = input.valorAjuste as number;
+
+    if (valorAjuste > credit.saldo_pendiente) {
+      throw new ApiError(
+        'CREDIT_ADJUSTMENT_EXCEEDS_BALANCE',
+        'El descuento no puede ser mayor que el saldo pendiente.',
+        400,
+      );
+    }
+
+    saldoDespues = credit.saldo_pendiente - valorAjuste;
+  } else {
+    saldoDespues = input.saldoFinal as number;
+    // En CORRECCION se guarda la diferencia absoluta: el tipo de ajuste explica
+    // que no es un abono ni un descuento comercial, y el valor conserva la
+    // magnitud del cambio para auditoria sin introducir montos negativos.
+    valorAjuste = Math.abs(saldoDespues - credit.saldo_pendiente);
+  }
+
+  if (saldoDespues < 0) {
+    throw new ApiError('NEGATIVE_CREDIT_BALANCE', 'El ajuste no puede dejar saldo negativo.', 400);
+  }
+
+  const estadoCredito = resolveCreditStatusAfterBalance(saldoDespues, credit.monto_abonado);
+  const idAjuste = createId('aju');
+
+  // Solo ADMINISTRADOR puede crear ajustes porque cambian el saldo sin dinero
+  // recibido. Ventas a credito y mixtas quedan para una fase posterior; aqui no
+  // se crean ventas, pagos de venta, abonos ni movimientos de inventario.
+  await creditsRepository.createCreditAdjustment(env, {
+    idAjuste,
+    idCredito,
+    idUsuario: auth.user.id_usuario,
+    tipoAjuste: input.tipoAjuste,
+    valorAjuste,
+    saldoAntes: credit.saldo_pendiente,
+    saldoDespues,
+    motivo: input.motivo,
+    montoAbonadoActual: credit.monto_abonado,
+    estadoCredito,
+  });
+
+  const persistence = await creditsRepository.getCreditAdjustmentPersistenceStatus(
+    env,
+    idCredito,
+    idAjuste,
+  );
+
+  if (
+    !persistence.adjustmentExists ||
+    persistence.creditSaldoPendiente !== saldoDespues ||
+    persistence.creditMontoAbonado !== credit.monto_abonado ||
+    persistence.creditEstado !== estadoCredito
+  ) {
+    throw new ApiError(
+      'CREDIT_ADJUSTMENT_NOT_APPLIED',
+      'No se pudo registrar el ajuste del credito.',
+      409,
+    );
+  }
+
+  return {
+    id_credito: idCredito,
+    id_ajuste: idAjuste,
+    tipo_ajuste: input.tipoAjuste,
+    valor_ajuste: valorAjuste,
+    saldo_antes: credit.saldo_pendiente,
+    saldo_despues: saldoDespues,
     estado_credito: estadoCredito,
   };
 }

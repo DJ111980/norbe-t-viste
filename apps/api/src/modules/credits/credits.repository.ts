@@ -1,7 +1,9 @@
 import type { ApiEnv } from '../../config/env';
 import type {
+  CreateCreditAdjustmentRepositoryInput,
   CreateCreditPaymentRepositoryInput,
   CreateOldDebtInput,
+  CreditAdjustmentPersistenceStatus,
   CreditAdjustmentRecord,
   CreditClientRecord,
   CreditDetailRecord,
@@ -438,5 +440,112 @@ export async function getCreditPaymentPersistenceStatus(
     creditMontoAbonado: status?.creditMontoAbonado ?? null,
     creditEstado: status?.creditEstado ?? null,
     paymentExists: Boolean(status?.paymentExists),
+  };
+}
+
+export async function createCreditAdjustment(
+  env: ApiEnv,
+  input: CreateCreditAdjustmentRepositoryInput,
+): Promise<void> {
+  // Un ajuste corrige cartera, no representa dinero recibido. Por eso no se
+  // modifica monto_abonado y se guardan saldo_antes/saldo_despues como evidencia
+  // auditable del efecto exacto de la decision administrativa.
+  await env.DB.batch([
+    env.DB.prepare(
+      `
+        UPDATE creditos_clientes
+        SET
+          saldo_pendiente = ?,
+          estado_credito = ?,
+          actualizado_por = ?,
+          actualizado_en = datetime('now')
+        WHERE id_credito = ?
+          AND estado_credito != 'ANULADO'
+          AND saldo_pendiente = ?
+          AND ? >= 0
+      `,
+    ).bind(
+      input.saldoDespues,
+      input.estadoCredito,
+      input.idUsuario,
+      input.idCredito,
+      input.saldoAntes,
+      input.saldoDespues,
+    ),
+    env.DB.prepare(
+      `
+        INSERT INTO ajustes_creditos (
+          id_ajuste,
+          id_credito,
+          id_usuario,
+          tipo_ajuste,
+          valor_ajuste,
+          saldo_antes,
+          saldo_despues,
+          motivo,
+          creado_en
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+        WHERE EXISTS (
+          SELECT 1
+          FROM creditos_clientes
+          WHERE id_credito = ?
+            AND saldo_pendiente = ?
+            AND monto_abonado = ?
+            AND estado_credito = ?
+        )
+      `,
+    ).bind(
+      input.idAjuste,
+      input.idCredito,
+      input.idUsuario,
+      input.tipoAjuste,
+      input.valorAjuste,
+      input.saldoAntes,
+      input.saldoDespues,
+      input.motivo,
+      input.idCredito,
+      input.saldoDespues,
+      input.montoAbonadoActual,
+      input.estadoCredito,
+    ),
+  ]);
+}
+
+export async function getCreditAdjustmentPersistenceStatus(
+  env: ApiEnv,
+  idCredito: string,
+  idAjuste: string,
+): Promise<CreditAdjustmentPersistenceStatus> {
+  const status = await env.DB.prepare(
+    `
+      SELECT
+        cr.saldo_pendiente AS creditSaldoPendiente,
+        cr.monto_abonado AS creditMontoAbonado,
+        cr.estado_credito AS creditEstado,
+        EXISTS (
+          SELECT 1
+          FROM ajustes_creditos aj
+          WHERE aj.id_ajuste = ?
+            AND aj.id_credito = cr.id_credito
+        ) AS adjustmentExists
+      FROM creditos_clientes cr
+      WHERE cr.id_credito = ?
+      LIMIT 1
+    `,
+  )
+    .bind(idAjuste, idCredito)
+    .first<{
+      creditSaldoPendiente: number | null;
+      creditMontoAbonado: number | null;
+      creditEstado: CreditAdjustmentPersistenceStatus['creditEstado'];
+      adjustmentExists: number;
+    }>();
+
+  return {
+    creditSaldoPendiente: status?.creditSaldoPendiente ?? null,
+    creditMontoAbonado: status?.creditMontoAbonado ?? null,
+    creditEstado: status?.creditEstado ?? null,
+    adjustmentExists: Boolean(status?.adjustmentExists),
   };
 }

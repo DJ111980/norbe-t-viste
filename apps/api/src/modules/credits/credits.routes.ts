@@ -4,6 +4,7 @@ import { ApiError } from '../../shared/errors';
 import { successResponse } from '../../shared/responses';
 import { ensureMethod, readJsonBody } from '../../shared/validation';
 import {
+  createCreditAdjustment,
   createCreditPayment,
   createOldDebt,
   getCreditById,
@@ -11,6 +12,7 @@ import {
   listCredits,
 } from './credits.service';
 import {
+  validateCreateCreditAdjustmentInput,
   validateCreateCreditPaymentInput,
   validateCreateOldDebtInput,
   validateListClientCreditsFilters,
@@ -84,6 +86,28 @@ export async function handleCreditRoutes(request: Request, env: ApiEnv): Promise
 
   if (creditPath) {
     requireRole(auth, ['ADMINISTRADOR', 'VENDEDOR']);
+
+    if (creditPath.action === 'ajustes') {
+      // Los ajustes cambian cartera sin entrada de dinero real; por control
+      // administrativo no se delegan a VENDEDOR en esta fase.
+      requireRole(auth, ['ADMINISTRADOR']);
+
+      if (request.method === 'POST') {
+        return successResponse(
+          {
+            ajuste: await createCreditAdjustment(
+              env,
+              auth,
+              creditPath.idCredito,
+              validateCreateCreditAdjustmentInput(await readJsonBody(request)),
+            ),
+          },
+          201,
+        );
+      }
+
+      ensureMethod(request, 'POST');
+    }
 
     if (creditPath.action === 'abonos') {
       if (request.method === 'POST') {
