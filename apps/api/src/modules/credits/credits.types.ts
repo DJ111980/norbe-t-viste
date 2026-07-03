@@ -1,0 +1,174 @@
+export type CreditOrigin = 'VENTA' | 'DEUDA_ANTIGUA' | 'AJUSTE_MANUAL';
+export type OldDebtType = 'SOLO_MONTO' | 'CON_PRODUCTOS';
+export type CreditStatus = 'PENDIENTE' | 'PARCIAL' | 'PAGADO' | 'VENCIDO' | 'ANULADO';
+export type PaymentMethod =
+  'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'NEQUI' | 'DAVIPLATA' | 'OTRO';
+export type CreditAdjustmentType = 'AUMENTO' | 'DESCUENTO' | 'ANULACION' | 'CORRECCION';
+
+export interface CreditClientRecord {
+  id_cliente: string;
+  nombre_completo: string;
+  documento: string | null;
+  telefono: string | null;
+  estado: 'ACTIVO' | 'INACTIVO';
+}
+
+export interface CreditSaleRecord {
+  id_venta: string;
+  numero_venta: string;
+  tipo_venta: string;
+  estado_venta: string;
+  total: number;
+  saldo_pendiente: number;
+}
+
+export interface CreditRecord {
+  id_credito: string;
+  id_cliente: string;
+  id_venta: string | null;
+  id_usuario: string;
+  origen_credito: CreditOrigin;
+  tipo_deuda_antigua: OldDebtType | null;
+  descripcion_credito: string | null;
+  monto_inicial: number;
+  monto_abonado: number;
+  saldo_pendiente: number;
+  fecha_credito: string;
+  fecha_vencimiento: string | null;
+  estado_credito: CreditStatus;
+  observaciones: string | null;
+  creado_en: string;
+  actualizado_en: string;
+  actualizado_por: string | null;
+  anulado_por: string | null;
+  anulado_en: string | null;
+  motivo_anulacion: string | null;
+  cliente_nombre: string;
+  cliente_documento: string | null;
+  cliente_telefono: string | null;
+}
+
+export interface CreditDetailRecord {
+  id_detalle_credito: string;
+  id_credito: string;
+  id_variante: string | null;
+  nombre_producto: string;
+  sku: string | null;
+  talla: string | null;
+  color: string | null;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+  observaciones: string | null;
+  creado_en: string;
+}
+
+export interface CreditPaymentRecord {
+  id_abono: string;
+  id_credito: string;
+  id_cliente: string;
+  id_usuario: string;
+  valor_abono: number;
+  metodo_pago: PaymentMethod;
+  referencia_pago: string | null;
+  fecha_abono: string;
+  observaciones: string | null;
+  creado_en: string;
+  estado_abono: 'ACTIVO' | 'ANULADO';
+  anulado_en: string | null;
+  motivo_anulacion: string | null;
+  usuario_nombre: string | null;
+}
+
+export interface CreditAdjustmentRecord {
+  id_ajuste: string;
+  id_credito: string;
+  id_usuario: string;
+  tipo_ajuste: CreditAdjustmentType;
+  valor_ajuste: number;
+  saldo_antes: number;
+  saldo_despues: number;
+  motivo: string;
+  creado_en: string;
+  usuario_nombre: string | null;
+}
+
+export interface CreditDetailViewRecord extends CreditRecord {
+  venta: CreditSaleRecord | null;
+  detalles: CreditDetailRecord[];
+  abonos: CreditPaymentRecord[];
+  ajustes: CreditAdjustmentRecord[];
+}
+
+export interface ListCreditsFilters {
+  cliente?: string;
+  estado?: CreditStatus;
+  origenCredito?: CreditOrigin;
+  saldoPendiente?: boolean;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  limit: number;
+  offset: number;
+}
+
+export interface ListClientCreditsFilters {
+  estado?: CreditStatus;
+  origenCredito?: CreditOrigin;
+  saldoPendiente?: boolean;
+  limit: number;
+  offset: number;
+}
+
+export interface CreateOldDebtInput {
+  idCliente: string;
+  montoInicial: number;
+  descripcion: string;
+  tipoDeudaAntigua: OldDebtType;
+}
+
+export interface PublicCreditSummary {
+  idCredito: string;
+  origenCredito: CreditOrigin;
+  tipoDeudaAntigua: OldDebtType | null;
+  descripcionCredito: string | null;
+  montoInicial: number;
+  montoAbonado: number;
+  saldoPendiente: number;
+  fechaCredito: string;
+  fechaVencimiento: string | null;
+  estadoCredito: CreditStatus;
+  cliente: {
+    idCliente: string;
+    nombreCompleto: string;
+    documento: string | null;
+    telefono: string | null;
+  };
+}
+
+export interface PublicCreditDetail extends PublicCreditSummary {
+  idVenta: string | null;
+  venta: CreditSaleRecord | null;
+  observaciones: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
+  detalles: CreditDetailRecord[];
+  abonos: CreditPaymentRecord[];
+  ajustes: CreditAdjustmentRecord[];
+  resumen: {
+    montoInicial: number;
+    montoAbonado: number;
+    saldoPendiente: number;
+    estadoCredito: CreditStatus;
+  };
+}
+
+export interface CreateOldDebtResult {
+  id_credito: string;
+  id_cliente: string;
+  origen_credito: 'DEUDA_ANTIGUA';
+  tipo_deuda_antigua: OldDebtType;
+  monto_inicial: number;
+  monto_abonado: 0;
+  saldo_pendiente: number;
+  estado_credito: 'PENDIENTE';
+}
