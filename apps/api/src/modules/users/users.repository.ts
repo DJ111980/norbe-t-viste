@@ -4,6 +4,7 @@ import type { CreateUserInput, UpdateUserInput, UserRecord, UserStatus } from '.
 const USER_COLUMNS = `
   id_usuario,
   nombre_completo,
+  nombre_usuario,
   correo,
   contrasena_hash,
   rol,
@@ -54,6 +55,22 @@ export async function findUserByEmail(env: ApiEnv, correo: string): Promise<User
     .first<UserRecord>();
 }
 
+export async function findUserByUsername(
+  env: ApiEnv,
+  nombreUsuario: string,
+): Promise<UserRecord | null> {
+  return env.DB.prepare(
+    `
+      SELECT ${USER_COLUMNS}
+      FROM usuarios
+      WHERE nombre_usuario = ?
+      LIMIT 1
+    `,
+  )
+    .bind(nombreUsuario)
+    .first<UserRecord>();
+}
+
 export async function createUser(
   env: ApiEnv,
   idUsuario: string,
@@ -66,6 +83,7 @@ export async function createUser(
       INSERT INTO usuarios (
         id_usuario,
         nombre_completo,
+        nombre_usuario,
         correo,
         contrasena_hash,
         rol,
@@ -75,10 +93,18 @@ export async function createUser(
         creado_por,
         creado_en,
         actualizado_en
-      ) VALUES (?, ?, ?, ?, ?, 'ACTIVO', 1, datetime('now'), ?, datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, 'ACTIVO', 1, datetime('now'), ?, datetime('now'), datetime('now'))
     `,
   )
-    .bind(idUsuario, input.nombreCompleto, input.correo, passwordHash, input.rol, createdByUserId)
+    .bind(
+      idUsuario,
+      input.nombreCompleto,
+      input.nombreUsuario,
+      input.correo,
+      passwordHash,
+      input.rol,
+      createdByUserId,
+    )
     .run();
 
   return (await findUserById(env, idUsuario)) as UserRecord;
@@ -100,6 +126,11 @@ export async function updateUser(
   if (input.correo !== undefined) {
     assignments.push('correo = ?');
     values.push(input.correo);
+  }
+
+  if (input.nombreUsuario !== undefined) {
+    assignments.push('nombre_usuario = ?');
+    values.push(input.nombreUsuario);
   }
 
   if (input.rol !== undefined) {

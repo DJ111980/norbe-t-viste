@@ -7,6 +7,7 @@ describe('users mapper', () => {
     const publicUser = toPublicUser({
       id_usuario: 'usr_1',
       nombre_completo: 'Usuario',
+      nombre_usuario: 'usuario',
       correo: 'usuario@norbe.test',
       contrasena_hash: 'hash-secreto',
       rol: 'VENDEDOR',
@@ -20,6 +21,7 @@ describe('users mapper', () => {
     } satisfies UserRecord);
 
     expect(publicUser).not.toHaveProperty('contrasena_hash');
+    expect(publicUser.nombreUsuario).toBe('usuario');
     expect(JSON.stringify(publicUser)).not.toContain('hash-secreto');
   });
 });

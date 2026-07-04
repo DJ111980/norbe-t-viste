@@ -26,12 +26,14 @@ describe('users service', () => {
 
     await createUser('token', {
       nombre_completo: 'Demo',
+      nombre_usuario: 'demo',
       correo: 'demo@example.com',
       rol: 'VENDEDOR',
       contrasena: 'demo1234',
     });
     await updateUser('token', 'usr_1', {
       nombre_completo: 'Demo Editado',
+      nombre_usuario: 'demo-editado',
       correo: 'demo2@example.com',
       rol: 'ADMINISTRADOR',
     });
@@ -41,6 +43,7 @@ describe('users service', () => {
       token: 'token',
       body: {
         nombre_completo: 'Demo',
+        nombre_usuario: 'demo',
         correo: 'demo@example.com',
         rol: 'VENDEDOR',
         contrasena: 'demo1234',
@@ -51,6 +54,7 @@ describe('users service', () => {
       token: 'token',
       body: {
         nombre_completo: 'Demo Editado',
+        nombre_usuario: 'demo-editado',
         correo: 'demo2@example.com',
         rol: 'ADMINISTRADOR',
       },

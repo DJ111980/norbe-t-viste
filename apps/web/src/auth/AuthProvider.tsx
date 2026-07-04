@@ -38,12 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearSession();
   }, [clearSession]);
 
-  const login = useCallback(async (correo: string, contrasena: string) => {
-    const session = await apiRequest<LoginResponse, { correo: string; contrasena: string }>(
+  const login = useCallback(async (usuario: string, contrasena: string) => {
+    const session = await apiRequest<LoginResponse, { usuario: string; contrasena: string }>(
       '/auth/login',
       {
         method: 'POST',
-        body: { correo, contrasena },
+        body: { usuario, contrasena },
       },
     );
 

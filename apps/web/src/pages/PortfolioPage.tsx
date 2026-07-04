@@ -39,6 +39,7 @@ import { getClientPortfolio, getPortfolio, type PortfolioFilters } from '../serv
 import type {
   Client,
   ClientPortfolio,
+  CreditClientInfo,
   CreditAdjustmentFormValues,
   CreditDetail,
   CreditOrigin,
@@ -49,6 +50,7 @@ import type {
   OldDebtFormValues,
   PaymentMethod,
   Portfolio,
+  PortfolioCredit,
   UserRole,
 } from '../types';
 
@@ -118,7 +120,7 @@ function currency(value: number): string {
 }
 
 function handleMessage(error: unknown, fallback: string): string {
-  if (isForbiddenError(error)) return 'No tienes permisos para esta accion.';
+  if (isForbiddenError(error)) return 'No tienes permisos para esta acción.';
   return error instanceof ApiClientError ? error.message : fallback;
 }
 
@@ -174,6 +176,7 @@ export function PortfolioPage({
     [clients],
   );
   const canViewGeneral = canViewGeneralPortfolio(role);
+  const isPortfolioView = initialView === 'portfolio';
 
   async function expireIfNeeded(actionError: unknown): Promise<boolean> {
     if (!isUnauthorizedError(actionError)) return false;
@@ -413,13 +416,17 @@ export function PortfolioPage({
   return (
     <section className="space-y-6">
       <PageHeader
-        title={initialView === 'portfolio' ? 'Cartera' : 'Creditos'}
-        description="Consulta cartera, revisa creditos y registra abonos sin editar saldos manualmente."
+        title={isPortfolioView ? 'Cartera' : 'Créditos'}
+        description={
+          isPortfolioView
+            ? 'Resumen financiero de saldos pendientes y clientes con deuda.'
+            : 'Vista operativa de créditos individuales, abonos, ajustes y anulaciones permitidas.'
+        }
       />
 
       {!canViewGeneral && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Tu usuario consulta cartera por cliente. La cartera general esta reservada para
+          Tu usuario consulta cartera por cliente. La cartera general está reservada para
           administradores.
         </div>
       )}
@@ -443,7 +450,9 @@ export function PortfolioPage({
         <ClientPortfolioSummary clientPortfolio={clientPortfolio} />
       )}
 
-      {canManageOldDebts(role) && (
+      {isPortfolioView && portfolio && <PortfolioByClient credits={portfolio.creditos} />}
+
+      {canManageOldDebts(role) && !isPortfolioView && (
         <OldDebtForm
           form={oldDebtForm}
           clients={activeClients}
@@ -453,19 +462,19 @@ export function PortfolioPage({
         />
       )}
 
-      {isLoading ? (
+      {!isPortfolioView && isLoading ? (
         <LoadingState />
-      ) : credits.length === 0 ? (
-        <EmptyState message="No hay creditos para mostrar." />
-      ) : (
+      ) : !isPortfolioView && credits.length === 0 ? (
+        <EmptyState message="No hay créditos para mostrar." />
+      ) : !isPortfolioView ? (
         <CreditsTable
           credits={credits}
           selected={selected}
           onSelect={(credit) => void loadCredit(credit.idCredito)}
         />
-      )}
+      ) : null}
 
-      {selected && (
+      {selected && !isPortfolioView && (
         <CreditDetailPanel
           role={role}
           credit={selected}
@@ -617,7 +626,7 @@ function ClientPortfolioSummary({ clientPortfolio }: { clientPortfolio: ClientPo
         value={currency(clientPortfolio.resumen.totalSaldoPendiente)}
       />
       <SummaryCard
-        label="Creditos activos"
+        label="Créditos activos"
         value={String(clientPortfolio.creditosActivos.length)}
       />
       <SummaryCard
@@ -628,6 +637,81 @@ function ClientPortfolioSummary({ clientPortfolio }: { clientPortfolio: ClientPo
             : 'Sin abonos'
         }
       />
+    </div>
+  );
+}
+
+function PortfolioByClient({ credits }: { credits: PortfolioCredit[] }) {
+  const rows = Object.values(
+    credits.reduce<
+      Record<
+        string,
+        {
+          cliente: CreditClientInfo;
+          saldo: number;
+          pendientes: number;
+          parciales: number;
+          creditos: number;
+        }
+      >
+    >((groups, credit) => {
+      const current = groups[credit.cliente.idCliente] ?? {
+        cliente: credit.cliente,
+        saldo: 0,
+        pendientes: 0,
+        parciales: 0,
+        creditos: 0,
+      };
+
+      current.creditos += 1;
+      current.saldo += credit.saldoPendiente;
+      if (credit.estadoCredito === 'PENDIENTE') current.pendientes += 1;
+      if (credit.estadoCredito === 'PARCIAL') current.parciales += 1;
+      groups[credit.cliente.idCliente] = current;
+
+      return groups;
+    }, {}),
+  ).sort((a, b) => b.saldo - a.saldo);
+
+  if (rows.length === 0) {
+    return <EmptyState message="No hay clientes con deuda para mostrar." />;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
+      <div className="border-b border-stone-100 p-4">
+        <h2 className="text-sm font-semibold text-stone-950">Clientes con deuda</h2>
+        <p className="mt-1 text-xs text-stone-500">
+          Resumen construido desde los créditos devueltos por cartera.
+        </p>
+      </div>
+      <table className="w-full min-w-[760px] text-left text-sm">
+        <thead className="bg-stone-50 text-xs uppercase text-stone-500">
+          <tr>
+            <th className="px-4 py-3">Cliente</th>
+            <th className="px-4 py-3">Saldo pendiente</th>
+            <th className="px-4 py-3">Créditos</th>
+            <th className="px-4 py-3">Pendientes</th>
+            <th className="px-4 py-3">Parciales</th>
+            <th className="px-4 py-3">Acceso</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-stone-100">
+          {rows.map((row) => (
+            <tr key={row.cliente.idCliente}>
+              <td className="px-4 py-3">
+                <p className="font-medium text-stone-950">{row.cliente.nombreCompleto}</p>
+                <p className="text-xs text-stone-500">{row.cliente.documento ?? 'Sin doc.'}</p>
+              </td>
+              <td className="px-4 py-3 font-semibold text-stone-950">{currency(row.saldo)}</td>
+              <td className="px-4 py-3 text-stone-700">{row.creditos}</td>
+              <td className="px-4 py-3 text-stone-700">{row.pendientes}</td>
+              <td className="px-4 py-3 text-stone-700">{row.parciales}</td>
+              <td className="px-4 py-3 text-stone-700">Ir a Créditos</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -3,6 +3,7 @@ export type UserRole = 'ADMINISTRADOR' | 'VENDEDOR';
 export interface AuthUser {
   idUsuario: string;
   nombreCompleto: string;
+  nombreUsuario: string;
   correo: string;
   rol: UserRole;
 }
@@ -12,6 +13,7 @@ export type UserStatus = 'ACTIVO' | 'INACTIVO';
 export interface UserAccount {
   idUsuario: string;
   nombreCompleto: string;
+  nombreUsuario: string;
   correo: string;
   rol: UserRole;
   estado: UserStatus;
@@ -25,6 +27,7 @@ export interface UserAccount {
 
 export interface UserFormValues {
   nombre_completo: string;
+  nombre_usuario: string;
   correo: string;
   rol: UserRole;
   contrasena: string;
@@ -32,6 +35,7 @@ export interface UserFormValues {
 
 export interface UserUpdateFormValues {
   nombre_completo: string;
+  nombre_usuario: string;
   correo: string;
   rol: UserRole;
 }
@@ -42,6 +46,16 @@ export interface UserPasswordFormValues {
 
 export interface BusinessLogo {
   key: string;
+  url: string;
+  existe: true;
+}
+
+export interface BusinessBranding {
+  nombre_negocio: string;
+  eslogan: string;
+  descripcion_login: string;
+  color_principal: string;
+  logo: BusinessLogo | null;
 }
 
 export interface LabelBatchItemFormValues {

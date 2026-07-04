@@ -38,6 +38,22 @@ async function ensureEmailIsAvailable(
   }
 }
 
+async function ensureUsernameIsAvailable(
+  env: ApiEnv,
+  nombreUsuario: string,
+  currentUserId?: string,
+): Promise<void> {
+  const existingUser = await usersRepository.findUserByUsername(env, nombreUsuario);
+
+  if (existingUser && existingUser.id_usuario !== currentUserId) {
+    throw new ApiError(
+      'USER_NAME_ALREADY_EXISTS',
+      'Ya existe un usuario con ese nombre de usuario.',
+      409,
+    );
+  }
+}
+
 export async function listUsers(env: ApiEnv): Promise<PublicUser[]> {
   const users = await usersRepository.listUsers(env);
 
@@ -54,6 +70,7 @@ export async function createUser(
   input: CreateUserInput,
 ): Promise<PublicUser> {
   await ensureEmailIsAvailable(env, input.correo);
+  await ensureUsernameIsAvailable(env, input.nombreUsuario);
 
   const passwordHash = await hashPassword(input.contrasena);
   const user = await usersRepository.createUser(
@@ -76,6 +93,10 @@ export async function updateUser(
 
   if (input.correo) {
     await ensureEmailIsAvailable(env, input.correo, idUsuario);
+  }
+
+  if (input.nombreUsuario) {
+    await ensureUsernameIsAvailable(env, input.nombreUsuario, idUsuario);
   }
 
   return toPublicUser(await usersRepository.updateUser(env, idUsuario, input));

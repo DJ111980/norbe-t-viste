@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { useBranding } from '../branding/branding-context';
 import type { UserRole } from '../types';
 
 interface NavItem {
@@ -12,18 +13,18 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Clientes', path: '/clientes' },
   { label: 'Proveedores', path: '/proveedores' },
-  { label: 'Categorias', path: '/categorias' },
+  { label: 'Categorías', path: '/categorias' },
   { label: 'Productos', path: '/productos' },
   { label: 'Variantes', path: '/variantes' },
   { label: 'Inventario', path: '/inventario' },
   { label: 'Lotes de entrada', path: '/lotes-entrada' },
   { label: 'Ventas', path: '/ventas' },
-  { label: 'Creditos', path: '/creditos' },
+  { label: 'Créditos', path: '/creditos' },
   { label: 'Cartera', path: '/cartera' },
   { label: 'Devoluciones', path: '/devoluciones' },
   { label: 'Etiquetas', path: '/etiquetas' },
   { label: 'Reportes', path: '/reportes' },
-  { label: 'Branding', path: '/branding', adminOnly: true },
+  { label: 'Marca del negocio', path: '/branding', adminOnly: true },
   { label: 'Usuarios', path: '/usuarios', adminOnly: true },
 ];
 
@@ -41,14 +42,34 @@ export function AppLayout({
   children: ReactNode;
 }) {
   const { user, logout } = useAuth();
+  const { branding, logoUrl } = useBranding();
   const visibleItems = useMemo(() => getVisibleNavItems(user?.rol ?? 'VENDEDOR'), [user?.rol]);
 
   return (
     <div className="min-h-screen bg-stone-100 text-stone-950">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-stone-200 bg-white lg:block">
         <div className="border-b border-stone-200 px-6 py-5">
-          <p className="text-xs font-semibold uppercase text-red-700">NORBE T VISTE</p>
-          <p className="mt-1 text-sm text-stone-600">Gestion comercial</p>
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-white">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={`Logo ${branding.nombre_negocio}`}
+                  className="max-h-10 max-w-10 object-contain"
+                />
+              ) : (
+                <span className="text-xs font-semibold text-red-700">
+                  {branding.nombre_negocio.slice(0, 3)}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold uppercase text-red-700">
+                {branding.nombre_negocio}
+              </p>
+              <p className="mt-1 truncate text-sm text-stone-600">{branding.eslogan}</p>
+            </div>
+          </div>
         </div>
 
         <nav className="space-y-1 px-3 py-4">
@@ -74,7 +95,7 @@ export function AppLayout({
           <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-8">
             <div>
               <p className="text-xs font-semibold uppercase text-red-700 lg:hidden">
-                NORBE T VISTE
+                {branding.nombre_negocio}
               </p>
               <p className="text-sm font-medium text-stone-950">
                 {user?.nombreCompleto ?? 'Usuario'}

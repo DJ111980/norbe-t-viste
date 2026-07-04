@@ -12,6 +12,7 @@ const VALID_STATUSES: UserStatus[] = ['ACTIVO', 'INACTIVO'];
 
 interface RawCreateUserBody {
   nombre_completo?: unknown;
+  nombre_usuario?: unknown;
   correo?: unknown;
   rol?: unknown;
   contrasena?: unknown;
@@ -19,6 +20,7 @@ interface RawCreateUserBody {
 
 interface RawUpdateUserBody {
   nombre_completo?: unknown;
+  nombre_usuario?: unknown;
   correo?: unknown;
   rol?: unknown;
 }
@@ -33,6 +35,10 @@ interface RawResetPasswordBody {
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+export function normalizeUsername(username: string): string {
+  return username.trim().toLowerCase();
 }
 
 export function validatePasswordPolicy(password: string): string[] {
@@ -56,6 +62,16 @@ export function validatePasswordPolicy(password: string): string[] {
 function validateEmail(email: string): void {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new ApiError('INVALID_EMAIL', 'El correo no tiene un formato valido.', 400);
+  }
+}
+
+function validateUsername(username: string): void {
+  if (!/^[a-z0-9._-]{3,40}$/.test(username)) {
+    throw new ApiError(
+      'INVALID_USERNAME',
+      'El usuario debe tener entre 3 y 40 caracteres y usar letras, numeros, punto, guion o guion bajo.',
+      400,
+    );
   }
 }
 
@@ -86,6 +102,8 @@ export function validateCreateUserInput(body: unknown): CreateUserInput {
   const nombreCompleto =
     typeof rawBody?.nombre_completo === 'string' ? rawBody.nombre_completo.trim() : '';
   const correo = typeof rawBody?.correo === 'string' ? normalizeEmail(rawBody.correo) : '';
+  const nombreUsuario =
+    typeof rawBody?.nombre_usuario === 'string' ? normalizeUsername(rawBody.nombre_usuario) : '';
 
   if (!nombreCompleto) {
     throw new ApiError('INVALID_USER_NAME', 'El nombre completo es obligatorio.', 400);
@@ -95,10 +113,16 @@ export function validateCreateUserInput(body: unknown): CreateUserInput {
     throw new ApiError('INVALID_EMAIL', 'El correo es obligatorio.', 400);
   }
 
+  if (!nombreUsuario) {
+    throw new ApiError('INVALID_USERNAME', 'El usuario es obligatorio.', 400);
+  }
+
   validateEmail(correo);
+  validateUsername(nombreUsuario);
 
   return {
     nombreCompleto,
+    nombreUsuario,
     correo,
     rol: validateRole(rawBody.rol),
     contrasena: validatePassword(rawBody.contrasena),
@@ -123,6 +147,12 @@ export function validateUpdateUserInput(body: unknown): UpdateUserInput {
     const correo = normalizeEmail(rawBody.correo);
     validateEmail(correo);
     input.correo = correo;
+  }
+
+  if (typeof rawBody?.nombre_usuario === 'string') {
+    const nombreUsuario = normalizeUsername(rawBody.nombre_usuario);
+    validateUsername(nombreUsuario);
+    input.nombreUsuario = nombreUsuario;
   }
 
   if (rawBody?.rol !== undefined) {

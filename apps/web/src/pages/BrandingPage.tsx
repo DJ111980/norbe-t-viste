@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { useBranding } from '../branding/branding-context';
 import {
   ErrorMessage,
   Field,
@@ -9,27 +10,49 @@ import {
   primaryButtonClassName,
   secondaryButtonClassName,
   SuccessMessage,
+  textareaClassName,
 } from '../components/ui';
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
 import { canManageBranding } from '../permissions';
-import { deleteLogo, getLogo, getLogoFile, uploadLogo } from '../services/branding';
-import type { BusinessLogo } from '../types';
+import { deleteLogo, updateBranding, uploadLogo } from '../services/branding';
+import type { BusinessBranding } from '../types';
 
 function handleMessage(error: unknown, fallback: string): string {
-  if (isForbiddenError(error)) return 'No tienes permisos para esta accion.';
+  if (isForbiddenError(error)) return 'No tienes permisos para esta acción.';
+  if (error instanceof ApiClientError && error.code === 'R2_NOT_CONFIGURED') {
+    return 'R2 no está configurado para administrar el logo en este entorno.';
+  }
   return error instanceof ApiClientError ? error.message : fallback;
 }
 
+type BrandingForm = Pick<
+  BusinessBranding,
+  'nombre_negocio' | 'eslogan' | 'descripcion_login' | 'color_principal'
+>;
+
 export function BrandingPage({ onSessionExpired }: { onSessionExpired: () => void }) {
   const { token, user, logout } = useAuth();
-  const [logo, setLogo] = useState<BusinessLogo | null>(null);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const { branding, logoUrl, refreshBranding, isLoading } = useBranding();
+  const [form, setForm] = useState<BrandingForm>({
+    nombre_negocio: branding.nombre_negocio,
+    eslogan: branding.eslogan,
+    descripcion_login: branding.descripcion_login,
+    color_principal: branding.color_principal,
+  });
   const [file, setFile] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const canManage = user ? canManageBranding(user.rol) : false;
+
+  useEffect(() => {
+    setForm({
+      nombre_negocio: branding.nombre_negocio,
+      eslogan: branding.eslogan,
+      descripcion_login: branding.descripcion_login,
+      color_principal: branding.color_principal,
+    });
+  }, [branding]);
 
   async function expireIfNeeded(actionError: unknown): Promise<boolean> {
     if (!isUnauthorizedError(actionError)) return false;
@@ -38,37 +61,24 @@ export function BrandingPage({ onSessionExpired }: { onSessionExpired: () => voi
     return true;
   }
 
-  async function loadLogo() {
-    if (!token) return;
-    setIsLoading(true);
+  async function saveBranding(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !canManage) return;
+    setIsSaving(true);
     setError(null);
+    setSuccess(null);
 
     try {
-      const currentLogo = await getLogo(token);
-      setLogo(currentLogo);
-
-      if (logoUrl) URL.revokeObjectURL(logoUrl);
-      if (currentLogo) {
-        const blob = await getLogoFile(token);
-        setLogoUrl(URL.createObjectURL(blob));
-      } else {
-        setLogoUrl(null);
-      }
-    } catch (loadError) {
-      if (await expireIfNeeded(loadError)) return;
-      setError(handleMessage(loadError, 'No se pudo cargar el logo.'));
+      await updateBranding(token, form);
+      await refreshBranding();
+      setSuccess('Marca del negocio actualizada.');
+    } catch (saveError) {
+      if (await expireIfNeeded(saveError)) return;
+      setError(handleMessage(saveError, 'No se pudo guardar la marca.'));
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   }
-
-  useEffect(() => {
-    void loadLogo();
-
-    return () => {
-      if (logoUrl) URL.revokeObjectURL(logoUrl);
-    };
-  }, [token]);
 
   async function saveLogo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,8 +90,8 @@ export function BrandingPage({ onSessionExpired }: { onSessionExpired: () => voi
     try {
       await uploadLogo(token, file);
       setFile(null);
+      await refreshBranding();
       setSuccess('Logo actualizado.');
-      await loadLogo();
     } catch (saveError) {
       if (await expireIfNeeded(saveError)) return;
       setError(handleMessage(saveError, 'No se pudo subir el logo.'));
@@ -98,8 +108,8 @@ export function BrandingPage({ onSessionExpired }: { onSessionExpired: () => voi
 
     try {
       await deleteLogo(token);
+      await refreshBranding();
       setSuccess('Logo eliminado.');
-      await loadLogo();
     } catch (deleteError) {
       if (await expireIfNeeded(deleteError)) return;
       setError(handleMessage(deleteError, 'No se pudo eliminar el logo.'));
@@ -111,8 +121,8 @@ export function BrandingPage({ onSessionExpired }: { onSessionExpired: () => voi
   return (
     <section className="space-y-6">
       <PageHeader
-        title="Branding"
-        description="Administra el logo del negocio usando el backend y R2."
+        title="Marca del negocio"
+        description="Administra nombre, eslogan, color principal y logo global de la aplicación."
       />
 
       {error && <ErrorMessage message={error} />}
@@ -121,24 +131,85 @@ export function BrandingPage({ onSessionExpired }: { onSessionExpired: () => voi
       {isLoading ? (
         <LoadingState />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="rounded-md border border-stone-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-stone-950">Logo actual</h2>
-            <div className="mt-4 flex min-h-60 items-center justify-center rounded-md border border-dashed border-stone-300 bg-stone-50 p-6">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt="Logo NORBE T VISTE"
-                  className="max-h-52 max-w-full object-contain"
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={saveBranding}>
+            <h2 className="text-sm font-semibold text-stone-950">Datos visibles</h2>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <Field label="Nombre del negocio">
+                <input
+                  required
+                  value={form.nombre_negocio}
+                  onChange={(event) => setForm({ ...form, nombre_negocio: event.target.value })}
+                  className={inputClassName}
                 />
-              ) : (
-                <p className="text-sm text-stone-500">No hay logo configurado.</p>
-              )}
+              </Field>
+              <Field label="Eslogan">
+                <input
+                  required
+                  value={form.eslogan}
+                  onChange={(event) => setForm({ ...form, eslogan: event.target.value })}
+                  className={inputClassName}
+                />
+              </Field>
+              <Field label="Color principal">
+                <input
+                  required
+                  type="color"
+                  value={form.color_principal}
+                  onChange={(event) => setForm({ ...form, color_principal: event.target.value })}
+                  className="mt-1 h-11 w-full rounded-md border border-stone-300 bg-white px-2"
+                />
+              </Field>
             </div>
-            {logo && <p className="mt-3 text-xs text-stone-500">Key: {logo.key}</p>}
-          </div>
+            <div className="mt-4">
+              <Field label="Descripción del login">
+                <textarea
+                  required
+                  value={form.descripcion_login}
+                  onChange={(event) => setForm({ ...form, descripcion_login: event.target.value })}
+                  className={textareaClassName}
+                />
+              </Field>
+            </div>
+            <button
+              type="submit"
+              disabled={!canManage || isSaving}
+              className={`${primaryButtonClassName} mt-4`}
+            >
+              Guardar marca
+            </button>
+          </form>
 
           <div className="space-y-4">
+            <div className="rounded-md border border-stone-200 bg-white p-4">
+              <h2 className="text-sm font-semibold text-stone-950">Vista previa</h2>
+              <div
+                className="mt-4 rounded-md p-5 text-white"
+                style={{ backgroundColor: form.color_principal }}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-md bg-white p-3">
+                    {logoUrl ? (
+                      <img
+                        src={logoUrl}
+                        alt={`Logo ${form.nombre_negocio}`}
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    ) : (
+                      <span className="text-sm font-semibold text-red-800">
+                        {form.nombre_negocio.slice(0, 3)}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold uppercase">{form.nombre_negocio}</p>
+                    <p className="mt-1 text-sm text-red-50">{form.eslogan}</p>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm leading-6 text-red-50">{form.descripcion_login}</p>
+              </div>
+            </div>
+
             {canManage ? (
               <>
                 <form
@@ -157,7 +228,7 @@ export function BrandingPage({ onSessionExpired }: { onSessionExpired: () => voi
                   <button
                     type="submit"
                     disabled={!file || isSaving}
-                    className={`${primaryButtonClassName} mt-4`}
+                    className={`${secondaryButtonClassName} mt-4`}
                   >
                     Subir logo
                   </button>
@@ -165,12 +236,9 @@ export function BrandingPage({ onSessionExpired }: { onSessionExpired: () => voi
 
                 <div className="rounded-md border border-stone-200 bg-white p-4">
                   <h2 className="text-sm font-semibold text-stone-950">Eliminar logo</h2>
-                  <p className="mt-2 text-sm text-stone-600">
-                    Esta accion elimina la referencia mediante el backend.
-                  </p>
                   <button
                     type="button"
-                    disabled={!logo || isSaving}
+                    disabled={!branding.logo || isSaving}
                     onClick={() => void removeLogo()}
                     className={`${secondaryButtonClassName} mt-4`}
                   >
@@ -180,7 +248,7 @@ export function BrandingPage({ onSessionExpired }: { onSessionExpired: () => voi
               </>
             ) : (
               <div className="rounded-md border border-stone-200 bg-white p-4 text-sm text-stone-600">
-                Tu usuario puede ver el logo, pero no administrarlo.
+                Tu usuario puede ver la marca, pero no administrarla.
               </div>
             )}
           </div>

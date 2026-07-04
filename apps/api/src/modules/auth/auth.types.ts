@@ -5,6 +5,7 @@ export type UserRole = (typeof USER_ROLES)[number];
 export interface UserRecord {
   id_usuario: string;
   nombre_completo: string;
+  nombre_usuario: string;
   correo: string;
   contrasena_hash: string;
   rol: UserRole;
@@ -20,12 +21,13 @@ export interface UserRecord {
 export interface AuthenticatedUser {
   idUsuario: string;
   nombreCompleto: string;
+  nombreUsuario: string;
   correo: string;
   rol: UserRole;
 }
 
 export interface LoginInput {
-  correo: string;
+  usuario: string;
   contrasena: string;
 }
 

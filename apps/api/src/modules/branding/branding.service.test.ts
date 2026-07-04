@@ -37,6 +37,9 @@ vi.mock('./branding.repository', () => ({
       mocks.config = {
         id_configuracion: 'configuracion_principal',
         nombre_negocio: 'NORBE T VISTE',
+        eslogan: 'Gestion comercial',
+        descripcion_login: 'Gestion comercial lista para operar desde el navegador.',
+        color_principal: '#b0181b',
         logo_imagen: null,
       };
     }
@@ -46,6 +49,9 @@ vi.mock('./branding.repository', () => ({
     mocks.config = {
       id_configuracion: idConfiguracion,
       nombre_negocio: 'NORBE T VISTE',
+      eslogan: 'Gestion comercial',
+      descripcion_login: 'Gestion comercial lista para operar desde el navegador.',
+      color_principal: '#b0181b',
       logo_imagen: logoKey,
     };
     return mocks.config;
@@ -88,6 +94,9 @@ describe('branding service', () => {
     mocks.config = {
       id_configuracion: 'cfg_1',
       nombre_negocio: 'NORBE T VISTE',
+      eslogan: 'Gestion comercial',
+      descripcion_login: 'Gestion comercial lista para operar desde el navegador.',
+      color_principal: '#b0181b',
       logo_imagen: 'branding/logo/anterior.png',
     };
 
@@ -101,10 +110,17 @@ describe('branding service', () => {
     mocks.config = {
       id_configuracion: 'cfg_1',
       nombre_negocio: 'NORBE T VISTE',
+      eslogan: 'Gestion comercial',
+      descripcion_login: 'Gestion comercial lista para operar desde el navegador.',
+      color_principal: '#b0181b',
       logo_imagen: 'branding/logo/logo.png',
     };
 
-    expect(await getLogo(env)).toEqual({ key: 'branding/logo/logo.png' });
+    expect(await getLogo(env)).toEqual({
+      key: 'branding/logo/logo.png',
+      url: '/branding/logo/file',
+      existe: true,
+    });
 
     const response = await getLogoFile(env);
 
@@ -116,6 +132,9 @@ describe('branding service', () => {
     mocks.config = {
       id_configuracion: 'cfg_1',
       nombre_negocio: 'NORBE T VISTE',
+      eslogan: 'Gestion comercial',
+      descripcion_login: 'Gestion comercial lista para operar desde el navegador.',
+      color_principal: '#b0181b',
       logo_imagen: 'branding/logo/logo.png',
     };
 

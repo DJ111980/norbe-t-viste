@@ -17,6 +17,7 @@ vi.mock('../../middleware/auth.middleware', () => ({
       user: {
         id_usuario: mocks.role === 'ADMINISTRADOR' ? 'usr_admin' : 'usr_vendedor',
         nombre_completo: mocks.role,
+        nombre_usuario: mocks.role.toLowerCase(),
         correo: `${mocks.role.toLowerCase()}@norbe.test`,
         contrasena_hash: 'hash',
         rol: mocks.role,
@@ -38,9 +39,26 @@ vi.mock('./branding.validation', () => ({
     contentType: 'image/png',
     size: 4,
   })),
+  validateUpdateBrandingInput: vi.fn(() => ({
+    nombreNegocio: 'NORBE T VISTE',
+  })),
 }));
 
 vi.mock('./branding.service', () => ({
+  getBranding: vi.fn(async () => ({
+    nombre_negocio: 'NORBE T VISTE',
+    eslogan: 'Gestion comercial',
+    descripcion_login: 'Gestion comercial lista para operar desde el navegador.',
+    color_principal: '#b0181b',
+    logo: null,
+  })),
+  updateBranding: vi.fn(async () => ({
+    nombre_negocio: 'NORBE T VISTE',
+    eslogan: 'Gestion comercial',
+    descripcion_login: 'Gestion comercial lista para operar desde el navegador.',
+    color_principal: '#b0181b',
+    logo: null,
+  })),
   getLogo: vi.fn(async () => ({ key: 'branding/logo/logo.png' })),
   uploadLogo: vi.fn(async () => ({ key: 'branding/logo/logo.png' })),
   deleteLogo: vi.fn(async () => null),
@@ -50,6 +68,37 @@ vi.mock('./branding.service', () => ({
 }));
 
 describe('branding routes', () => {
+  it('GET /branding es publico para cargar login', async () => {
+    mocks.authenticated = false;
+
+    expect(
+      (await handleBrandingRoutes(new Request('http://localhost/branding'), {} as ApiEnv))?.status,
+    ).toBe(200);
+  });
+
+  it('solo ADMINISTRADOR puede actualizar branding global', async () => {
+    mocks.authenticated = true;
+    mocks.role = 'VENDEDOR';
+
+    await expect(
+      handleBrandingRoutes(
+        new Request('http://localhost/branding', { method: 'PATCH', body: '{}' }),
+        {} as ApiEnv,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+
+    mocks.role = 'ADMINISTRADOR';
+
+    expect(
+      (
+        await handleBrandingRoutes(
+          new Request('http://localhost/branding', { method: 'PATCH', body: '{}' }),
+          {} as ApiEnv,
+        )
+      )?.status,
+    ).toBe(200);
+  });
+
   it('VENDEDOR puede consultar logo y archivo', async () => {
     mocks.authenticated = true;
     mocks.role = 'VENDEDOR';

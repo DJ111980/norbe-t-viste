@@ -2,15 +2,42 @@ import type { ApiEnv } from '../../config/env';
 import { requireAuth, requireRole } from '../../middleware/auth.middleware';
 import { ApiError } from '../../shared/errors';
 import { successResponse } from '../../shared/responses';
-import { ensureMethod } from '../../shared/validation';
-import { deleteLogo, getLogo, getLogoFile, uploadLogo } from './branding.service';
-import { validateLogoUploadRequest } from './branding.validation';
+import { ensureMethod, readJsonBody } from '../../shared/validation';
+import {
+  deleteLogo,
+  getBranding,
+  getLogo,
+  getLogoFile,
+  updateBranding,
+  uploadLogo,
+} from './branding.service';
+import { validateLogoUploadRequest, validateUpdateBrandingInput } from './branding.validation';
 
 export async function handleBrandingRoutes(
   request: Request,
   env: ApiEnv,
 ): Promise<Response | null> {
   const url = new URL(request.url);
+
+  if (url.pathname === '/branding') {
+    if (request.method === 'GET') {
+      return successResponse({
+        branding: await getBranding(env),
+      });
+    }
+
+    if (request.method === 'PATCH') {
+      const auth = await requireAuth(request, env);
+      requireRole(auth, ['ADMINISTRADOR']);
+      const input = validateUpdateBrandingInput(await readJsonBody(request));
+
+      return successResponse({
+        branding: await updateBranding(env, input),
+      });
+    }
+
+    ensureMethod(request, 'GET');
+  }
 
   if (url.pathname === '/branding/logo') {
     const auth = await requireAuth(request, env);
@@ -47,8 +74,6 @@ export async function handleBrandingRoutes(
   }
 
   if (url.pathname === '/branding/logo/file') {
-    const auth = await requireAuth(request, env);
-    requireRole(auth, ['ADMINISTRADOR', 'VENDEDOR']);
     ensureMethod(request, 'GET');
 
     return getLogoFile(env);

@@ -32,6 +32,7 @@ describe('create admin script helpers', () => {
       }),
     ).toEqual({
       nombreCompleto: 'Admin Principal',
+      nombreUsuario: 'admin',
       correo: 'admin@norbe.test',
       contrasena: 'clave123',
     });
@@ -41,6 +42,7 @@ describe('create admin script helpers', () => {
     const sql = buildInsertAdminSql(
       {
         nombreCompleto: "Admin O'Connor",
+        nombreUsuario: 'admin',
         correo: "admin'o@norbe.test",
         contrasena: 'clave123',
       },

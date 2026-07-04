@@ -18,6 +18,7 @@ interface UserResponse {
 function toCreateBody(values: UserFormValues) {
   return {
     nombre_completo: values.nombre_completo,
+    nombre_usuario: values.nombre_usuario,
     correo: values.correo,
     rol: values.rol,
     contrasena: values.contrasena,
@@ -27,6 +28,7 @@ function toCreateBody(values: UserFormValues) {
 function toUpdateBody(values: UserUpdateFormValues) {
   return {
     nombre_completo: values.nombre_completo,
+    nombre_usuario: values.nombre_usuario,
     correo: values.correo,
     rol: values.rol,
   };

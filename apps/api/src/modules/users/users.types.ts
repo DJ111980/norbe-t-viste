@@ -5,6 +5,7 @@ export type UserStatus = 'ACTIVO' | 'INACTIVO';
 export interface UserRecord {
   id_usuario: string;
   nombre_completo: string;
+  nombre_usuario: string;
   correo: string;
   contrasena_hash: string;
   rol: UserRole;
@@ -20,6 +21,7 @@ export interface UserRecord {
 export interface PublicUser {
   idUsuario: string;
   nombreCompleto: string;
+  nombreUsuario: string;
   correo: string;
   rol: UserRole;
   estado: UserStatus;
@@ -33,6 +35,7 @@ export interface PublicUser {
 
 export interface CreateUserInput {
   nombreCompleto: string;
+  nombreUsuario: string;
   correo: string;
   rol: UserRole;
   contrasena: string;
@@ -40,6 +43,7 @@ export interface CreateUserInput {
 
 export interface UpdateUserInput {
   nombreCompleto?: string;
+  nombreUsuario?: string;
   correo?: string;
   rol?: UserRole;
 }

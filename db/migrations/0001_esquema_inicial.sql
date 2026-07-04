@@ -6,6 +6,8 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS configuracion_negocio (
   id_configuracion TEXT PRIMARY KEY,
   nombre_negocio TEXT NOT NULL,
+  eslogan TEXT NOT NULL DEFAULT 'Gestion comercial',
+  descripcion_login TEXT NOT NULL DEFAULT 'Gestion comercial lista para operar desde el navegador.',
   telefono TEXT,
   direccion TEXT,
   ciudad TEXT,
@@ -23,6 +25,7 @@ CREATE TABLE IF NOT EXISTS configuracion_negocio (
 CREATE TABLE IF NOT EXISTS usuarios (
   id_usuario TEXT PRIMARY KEY,
   nombre_completo TEXT NOT NULL,
+  nombre_usuario TEXT NOT NULL UNIQUE,
   correo TEXT NOT NULL UNIQUE,
   contrasena_hash TEXT NOT NULL,
   rol TEXT NOT NULL CHECK (rol IN ('ADMINISTRADOR', 'VENDEDOR')),
@@ -349,6 +352,7 @@ CREATE TABLE IF NOT EXISTS ajustes_creditos (
 );
 
 CREATE INDEX IF NOT EXISTS idx_usuarios_correo ON usuarios (correo);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_nombre_usuario ON usuarios (nombre_usuario);
 CREATE INDEX IF NOT EXISTS idx_clientes_nombre ON clientes (nombre_completo);
 CREATE INDEX IF NOT EXISTS idx_clientes_telefono ON clientes (telefono);
 CREATE INDEX IF NOT EXISTS idx_proveedores_nombre ON proveedores (nombre_proveedor);

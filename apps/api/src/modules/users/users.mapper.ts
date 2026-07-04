@@ -5,6 +5,7 @@ export function toPublicUser(user: UserRecord): PublicUser {
   return {
     idUsuario: user.id_usuario,
     nombreCompleto: user.nombre_completo,
+    nombreUsuario: user.nombre_usuario,
     correo: user.correo,
     rol: user.rol,
     estado: user.estado,

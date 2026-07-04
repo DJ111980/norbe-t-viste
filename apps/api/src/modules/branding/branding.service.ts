@@ -1,9 +1,14 @@
 import type { ApiEnv } from '../../config/env';
 import { ApiError } from '../../shared/errors';
 import { buildInternalKey, deleteObject, getObject, uploadObject } from '../../services/r2';
-import { toPublicLogo } from './branding.mapper';
+import { toPublicBranding, toPublicLogo } from './branding.mapper';
 import * as brandingRepository from './branding.repository';
-import type { LogoUploadInput, PublicLogo } from './branding.types';
+import type {
+  LogoUploadInput,
+  PublicBranding,
+  PublicLogo,
+  UpdateBrandingInput,
+} from './branding.types';
 
 function buildLogoKey(extension: string): string {
   return buildInternalKey(['branding', 'logo', `${crypto.randomUUID()}.${extension}`]);
@@ -11,6 +16,24 @@ function buildLogoKey(extension: string): string {
 
 export async function getLogo(env: ApiEnv): Promise<PublicLogo | null> {
   return toPublicLogo(await brandingRepository.getBusinessConfig(env));
+}
+
+export async function getBranding(env: ApiEnv): Promise<PublicBranding> {
+  return toPublicBranding(await brandingRepository.ensureBusinessConfig(env));
+}
+
+export async function updateBranding(
+  env: ApiEnv,
+  input: UpdateBrandingInput,
+): Promise<PublicBranding> {
+  const config = await brandingRepository.ensureBusinessConfig(env);
+  const updatedConfig = await brandingRepository.updateBusinessConfig(
+    env,
+    config.id_configuracion,
+    input,
+  );
+
+  return toPublicBranding(updatedConfig);
 }
 
 export async function uploadLogo(env: ApiEnv, input: LogoUploadInput): Promise<PublicLogo> {

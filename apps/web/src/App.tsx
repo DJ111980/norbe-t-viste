@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { AuthProvider } from './auth/AuthProvider';
 import { useAuth } from './auth/auth-context';
+import { BrandingProvider } from './branding/BrandingProvider';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { BrandingPage } from './pages/BrandingPage';
@@ -24,26 +25,28 @@ import { useRoute } from './routing/useRoute';
 const routeTitles: Record<string, string> = {
   '/clientes': 'Clientes',
   '/proveedores': 'Proveedores',
-  '/categorias': 'Categorias',
+  '/categorias': 'Categorías',
   '/productos': 'Productos',
   '/variantes': 'Variantes',
   '/inventario': 'Inventario',
   '/lotes-entrada': 'Lotes de entrada',
   '/ventas': 'Ventas',
-  '/creditos': 'Creditos',
+  '/creditos': 'Créditos',
   '/cartera': 'Cartera',
   '/devoluciones': 'Devoluciones',
   '/etiquetas': 'Etiquetas',
   '/reportes': 'Reportes',
-  '/branding': 'Branding',
+  '/branding': 'Marca del negocio',
   '/usuarios': 'Usuarios',
 };
 
 export function App() {
   return (
-    <AuthProvider>
-      <AppShell />
-    </AuthProvider>
+    <BrandingProvider>
+      <AuthProvider>
+        <AppShell />
+      </AuthProvider>
+    </BrandingProvider>
   );
 }
 
@@ -70,7 +73,7 @@ function AppShell() {
   if (isLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-stone-100 text-sm text-stone-600">
-        Cargando sesion...
+        Cargando sesión...
       </main>
     );
   }
@@ -163,7 +166,7 @@ function renderProtectedPage(
     return <UsersPage onSessionExpired={onSessionExpired} />;
   }
 
-  return <PlaceholderPage title={routeTitles[path] ?? 'Modulo no encontrado'} />;
+  return <PlaceholderPage title={routeTitles[path] ?? 'Módulo no encontrado'} />;
 }
 
 function AccessDenied() {
@@ -172,7 +175,7 @@ function AccessDenied() {
       <div>
         <h1 className="text-2xl font-semibold text-stone-950">Acceso denegado</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Tu usuario no tiene permisos para entrar a esta seccion.
+          Tu usuario no tiene permisos para entrar a esta sección.
         </p>
       </div>
 

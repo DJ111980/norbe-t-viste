@@ -6,6 +6,7 @@ function user(): UserAccount {
   return {
     idUsuario: 'usr_1',
     nombreCompleto: 'Demo',
+    nombreUsuario: 'demo',
     correo: 'demo@example.com',
     rol: 'VENDEDOR',
     estado: 'ACTIVO',
@@ -22,6 +23,7 @@ describe('UsersPage helpers', () => {
   it('edicion normal no incluye contrasena ni hash', () => {
     expect(toUserUpdateForm(user())).toEqual({
       nombre_completo: 'Demo',
+      nombre_usuario: 'demo',
       correo: 'demo@example.com',
       rol: 'VENDEDOR',
     });

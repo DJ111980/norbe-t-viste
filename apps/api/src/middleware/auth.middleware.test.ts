@@ -7,6 +7,7 @@ const auth = {
   user: {
     id_usuario: 'usr_1',
     nombre_completo: 'Administrador',
+    nombre_usuario: 'admin',
     correo: 'admin@norbe.test',
     contrasena_hash: 'hash',
     rol: 'ADMINISTRADOR',

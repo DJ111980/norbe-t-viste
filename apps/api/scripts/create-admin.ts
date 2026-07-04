@@ -15,6 +15,7 @@ const TEMP_SQL_PATH = './apps/api/.wrangler/tmp/create-admin.sql';
 
 export interface AdminSeedInput {
   nombreCompleto: string;
+  nombreUsuario: string;
   correo: string;
   contrasena: string;
 }
@@ -80,6 +81,9 @@ export function validateAdminPassword(password: string): string[] {
 export function readAdminSeedInput(env: NodeJS.ProcessEnv): AdminSeedInput {
   const devVars = loadDevVars();
   const nombreCompleto = (env.ADMIN_SEED_NAME || devVars.ADMIN_SEED_NAME || '').trim();
+  const nombreUsuario = (env.ADMIN_SEED_USERNAME || devVars.ADMIN_SEED_USERNAME || 'admin')
+    .trim()
+    .toLowerCase();
   const correo = normalizeAdminEmail(env.ADMIN_SEED_EMAIL || devVars.ADMIN_SEED_EMAIL || '');
   const contrasena = env.ADMIN_SEED_PASSWORD || devVars.ADMIN_SEED_PASSWORD || '';
   const missingFields: string[] = [];
@@ -90,6 +94,10 @@ export function readAdminSeedInput(env: NodeJS.ProcessEnv): AdminSeedInput {
 
   if (!correo) {
     missingFields.push('ADMIN_SEED_EMAIL');
+  }
+
+  if (!/^[a-z0-9._-]{3,40}$/.test(nombreUsuario)) {
+    throw new Error('ADMIN_SEED_USERNAME debe tener entre 3 y 40 caracteres validos.');
   }
 
   if (!contrasena) {
@@ -108,6 +116,7 @@ export function readAdminSeedInput(env: NodeJS.ProcessEnv): AdminSeedInput {
 
   return {
     nombreCompleto,
+    nombreUsuario,
     correo,
     contrasena,
   };
@@ -180,6 +189,7 @@ export function buildInsertAdminSql(
     INSERT INTO usuarios (
       id_usuario,
       nombre_completo,
+      nombre_usuario,
       correo,
       contrasena_hash,
       rol,
@@ -189,6 +199,7 @@ export function buildInsertAdminSql(
     ) VALUES (
       ${sqlString(idUsuario)},
       ${sqlString(input.nombreCompleto)},
+      ${sqlString(input.nombreUsuario)},
       ${sqlString(input.correo)},
       ${sqlString(passwordHash)},
       'ADMINISTRADOR',

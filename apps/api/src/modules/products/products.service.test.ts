@@ -96,6 +96,7 @@ function createAuth(rol: 'ADMINISTRADOR' | 'VENDEDOR'): AuthContext {
     user: {
       id_usuario: rol === 'ADMINISTRADOR' ? 'usr_admin' : 'usr_vendedor',
       nombre_completo: rol,
+      nombre_usuario: rol.toLowerCase(),
       correo: `${rol.toLowerCase()}@norbe.test`,
       contrasena_hash: 'hash',
       rol,

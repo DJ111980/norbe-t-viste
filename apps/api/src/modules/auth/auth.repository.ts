@@ -1,22 +1,24 @@
 import type { ApiEnv } from '../../config/env';
 import type { UserRecord } from './auth.types';
 
-export async function findUserByEmail(env: ApiEnv, correo: string): Promise<UserRecord | null> {
+export async function findUserByLogin(env: ApiEnv, login: string): Promise<UserRecord | null> {
   return env.DB.prepare(
     `
       SELECT
         id_usuario,
         nombre_completo,
+        nombre_usuario,
         correo,
         contrasena_hash,
         rol,
         estado
       FROM usuarios
-      WHERE correo = ?
+      WHERE nombre_usuario = ?
+         OR correo = ?
       LIMIT 1
     `,
   )
-    .bind(correo)
+    .bind(login, login)
     .first<UserRecord>();
 }
 
@@ -26,6 +28,7 @@ export async function findUserById(env: ApiEnv, idUsuario: string): Promise<User
       SELECT
         id_usuario,
         nombre_completo,
+        nombre_usuario,
         correo,
         contrasena_hash,
         rol,

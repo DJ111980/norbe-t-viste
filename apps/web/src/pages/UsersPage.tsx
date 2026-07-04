@@ -30,6 +30,7 @@ import type {
 
 const emptyUserForm: UserFormValues = {
   nombre_completo: '',
+  nombre_usuario: '',
   correo: '',
   rol: 'VENDEDOR',
   contrasena: '',
@@ -42,13 +43,14 @@ const emptyPasswordForm: UserPasswordFormValues = {
 export function toUserUpdateForm(user: UserAccount): UserUpdateFormValues {
   return {
     nombre_completo: user.nombreCompleto,
+    nombre_usuario: user.nombreUsuario,
     correo: user.correo,
     rol: user.rol,
   };
 }
 
 function handleMessage(error: unknown, fallback: string): string {
-  if (isForbiddenError(error)) return 'No tienes permisos para esta accion.';
+  if (isForbiddenError(error)) return 'No tienes permisos para esta acción.';
   return error instanceof ApiClientError ? error.message : fallback;
 }
 
@@ -108,7 +110,7 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
 
     try {
       const user = await createUser(token, form);
-      setSuccess(`Usuario ${user.correo} creado.`);
+      setSuccess(`Usuario ${user.nombreUsuario} creado.`);
       setForm(emptyUserForm);
       await loadUsers();
     } catch (saveError) {
@@ -128,7 +130,7 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
 
     try {
       const user = await updateUser(token, selected.idUsuario, editForm);
-      setSuccess(`Usuario ${user.correo} actualizado.`);
+      setSuccess(`Usuario ${user.nombreUsuario} actualizado.`);
       setSelected(user);
       setEditForm(toUserUpdateForm(user));
       await loadUsers();
@@ -149,7 +151,7 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
 
     try {
       await resetUserPassword(token, selected.idUsuario, passwordForm);
-      setSuccess('Contrasena actualizada.');
+      setSuccess('Contraseña actualizada.');
       setPasswordForm(emptyPasswordForm);
       await loadUsers();
     } catch (saveError) {
@@ -180,7 +182,7 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
     <section className="space-y-6">
       <PageHeader
         title="Usuarios"
-        description="Administra usuarios, roles, estado y cambio de contrasena."
+        description="Administra usuarios, roles, estado y cambio de contraseña."
       />
 
       {error && <ErrorMessage message={error} />}
@@ -250,12 +252,20 @@ function UserForm({
   return (
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
       <h2 className="text-sm font-semibold text-stone-950">Crear usuario</h2>
-      <div className="mt-4 grid gap-4 lg:grid-cols-4">
+      <div className="mt-4 grid gap-4 lg:grid-cols-5">
         <Field label="Nombre completo">
           <input
             required
             value={form.nombre_completo}
             onChange={(event) => onChange({ ...form, nombre_completo: event.target.value })}
+            className={inputClassName}
+          />
+        </Field>
+        <Field label="Usuario">
+          <input
+            required
+            value={form.nombre_usuario}
+            onChange={(event) => onChange({ ...form, nombre_usuario: event.target.value })}
             className={inputClassName}
           />
         </Field>
@@ -271,7 +281,7 @@ function UserForm({
         <Field label="Rol">
           <RoleSelect value={form.rol} onChange={(rol) => onChange({ ...form, rol })} />
         </Field>
-        <Field label="Contrasena">
+        <Field label="Contraseña">
           <input
             required
             type="password"
@@ -305,6 +315,7 @@ function UsersTable({
         <thead className="bg-stone-50 text-xs uppercase text-stone-500">
           <tr>
             <th className="px-4 py-3">Usuario</th>
+            <th className="px-4 py-3">Correo</th>
             <th className="px-4 py-3">Rol</th>
             <th className="px-4 py-3">Estado</th>
             <th className="px-4 py-3">Ultimo acceso</th>
@@ -316,8 +327,9 @@ function UsersTable({
             <tr key={user.idUsuario}>
               <td className="px-4 py-3">
                 <p className="font-medium text-stone-950">{user.nombreCompleto}</p>
-                <p className="text-xs text-stone-500">{user.correo}</p>
+                <p className="text-xs text-stone-500">@{user.nombreUsuario}</p>
               </td>
+              <td className="px-4 py-3 text-stone-700">{user.correo}</td>
               <td className="px-4 py-3 text-stone-700">{user.rol}</td>
               <td className="px-4 py-3">
                 <StatusBadge status={user.estado} />
@@ -372,13 +384,21 @@ function EditUserForm({
 }) {
   return (
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
-      <h2 className="text-sm font-semibold text-stone-950">Editar {user.correo}</h2>
+      <h2 className="text-sm font-semibold text-stone-950">Editar {user.nombreUsuario}</h2>
       <div className="mt-4 space-y-3">
         <Field label="Nombre completo">
           <input
             required
             value={form.nombre_completo}
             onChange={(event) => onChange({ ...form, nombre_completo: event.target.value })}
+            className={inputClassName}
+          />
+        </Field>
+        <Field label="Usuario">
+          <input
+            required
+            value={form.nombre_usuario}
+            onChange={(event) => onChange({ ...form, nombre_usuario: event.target.value })}
             className={inputClassName}
           />
         </Field>
@@ -415,8 +435,8 @@ function PasswordForm({
 }) {
   return (
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
-      <h2 className="text-sm font-semibold text-stone-950">Cambiar contrasena</h2>
-      <Field label="Nueva contrasena">
+      <h2 className="text-sm font-semibold text-stone-950">Cambiar contraseña</h2>
+      <Field label="Nueva contraseña">
         <input
           required
           type="password"
@@ -426,7 +446,7 @@ function PasswordForm({
         />
       </Field>
       <button type="submit" disabled={isSaving} className={`${secondaryButtonClassName} mt-4`}>
-        Cambiar contrasena
+        Cambiar contraseña
       </button>
     </form>
   );

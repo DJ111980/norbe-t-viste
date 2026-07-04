@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./auth.repository', () => ({
-  findUserByEmail: vi.fn(async () => mocks.user),
+  findUserByLogin: vi.fn(async () => mocks.user),
   updateLastAccess: vi.fn(async (_env: ApiEnv, idUsuario: string) => {
     mocks.updatedUserIds.push(idUsuario);
   }),
@@ -26,6 +26,7 @@ async function createUser(overrides: Partial<UserRecord> = {}): Promise<UserReco
   return {
     id_usuario: 'usr_1',
     nombre_completo: 'Administrador',
+    nombre_usuario: 'admin',
     correo: 'admin@norbe.test',
     contrasena_hash: await hashPassword('Clave segura 123'),
     rol: 'ADMINISTRADOR',
@@ -42,7 +43,7 @@ describe('auth service login', () => {
 
   it('rechaza login con usuario inexistente', async () => {
     await expect(
-      login(env, { correo: 'noexiste@norbe.test', contrasena: 'Clave segura 123' }),
+      login(env, { usuario: 'noexiste', contrasena: 'Clave segura 123' }),
     ).rejects.toMatchObject({
       code: 'INVALID_CREDENTIALS',
       status: 401,
@@ -52,9 +53,7 @@ describe('auth service login', () => {
   it('rechaza login con contrasena incorrecta', async () => {
     mocks.user = await createUser();
 
-    await expect(
-      login(env, { correo: 'admin@norbe.test', contrasena: 'incorrecta' }),
-    ).rejects.toMatchObject({
+    await expect(login(env, { usuario: 'admin', contrasena: 'incorrecta' })).rejects.toMatchObject({
       code: 'INVALID_CREDENTIALS',
       status: 401,
     });
@@ -64,7 +63,7 @@ describe('auth service login', () => {
     mocks.user = await createUser({ estado: 'INACTIVO' });
 
     await expect(
-      login(env, { correo: 'admin@norbe.test', contrasena: 'Clave segura 123' }),
+      login(env, { usuario: 'admin', contrasena: 'Clave segura 123' }),
     ).rejects.toMatchObject({
       code: 'USER_INACTIVE',
       status: 403,
@@ -75,7 +74,7 @@ describe('auth service login', () => {
     mocks.user = await createUser();
 
     const session = await login(env, {
-      correo: 'admin@norbe.test',
+      usuario: 'admin',
       contrasena: 'Clave segura 123',
     });
 
@@ -84,6 +83,7 @@ describe('auth service login', () => {
     expect(session.user).toEqual({
       idUsuario: 'usr_1',
       nombreCompleto: 'Administrador',
+      nombreUsuario: 'admin',
       correo: 'admin@norbe.test',
       rol: 'ADMINISTRADOR',
     });

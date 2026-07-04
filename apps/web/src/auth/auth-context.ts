@@ -5,7 +5,7 @@ export interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
-  login: (correo: string, contrasena: string) => Promise<void>;
+  login: (usuario: string, contrasena: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 

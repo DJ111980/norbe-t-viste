@@ -7,6 +7,7 @@ import type { CreateUserInput, UpdateUserInput, UserRecord, UserStatus } from '.
 const mocks = vi.hoisted(() => ({
   users: new Map<string, UserRecord>(),
   emailIndex: new Map<string, string>(),
+  usernameIndex: new Map<string, string>(),
   countActiveAdminsValue: 1,
   lastPasswordHash: '',
 }));
@@ -27,6 +28,10 @@ vi.mock('./users.repository', () => ({
     const idUsuario = mocks.emailIndex.get(correo);
     return idUsuario ? (mocks.users.get(idUsuario) ?? null) : null;
   }),
+  findUserByUsername: vi.fn(async (_env: ApiEnv, nombreUsuario: string) => {
+    const idUsuario = mocks.usernameIndex.get(nombreUsuario);
+    return idUsuario ? (mocks.users.get(idUsuario) ?? null) : null;
+  }),
   createUser: vi.fn(
     async (
       _env: ApiEnv,
@@ -38,6 +43,7 @@ vi.mock('./users.repository', () => ({
       const user = createUserRecord({
         id_usuario: idUsuario,
         nombre_completo: input.nombreCompleto,
+        nombre_usuario: input.nombreUsuario,
         correo: input.correo,
         contrasena_hash: passwordHash,
         rol: input.rol,
@@ -45,6 +51,7 @@ vi.mock('./users.repository', () => ({
       });
       mocks.users.set(idUsuario, user);
       mocks.emailIndex.set(input.correo, idUsuario);
+      mocks.usernameIndex.set(input.nombreUsuario, idUsuario);
       return user;
     },
   ),
@@ -57,6 +64,11 @@ vi.mock('./users.repository', () => ({
       user.correo = input.correo;
     }
     if (input.nombreCompleto) user.nombre_completo = input.nombreCompleto;
+    if (input.nombreUsuario) {
+      mocks.usernameIndex.delete(user.nombre_usuario);
+      mocks.usernameIndex.set(input.nombreUsuario, idUsuario);
+      user.nombre_usuario = input.nombreUsuario;
+    }
     if (input.rol) user.rol = input.rol;
     return user;
   }),
@@ -84,6 +96,7 @@ const env = {} as ApiEnv;
 const adminAuth = {
   user: createUserRecord({
     id_usuario: 'usr_admin',
+    nombre_usuario: 'admin',
     correo: 'admin@norbe.test',
     rol: 'ADMINISTRADOR',
   }),
@@ -93,6 +106,7 @@ function createUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
   return {
     id_usuario: 'usr_1',
     nombre_completo: 'Usuario',
+    nombre_usuario: 'usuario',
     correo: 'usuario@norbe.test',
     contrasena_hash: 'hash',
     rol: 'VENDEDOR',
@@ -110,12 +124,14 @@ function createUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
 function addMockUser(user: UserRecord): void {
   mocks.users.set(user.id_usuario, user);
   mocks.emailIndex.set(user.correo, user.id_usuario);
+  mocks.usernameIndex.set(user.nombre_usuario, user.id_usuario);
 }
 
 describe('users service', () => {
   beforeEach(() => {
     mocks.users = new Map();
     mocks.emailIndex = new Map();
+    mocks.usernameIndex = new Map();
     mocks.countActiveAdminsValue = 1;
     mocks.lastPasswordHash = '';
   });
@@ -126,6 +142,7 @@ describe('users service', () => {
     await expect(
       createUser(env, adminAuth, {
         nombreCompleto: 'Vendedor',
+        nombreUsuario: 'vendedor',
         correo: 'vendedor@norbe.test',
         rol: 'VENDEDOR',
         contrasena: 'clave123',
@@ -139,12 +156,14 @@ describe('users service', () => {
   it('crear usuario hashea contrasena y asigna auditoria', async () => {
     const user = await createUser(env, adminAuth, {
       nombreCompleto: 'Vendedor',
+      nombreUsuario: 'vendedor',
       correo: 'vendedor@norbe.test',
       rol: 'VENDEDOR',
       contrasena: 'clave123',
     });
 
     expect(user.correo).toBe('vendedor@norbe.test');
+    expect(user.nombreUsuario).toBe('vendedor');
     expect(user.creadoPor).toBe('usr_admin');
     expect(user.debeCambiarContrasena).toBe(true);
     expect(mocks.lastPasswordHash).toBe('hash:clave123');

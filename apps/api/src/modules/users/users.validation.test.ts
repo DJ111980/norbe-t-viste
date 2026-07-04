@@ -11,12 +11,14 @@ describe('users validation', () => {
     expect(
       validateCreateUserInput({
         nombre_completo: 'Vendedor Principal',
+        nombre_usuario: ' VENDEDOR_1 ',
         correo: ' VENDEDOR@NORBE.TEST ',
         rol: 'VENDEDOR',
         contrasena: 'clave123',
       }),
     ).toEqual({
       nombreCompleto: 'Vendedor Principal',
+      nombreUsuario: 'vendedor_1',
       correo: 'vendedor@norbe.test',
       rol: 'VENDEDOR',
       contrasena: 'clave123',
@@ -27,6 +29,7 @@ describe('users validation', () => {
     expect(() =>
       validateCreateUserInput({
         nombre_completo: 'Usuario',
+        nombre_usuario: 'usuario',
         correo: 'usuario@norbe.test',
         rol: 'CAJERO',
         contrasena: 'clave123',
@@ -38,6 +41,7 @@ describe('users validation', () => {
     expect(() =>
       validateCreateUserInput({
         nombre_completo: 'Usuario',
+        nombre_usuario: 'usuario',
         correo: 'usuario@norbe.test',
         rol: 'VENDEDOR',
         contrasena: 'abc',
@@ -52,6 +56,16 @@ describe('users validation', () => {
       }),
     ).toEqual({
       correo: 'nuevo@norbe.test',
+    });
+  });
+
+  it('editar usuario normaliza nombre de usuario', () => {
+    expect(
+      validateUpdateUserInput({
+        nombre_usuario: ' Nuevo-Usuario ',
+      }),
+    ).toEqual({
+      nombreUsuario: 'nuevo-usuario',
     });
   });
 
