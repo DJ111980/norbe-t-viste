@@ -20,8 +20,9 @@ describe('sales validation', () => {
       tipoVenta: 'CONTADO',
       idCliente: null,
       metodoPago: 'EFECTIVO',
+      descuentoGeneral: 0,
       observaciones: 'Venta de contado',
-      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 50000 }],
+      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 50000, descuento: 0 }],
     });
   });
 
@@ -36,8 +37,9 @@ describe('sales validation', () => {
     expect(input).toEqual({
       tipoVenta: 'CREDITO',
       idCliente: 'cli_1',
+      descuentoGeneral: 0,
       observaciones: 'Venta a credito',
-      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 50000 }],
+      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 50000, descuento: 0 }],
     });
   });
 
@@ -56,8 +58,23 @@ describe('sales validation', () => {
       idCliente: 'cli_1',
       valorPagadoInicial: 40000,
       metodoPago: 'EFECTIVO',
+      descuentoGeneral: 0,
       observaciones: 'Venta mixta',
-      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 100000 }],
+      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 100000, descuento: 0 }],
+    });
+  });
+
+  it('valida descuentos de linea y general', () => {
+    const input = validateCreateSaleInput({
+      tipo_venta: 'CONTADO',
+      metodo_pago: 'EFECTIVO',
+      descuento_general: 5000,
+      detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000, descuento: 3000 }],
+    });
+
+    expect(input).toMatchObject({
+      descuentoGeneral: 5000,
+      detalles: [{ descuento: 3000 }],
     });
   });
 

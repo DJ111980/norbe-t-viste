@@ -43,6 +43,7 @@ export async function findDetailsForReturn(
         d.id_variante,
         d.cantidad,
         d.precio_unitario,
+        d.subtotal,
         COALESCE(SUM(CASE
           WHEN dv.estado_devolucion = 'ACTIVA' THEN ddv.cantidad_devuelta
           ELSE 0

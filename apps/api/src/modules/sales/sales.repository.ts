@@ -32,6 +32,7 @@ const SALE_LIST_COLUMNS = `
   v.saldo_pendiente,
   v.estado_venta,
   v.observaciones,
+  v.fecha_venta,
   v.creado_en,
   v.actualizado_en,
   v.anulado_por,
@@ -68,11 +69,11 @@ function applySaleFilters(where: string[], values: (string | number)[], filters:
     values.push(filters.vendedor);
   }
   if (filters.fechaDesde) {
-    where.push('v.creado_en >= ?');
+    where.push('COALESCE(v.fecha_venta, v.creado_en) >= ?');
     values.push(filters.fechaDesde);
   }
   if (filters.fechaHasta) {
-    where.push('v.creado_en <= ?');
+    where.push('COALESCE(v.fecha_venta, v.creado_en) <= ?');
     values.push(filters.fechaHasta);
   }
 }
@@ -158,9 +159,10 @@ export async function createCashSale(
           estado_venta,
           observaciones,
           actualizado_por,
+          fecha_venta,
           creado_en,
           actualizado_en
-        ) VALUES (?, ?, ?, ?, 'CONTADO', ?, 0, ?, ?, 0, 'COMPLETADA', ?, ?, datetime('now'), datetime('now'))
+        ) VALUES (?, ?, ?, ?, 'CONTADO', ?, ?, ?, ?, 0, 'COMPLETADA', ?, ?, ?, datetime('now'), datetime('now'))
       `,
     ).bind(
       input.idVenta,
@@ -168,10 +170,12 @@ export async function createCashSale(
       input.idCliente,
       input.idUsuario,
       input.subtotal,
+      input.descuento,
       input.total,
       input.total,
       input.observaciones,
       input.idUsuario,
+      input.fechaVenta,
     ),
     env.DB.prepare(
       `
@@ -207,7 +211,7 @@ export async function createCashSale(
             descuento,
             subtotal,
             creado_en
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `,
       ).bind(
         detail.idDetalleVenta,
@@ -220,6 +224,7 @@ export async function createCashSale(
         detail.color,
         detail.cantidad,
         detail.precioUnitario,
+        detail.descuento,
         detail.subtotal,
       ),
     );
@@ -330,9 +335,10 @@ export async function createCreditSale(
           estado_venta,
           observaciones,
           actualizado_por,
+          fecha_venta,
           creado_en,
           actualizado_en
-        ) VALUES (?, ?, ?, ?, 'CREDITO', ?, 0, ?, 0, ?, 'COMPLETADA', ?, ?, datetime('now'), datetime('now'))
+        ) VALUES (?, ?, ?, ?, 'CREDITO', ?, ?, ?, 0, ?, 'COMPLETADA', ?, ?, ?, datetime('now'), datetime('now'))
       `,
     ).bind(
       input.idVenta,
@@ -340,10 +346,12 @@ export async function createCreditSale(
       input.idCliente,
       input.idUsuario,
       input.subtotal,
+      input.descuento,
       input.total,
       input.total,
       input.observaciones,
       input.idUsuario,
+      input.fechaVenta,
     ),
     env.DB.prepare(
       `
@@ -365,7 +373,7 @@ export async function createCreditSale(
           creado_en,
           actualizado_en
         )
-        SELECT ?, ?, ?, ?, 'VENTA', NULL, ?, ?, 0, ?, datetime('now'), 'PENDIENTE', ?, ?, datetime('now'), datetime('now')
+        SELECT ?, ?, ?, ?, 'VENTA', NULL, ?, ?, 0, ?, ?, 'PENDIENTE', ?, ?, datetime('now'), datetime('now')
         WHERE EXISTS (
           SELECT 1
           FROM ventas
@@ -382,6 +390,7 @@ export async function createCreditSale(
       'Venta a credito',
       input.total,
       input.total,
+      input.fechaVenta,
       input.observaciones,
       input.idUsuario,
       input.idVenta,
@@ -407,7 +416,7 @@ export async function createCreditSale(
             descuento,
             subtotal,
             creado_en
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `,
       ).bind(
         detail.idDetalleVenta,
@@ -420,6 +429,7 @@ export async function createCreditSale(
         detail.color,
         detail.cantidad,
         detail.precioUnitario,
+        detail.descuento,
         detail.subtotal,
       ),
     );
@@ -611,9 +621,10 @@ export async function createMixedSale(
           estado_venta,
           observaciones,
           actualizado_por,
+          fecha_venta,
           creado_en,
           actualizado_en
-        ) VALUES (?, ?, ?, ?, 'MIXTA', ?, 0, ?, ?, ?, 'COMPLETADA', ?, ?, datetime('now'), datetime('now'))
+        ) VALUES (?, ?, ?, ?, 'MIXTA', ?, ?, ?, ?, ?, 'COMPLETADA', ?, ?, ?, datetime('now'), datetime('now'))
       `,
     ).bind(
       input.idVenta,
@@ -621,11 +632,13 @@ export async function createMixedSale(
       input.idCliente,
       input.idUsuario,
       input.subtotal,
+      input.descuento,
       input.total,
       input.valorPagadoInicial,
       input.saldoCredito,
       input.observaciones,
       input.idUsuario,
+      input.fechaVenta,
     ),
     env.DB.prepare(
       `
@@ -677,7 +690,7 @@ export async function createMixedSale(
           creado_en,
           actualizado_en
         )
-        SELECT ?, ?, ?, ?, 'VENTA', NULL, ?, ?, 0, ?, datetime('now'), 'PENDIENTE', ?, ?, datetime('now'), datetime('now')
+        SELECT ?, ?, ?, ?, 'VENTA', NULL, ?, ?, 0, ?, ?, 'PENDIENTE', ?, ?, datetime('now'), datetime('now')
         WHERE EXISTS (
           SELECT 1
           FROM ventas
@@ -694,6 +707,7 @@ export async function createMixedSale(
       'Saldo restante de venta mixta',
       input.saldoCredito,
       input.saldoCredito,
+      input.fechaVenta,
       input.observaciones,
       input.idUsuario,
       input.idVenta,
@@ -719,7 +733,7 @@ export async function createMixedSale(
             descuento,
             subtotal,
             creado_en
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `,
       ).bind(
         detail.idDetalleVenta,
@@ -732,6 +746,7 @@ export async function createMixedSale(
         detail.color,
         detail.cantidad,
         detail.precioUnitario,
+        detail.descuento,
         detail.subtotal,
       ),
     );
@@ -944,7 +959,7 @@ export async function listSales(env: ApiEnv, filters: ListSalesFilters): Promise
       LEFT JOIN detalle_ventas d ON d.id_venta = v.id_venta
       ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
       GROUP BY v.id_venta
-      ORDER BY v.creado_en DESC
+      ORDER BY COALESCE(v.fecha_venta, v.creado_en) DESC
       LIMIT ?
       OFFSET ?
     `,

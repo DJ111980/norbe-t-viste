@@ -45,6 +45,8 @@ export interface SalesReportRow {
 export interface SalesReportTotals {
   cantidad_total: number;
   total_vendido: number;
+  total_bruto: number;
+  total_descuento: number;
   ventas_anuladas: number;
 }
 

@@ -30,8 +30,9 @@ describe('sales service', () => {
       id_cliente: '',
       metodo_pago: 'EFECTIVO',
       valor_pagado_inicial: 0,
+      descuento_general: 0,
       observaciones: '',
-      detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000 }],
+      detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000, descuento: 0 }],
     });
 
     expect(apiRequest).toHaveBeenCalledWith('/ventas', {
@@ -41,8 +42,9 @@ describe('sales service', () => {
         tipo_venta: 'CONTADO',
         id_cliente: null,
         metodo_pago: 'EFECTIVO',
+        descuento_general: 0,
         observaciones: null,
-        detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000 }],
+        detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000, descuento: 0 }],
       },
     });
   });
@@ -55,8 +57,9 @@ describe('sales service', () => {
       id_cliente: 'cli_1',
       metodo_pago: 'EFECTIVO',
       valor_pagado_inicial: 0,
+      descuento_general: 0,
       observaciones: 'credito',
-      detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000 }],
+      detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000, descuento: 0 }],
     });
 
     expect(apiRequest).toHaveBeenCalledWith('/ventas', {
@@ -65,8 +68,9 @@ describe('sales service', () => {
       body: {
         tipo_venta: 'CREDITO',
         id_cliente: 'cli_1',
+        descuento_general: 0,
         observaciones: 'credito',
-        detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000 }],
+        detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000, descuento: 0 }],
       },
     });
   });
@@ -81,8 +85,9 @@ describe('sales service', () => {
       id_cliente: 'cli_1',
       metodo_pago: 'NEQUI',
       valor_pagado_inicial: 20000,
+      descuento_general: 0,
       observaciones: '',
-      detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000 }],
+      detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000, descuento: 0 }],
     });
     await cancelSale('token', 'ven_1', 'Error en registro');
 
@@ -94,8 +99,9 @@ describe('sales service', () => {
         id_cliente: 'cli_1',
         valor_pagado_inicial: 20000,
         metodo_pago: 'NEQUI',
+        descuento_general: 0,
         observaciones: null,
-        detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000 }],
+        detalles: [{ id_variante: 'var_1', cantidad: 1, precio_unitario: 50000, descuento: 0 }],
       },
     });
     expect(apiRequest).toHaveBeenNthCalledWith(2, '/ventas/ven_1/anular', {

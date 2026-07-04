@@ -170,6 +170,7 @@ function buildDetail(
     id_variante: 'var_1',
     cantidad: 2,
     precio_unitario: 50000,
+    subtotal: 100000,
     cantidad_devuelta_activa: 0,
     stock_actual: 3,
     ...overrides,

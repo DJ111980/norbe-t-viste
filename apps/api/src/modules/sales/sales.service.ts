@@ -1,6 +1,7 @@
 import type { ApiEnv } from '../../config/env';
 import type { AuthContext } from '../../middleware/auth.middleware';
 import { ApiError } from '../../shared/errors';
+import { getBusinessDateCompact, getBusinessDateTime } from '../../shared/business-time';
 import {
   toCashSaleSummary,
   toPublicSaleDetail,
@@ -32,7 +33,7 @@ function createId(prefix: string): string {
 }
 
 function createSaleNumber(): string {
-  const compactDate = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+  const compactDate = getBusinessDateCompact();
   const suffix = crypto.randomUUID().slice(0, 8).toUpperCase();
   return `VTA-${compactDate}-${suffix}`;
 }
@@ -48,9 +49,16 @@ export async function createCashSale(
 async function buildSaleDetails(
   env: ApiEnv,
   input: CreateSaleInput,
-): Promise<{ detalles: SaleDetailToCreate[]; total: number }> {
+): Promise<{
+  detalles: SaleDetailToCreate[];
+  subtotal: number;
+  descuentoLineas: number;
+  descuentoGeneral: number;
+  total: number;
+}> {
   const detalles: SaleDetailToCreate[] = [];
-  let total = 0;
+  let subtotal = 0;
+  let descuentoLineas = 0;
 
   for (const item of input.detalles) {
     const variant = await salesRepository.findVariantForSale(env, item.idVariante);
@@ -71,7 +79,7 @@ async function buildSaleDetails(
       throw new ApiError('INSUFFICIENT_STOCK', 'No hay stock suficiente para la venta.', 400);
     }
 
-    const precioUnitario = item.precioUnitario ?? variant.precio_venta;
+    const precioUnitario = variant.precio_venta;
 
     if (precioUnitario <= 0) {
       throw new ApiError(
@@ -81,8 +89,28 @@ async function buildSaleDetails(
       );
     }
 
-    const subtotal = precioUnitario * item.cantidad;
-    total += subtotal;
+    if (item.precioUnitario !== undefined && item.precioUnitario !== precioUnitario) {
+      throw new ApiError(
+        'SALE_PRICE_MISMATCH',
+        'El precio de venta debe venir de la variante y no puede modificarse manualmente.',
+        400,
+      );
+    }
+
+    const subtotalBruto = precioUnitario * item.cantidad;
+    const descuentoLinea = item.descuento ?? 0;
+
+    if (descuentoLinea > subtotalBruto) {
+      throw new ApiError(
+        'SALE_LINE_DISCOUNT_EXCEEDS_SUBTOTAL',
+        'El descuento de linea no puede superar el subtotal del detalle.',
+        400,
+      );
+    }
+
+    const subtotalNeto = subtotalBruto - descuentoLinea;
+    subtotal += subtotalBruto;
+    descuentoLineas += descuentoLinea;
 
     detalles.push({
       idDetalleVenta: createId('detven'),
@@ -94,15 +122,32 @@ async function buildSaleDetails(
       color: variant.color,
       cantidad: item.cantidad,
       precioUnitario,
-      descuento: 0,
-      subtotal,
+      descuento: descuentoLinea,
+      subtotal: subtotalNeto,
       stockAntes: variant.stock_actual,
       stockDespues: variant.stock_actual - item.cantidad,
       idMovimiento: createId('mov'),
     });
   }
 
-  return { detalles, total };
+  const subtotalDespuesLineas = subtotal - descuentoLineas;
+  const descuentoGeneral = input.descuentoGeneral ?? 0;
+
+  if (descuentoGeneral > subtotalDespuesLineas) {
+    throw new ApiError(
+      'SALE_GENERAL_DISCOUNT_EXCEEDS_TOTAL',
+      'El descuento general no puede superar el total despues de descuentos de linea.',
+      400,
+    );
+  }
+
+  return {
+    detalles,
+    subtotal,
+    descuentoLineas,
+    descuentoGeneral,
+    total: subtotalDespuesLineas - descuentoGeneral,
+  };
 }
 
 export async function createSale(
@@ -130,7 +175,20 @@ export async function createSale(
     );
   }
 
-  const { detalles, total } = await buildSaleDetails(env, input);
+  const { detalles, subtotal, descuentoLineas, descuentoGeneral, total } = await buildSaleDetails(
+    env,
+    input,
+  );
+  const descuento = descuentoLineas + descuentoGeneral;
+  const fechaVenta = getBusinessDateTime();
+
+  if (total <= 0) {
+    throw new ApiError(
+      'SALE_TOTAL_MUST_BE_POSITIVE',
+      'El total final de la venta debe ser mayor que 0.',
+      400,
+    );
+  }
 
   const idVenta = createId('ven');
   const saleInput = {
@@ -139,8 +197,10 @@ export async function createSale(
     idCliente: input.idCliente,
     idUsuario: auth.user.id_usuario,
     observaciones: input.observaciones,
-    subtotal: total,
+    subtotal,
+    descuento,
     total,
+    fechaVenta,
     detalles,
   };
 

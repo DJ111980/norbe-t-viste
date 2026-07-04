@@ -53,12 +53,12 @@ export async function listSales(
         v.total,
         v.valor_pagado_inicial,
         v.saldo_pendiente,
-        v.creado_en
+        COALESCE(v.fecha_venta, v.creado_en) AS creado_en
       FROM ventas v
       LEFT JOIN clientes c ON c.id_cliente = v.id_cliente
       LEFT JOIN usuarios u ON u.id_usuario = v.id_usuario
       ${whereSql(where)}
-      ORDER BY v.creado_en DESC
+      ORDER BY COALESCE(v.fecha_venta, v.creado_en) DESC
       LIMIT ?
       OFFSET ?
     `,
@@ -76,11 +76,11 @@ function applySalesFilters(
   forcedUserId?: string,
 ): void {
   if (filters.fechaDesde) {
-    where.push('v.creado_en >= ?');
+    where.push('COALESCE(v.fecha_venta, v.creado_en) >= ?');
     values.push(filters.fechaDesde);
   }
   if (filters.fechaHasta) {
-    where.push('v.creado_en <= ?');
+    where.push('COALESCE(v.fecha_venta, v.creado_en) <= ?');
     values.push(filters.fechaHasta);
   }
   if (filters.tipoVenta) {
@@ -141,6 +141,8 @@ export async function getSalesTotals(
       SELECT
         COUNT(CASE WHEN ${includeCancelled ? '1 = 1' : "v.estado_venta != 'ANULADA'"} THEN 1 END) AS cantidad_total,
         COALESCE(SUM(CASE WHEN ${includeCancelled ? '1 = 1' : "v.estado_venta != 'ANULADA'"} THEN v.total ELSE 0 END), 0) AS total_vendido,
+        COALESCE(SUM(CASE WHEN ${includeCancelled ? '1 = 1' : "v.estado_venta != 'ANULADA'"} THEN v.subtotal ELSE 0 END), 0) AS total_bruto,
+        COALESCE(SUM(CASE WHEN ${includeCancelled ? '1 = 1' : "v.estado_venta != 'ANULADA'"} THEN v.descuento ELSE 0 END), 0) AS total_descuento,
         COUNT(CASE WHEN v.estado_venta = 'ANULADA' THEN 1 END) AS ventas_anuladas
       FROM ventas v
       ${whereSql(where)}
@@ -152,6 +154,8 @@ export async function getSalesTotals(
   return {
     cantidad_total: row?.cantidad_total ?? 0,
     total_vendido: row?.total_vendido ?? 0,
+    total_bruto: row?.total_bruto ?? 0,
+    total_descuento: row?.total_descuento ?? 0,
     ventas_anuladas: row?.ventas_anuladas ?? 0,
   };
 }

@@ -44,6 +44,7 @@ const emptySaleForm: SaleFormValues = {
   id_cliente: '',
   metodo_pago: 'EFECTIVO',
   valor_pagado_inicial: 0,
+  descuento_general: 0,
   observaciones: '',
   detalles: [],
 };
@@ -52,10 +53,33 @@ const emptyLine: SaleItemFormValues = {
   id_variante: '',
   cantidad: 1,
   precio_unitario: 0,
+  descuento: 0,
 };
 
+export function salePreviewTotals(items: SaleItemFormValues[], descuentoGeneral = 0) {
+  const subtotalBruto = items.reduce((sum, item) => sum + item.cantidad * item.precio_unitario, 0);
+  const descuentoLineas = items.reduce((sum, item) => sum + item.descuento, 0);
+  const subtotalDespuesLineas = subtotalBruto - descuentoLineas;
+
+  return {
+    subtotalBruto,
+    descuentoLineas,
+    descuentoGeneral,
+    descuentoTotal: descuentoLineas + descuentoGeneral,
+    totalFinal: Math.max(subtotalDespuesLineas - descuentoGeneral, 0),
+  };
+}
+
 export function salePreviewTotal(items: SaleItemFormValues[]): number {
-  return items.reduce((sum, item) => sum + item.cantidad * item.precio_unitario, 0);
+  return salePreviewTotals(items).totalFinal;
+}
+
+export function formatBusinessDate(value: string): string {
+  return new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'America/Bogota',
+  }).format(new Date(value));
 }
 
 export function canShowCancelButton(
@@ -74,7 +98,7 @@ function currency(value: number): string {
 }
 
 function handleMessage(error: unknown, fallback: string): string {
-  if (isForbiddenError(error)) return 'No tienes permisos para esta accion.';
+  if (isForbiddenError(error)) return 'No tienes permisos para esta acción.';
   return error instanceof ApiClientError ? error.message : fallback;
 }
 
@@ -82,6 +106,12 @@ function variantLabel(variant: Variant): string {
   return `${variant.producto.nombreProducto ?? 'Producto'} / ${variant.talla ?? 'Unica'} / ${
     variant.color ?? 'Sin color'
   } / ${variant.sku}`;
+}
+
+function clientLabel(client: Client): string {
+  return `${client.nombreCompleto}${client.documento ? ` / ${client.documento}` : ''}${
+    client.telefono ? ` / ${client.telefono}` : ''
+  }`;
 }
 
 export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }) {
@@ -101,7 +131,8 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const canCancel = user ? canCancelSales(user.rol) : false;
-  const total = salePreviewTotal(form.detalles);
+  const totals = salePreviewTotals(form.detalles, form.descuento_general);
+  const total = totals.totalFinal;
   const activeClients = useMemo(
     () => clients.filter((client) => client.estado === 'ACTIVO'),
     [clients],
@@ -138,6 +169,7 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
           id_variante: firstVariant.idVariante,
           cantidad: 1,
           precio_unitario: firstVariant.precioVenta,
+          descuento: 0,
         });
       }
     } catch (loadError) {
@@ -176,8 +208,17 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
       setFormError('Selecciona una variante valida.');
       return;
     }
-    if (line.cantidad <= 0 || line.precio_unitario <= 0) {
-      setFormError('Cantidad y precio deben ser mayores que 0.');
+    const subtotalBruto = line.cantidad * selectedVariant.precioVenta;
+    if (line.cantidad <= 0) {
+      setFormError('La cantidad debe ser mayor que 0.');
+      return;
+    }
+    if (line.cantidad > selectedVariant.stockActual) {
+      setFormError('La cantidad supera el stock disponible mostrado.');
+      return;
+    }
+    if (line.descuento < 0 || line.descuento > subtotalBruto) {
+      setFormError('El descuento de línea no puede superar el subtotal bruto.');
       return;
     }
     if (form.detalles.some((item) => item.id_variante === line.id_variante)) {
@@ -186,11 +227,15 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
     }
 
     setFormError(null);
-    setForm((current) => ({ ...current, detalles: [...current.detalles, line] }));
+    setForm((current) => ({
+      ...current,
+      detalles: [...current.detalles, { ...line, precio_unitario: selectedVariant.precioVenta }],
+    }));
     setLine({
       ...emptyLine,
       id_variante: selectedVariant.idVariante,
       precio_unitario: selectedVariant.precioVenta,
+      descuento: 0,
     });
   }
 
@@ -210,6 +255,16 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
 
     if (form.detalles.length === 0) {
       setFormError('Agrega al menos un detalle antes de guardar.');
+      setIsSaving(false);
+      return;
+    }
+    if (
+      form.descuento_general < 0 ||
+      form.descuento_general > totals.subtotalBruto - totals.descuentoLineas
+    ) {
+      setFormError(
+        'El descuento general no puede superar el total después de descuentos de línea.',
+      );
       setIsSaving(false);
       return;
     }
@@ -318,6 +373,7 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
         clients={activeClients}
         variants={activeVariants}
         total={total}
+        totals={totals}
         isSaving={isSaving}
         onFormChange={setForm}
         onLineChange={setLine}
@@ -359,6 +415,7 @@ function SaleForm({
   clients,
   variants,
   total,
+  totals,
   isSaving,
   onFormChange,
   onLineChange,
@@ -371,6 +428,7 @@ function SaleForm({
   clients: Client[];
   variants: Variant[];
   total: number;
+  totals: ReturnType<typeof salePreviewTotals>;
   isSaving: boolean;
   onFormChange: (form: SaleFormValues) => void;
   onLineChange: (line: SaleItemFormValues) => void;
@@ -398,27 +456,25 @@ function SaleForm({
             className={inputClassName}
           >
             <option value="CONTADO">Contado</option>
-            <option value="CREDITO">Credito</option>
+            <option value="CREDITO">Crédito</option>
             <option value="MIXTA">Mixta</option>
           </select>
         </Field>
-        {(form.tipo_venta === 'CREDITO' || form.tipo_venta === 'MIXTA') && (
-          <Field label="Cliente">
-            <select
-              required
-              value={form.id_cliente}
-              onChange={(event) => onFormChange({ ...form, id_cliente: event.target.value })}
-              className={inputClassName}
-            >
-              <option value="">Selecciona cliente activo</option>
-              {clients.map((client) => (
-                <option key={client.idCliente} value={client.idCliente}>
-                  {client.nombreCompleto}
-                </option>
-              ))}
-            </select>
-          </Field>
-        )}
+        <Field label={form.tipo_venta === 'CONTADO' ? 'Cliente opcional' : 'Cliente obligatorio'}>
+          <select
+            required={form.tipo_venta !== 'CONTADO'}
+            value={form.id_cliente}
+            onChange={(event) => onFormChange({ ...form, id_cliente: event.target.value })}
+            className={inputClassName}
+          >
+            <option value="">Sin cliente asociado</option>
+            {clients.map((client) => (
+              <option key={client.idCliente} value={client.idCliente}>
+                {clientLabel(client)}
+              </option>
+            ))}
+          </select>
+        </Field>
         {form.tipo_venta !== 'CREDITO' && (
           <Field label="Metodo de pago">
             <select
@@ -455,13 +511,13 @@ function SaleForm({
 
       {form.tipo_venta === 'CREDITO' && (
         <p className="mt-3 rounded-md bg-stone-100 px-3 py-2 text-sm text-stone-700">
-          Esta venta creara un credito por el total de la venta.
+          Esta venta creará un crédito por el total final de la venta.
         </p>
       )}
 
       <div className="mt-4 rounded-md border border-stone-200 p-4">
         <h3 className="text-sm font-semibold text-stone-950">Detalles</h3>
-        <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_120px_160px_auto]">
+        <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_120px_160px_160px_auto]">
           <Field label="Variante">
             <select
               value={line.id_variante}
@@ -471,6 +527,7 @@ function SaleForm({
                   ...line,
                   id_variante: event.target.value,
                   precio_unitario: next?.precioVenta ?? line.precio_unitario,
+                  descuento: 0,
                 });
               }}
               className={inputClassName}
@@ -494,14 +551,16 @@ function SaleForm({
             />
           </Field>
           <Field label="Precio unitario">
+            <input type="number" value={line.precio_unitario} readOnly className={inputClassName} />
+          </Field>
+          <Field label="Descuento línea">
             <input
               type="number"
-              min={1}
+              min={0}
+              max={selectedVariant ? selectedVariant.precioVenta * line.cantidad : undefined}
               step={1}
-              value={line.precio_unitario}
-              onChange={(event) =>
-                onLineChange({ ...line, precio_unitario: Number(event.target.value) })
-              }
+              value={line.descuento}
+              onChange={(event) => onLineChange({ ...line, descuento: Number(event.target.value) })}
               className={inputClassName}
             />
           </Field>
@@ -510,10 +569,16 @@ function SaleForm({
           </button>
         </div>
         {selectedVariant && (
-          <p className="mt-2 text-xs text-stone-500">
-            Stock actual informativo: {selectedVariant.stockActual}. El backend descuenta stock al
-            guardar.
-          </p>
+          <div className="mt-3 rounded-md bg-stone-100 p-3 text-sm text-stone-700">
+            <p className="font-medium">{selectedVariant.producto.nombreProducto}</p>
+            <p className="mt-1 text-xs">
+              SKU {selectedVariant.sku} / QR {selectedVariant.codigoQr} / Talla{' '}
+              {selectedVariant.talla ?? 'Única'} / Color {selectedVariant.color ?? 'Sin color'}
+            </p>
+            <p className="mt-2 text-xs font-semibold">
+              Stock disponible: {selectedVariant.stockActual}
+            </p>
+          </div>
         )}
         {form.detalles.length === 0 ? (
           <EmptyState message="Agrega al menos un detalle para guardar la venta." />
@@ -525,8 +590,10 @@ function SaleForm({
                   <th className="px-4 py-3">Variante</th>
                   <th className="px-4 py-3">Cantidad</th>
                   <th className="px-4 py-3">Precio</th>
-                  <th className="px-4 py-3">Subtotal</th>
-                  <th className="px-4 py-3">Accion</th>
+                  <th className="px-4 py-3">Bruto</th>
+                  <th className="px-4 py-3">Descuento</th>
+                  <th className="px-4 py-3">Neto</th>
+                  <th className="px-4 py-3">Acción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -541,6 +608,10 @@ function SaleForm({
                       <td className="px-4 py-3">{currency(item.precio_unitario)}</td>
                       <td className="px-4 py-3">
                         {currency(item.cantidad * item.precio_unitario)}
+                      </td>
+                      <td className="px-4 py-3">{currency(item.descuento)}</td>
+                      <td className="px-4 py-3">
+                        {currency(item.cantidad * item.precio_unitario - item.descuento)}
                       </td>
                       <td className="px-4 py-3">
                         <button
@@ -561,16 +632,43 @@ function SaleForm({
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <Field label="Observaciones">
-          <textarea
-            value={form.observaciones}
-            onChange={(event) => onFormChange({ ...form, observaciones: event.target.value })}
-            className={textareaClassName}
-          />
-        </Field>
+        <div className="space-y-4">
+          <Field label="Descuento general">
+            <input
+              type="number"
+              min={0}
+              max={Math.max(totals.subtotalBruto - totals.descuentoLineas, 0)}
+              step={1}
+              value={form.descuento_general}
+              onChange={(event) =>
+                onFormChange({ ...form, descuento_general: Number(event.target.value) })
+              }
+              className={inputClassName}
+            />
+          </Field>
+          <Field label="Observaciones">
+            <textarea
+              value={form.observaciones}
+              onChange={(event) => onFormChange({ ...form, observaciones: event.target.value })}
+              className={textareaClassName}
+            />
+          </Field>
+        </div>
         <div className="rounded-md border border-stone-200 bg-stone-50 p-4 text-sm">
           <p className="flex justify-between">
-            <span>Total vista previa</span>
+            <span>Total bruto</span>
+            <strong>{currency(totals.subtotalBruto)}</strong>
+          </p>
+          <p className="mt-2 flex justify-between">
+            <span>Descuentos por líneas</span>
+            <strong>{currency(totals.descuentoLineas)}</strong>
+          </p>
+          <p className="mt-2 flex justify-between">
+            <span>Descuento general</span>
+            <strong>{currency(totals.descuentoGeneral)}</strong>
+          </p>
+          <p className="mt-2 flex justify-between border-t border-stone-200 pt-2">
+            <span>Total final</span>
             <strong>{currency(total)}</strong>
           </p>
           {form.tipo_venta === 'MIXTA' && (
@@ -580,7 +678,7 @@ function SaleForm({
                 <strong>{currency(form.valor_pagado_inicial)}</strong>
               </p>
               <p className="mt-2 flex justify-between">
-                <span>Saldo a credito</span>
+                <span>Saldo a crédito</span>
                 <strong>{currency(Math.max(creditBalance, 0))}</strong>
               </p>
             </>
@@ -616,7 +714,9 @@ function SalesTable({
             <th className="px-4 py-3">Venta</th>
             <th className="px-4 py-3">Cliente</th>
             <th className="px-4 py-3">Tipo</th>
-            <th className="px-4 py-3">Total</th>
+            <th className="px-4 py-3">Bruto</th>
+            <th className="px-4 py-3">Descuento</th>
+            <th className="px-4 py-3">Total final</th>
             <th className="px-4 py-3">Estado</th>
             <th className="px-4 py-3">Fecha</th>
             <th className="px-4 py-3">Accion</th>
@@ -633,13 +733,13 @@ function SalesTable({
                 {sale.cliente?.nombreCompleto ?? 'Sin cliente'}
               </td>
               <td className="px-4 py-3 text-stone-700">{sale.tipoVenta}</td>
+              <td className="px-4 py-3 text-stone-700">{currency(sale.subtotal)}</td>
+              <td className="px-4 py-3 text-stone-700">{currency(sale.descuento)}</td>
               <td className="px-4 py-3 text-stone-700">{currency(sale.total)}</td>
               <td className="px-4 py-3">
                 <StatusBadge status={sale.estadoVenta} />
               </td>
-              <td className="px-4 py-3 text-stone-600">
-                {new Date(sale.creadoEn).toLocaleString('es-CO')}
-              </td>
+              <td className="px-4 py-3 text-stone-600">{formatBusinessDate(sale.fechaVenta)}</td>
               <td className="px-4 py-3">
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -689,7 +789,8 @@ function SaleDetailPanel({
         <div className="border-b border-stone-100 p-4">
           <h2 className="text-sm font-semibold text-stone-950">{sale.numeroVenta}</h2>
           <p className="mt-1 text-xs text-stone-500">
-            {sale.tipoVenta} / {sale.estadoVenta} / {currency(sale.total)}
+            {sale.tipoVenta} / {sale.estadoVenta} / {formatBusinessDate(sale.fechaVenta)} /{' '}
+            {currency(sale.total)}
           </p>
         </div>
         <table className="w-full min-w-[760px] text-left text-sm">
@@ -698,7 +799,9 @@ function SaleDetailPanel({
               <th className="px-4 py-3">Producto</th>
               <th className="px-4 py-3">Cantidad</th>
               <th className="px-4 py-3">Precio</th>
-              <th className="px-4 py-3">Subtotal</th>
+              <th className="px-4 py-3">Bruto</th>
+              <th className="px-4 py-3">Descuento</th>
+              <th className="px-4 py-3">Neto</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
@@ -713,6 +816,8 @@ function SaleDetailPanel({
                 </td>
                 <td className="px-4 py-3 text-stone-700">{line.cantidad}</td>
                 <td className="px-4 py-3 text-stone-700">{currency(line.precioUnitario)}</td>
+                <td className="px-4 py-3 text-stone-700">{currency(line.subtotalBruto)}</td>
+                <td className="px-4 py-3 text-stone-700">{currency(line.descuento)}</td>
                 <td className="px-4 py-3 text-stone-700">{currency(line.subtotal)}</td>
               </tr>
             ))}
@@ -728,7 +833,19 @@ function SaleDetailPanel({
             <strong>{sale.cliente?.nombreCompleto ?? 'Sin cliente'}</strong>
           </p>
           <p className="mt-2 flex justify-between">
-            <span>Total</span>
+            <span>Total bruto</span>
+            <strong>{currency(sale.resumen.subtotal)}</strong>
+          </p>
+          <p className="mt-2 flex justify-between">
+            <span>Descuentos por líneas</span>
+            <strong>{currency(sale.resumen.descuentoLineas)}</strong>
+          </p>
+          <p className="mt-2 flex justify-between">
+            <span>Descuento general</span>
+            <strong>{currency(sale.resumen.descuentoGeneral)}</strong>
+          </p>
+          <p className="mt-2 flex justify-between border-t border-stone-200 pt-2">
+            <span>Total final</span>
             <strong>{currency(sale.total)}</strong>
           </p>
           <p className="mt-2 flex justify-between">
@@ -756,7 +873,7 @@ function SaleDetailPanel({
                     <strong>{currency(payment.monto)}</strong>
                   </p>
                   <p className="mt-1 text-xs text-stone-500">
-                    {payment.estadoPago} / {new Date(payment.creadoEn).toLocaleString('es-CO')}
+                    {payment.estadoPago} / {formatBusinessDate(payment.creadoEn)}
                   </p>
                 </div>
               ))}

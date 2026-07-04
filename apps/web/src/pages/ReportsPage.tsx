@@ -507,7 +507,9 @@ function SalesReportSection({
           <TotalsPanel
             items={[
               { label: 'Ventas', value: number(report.totales.cantidad_total) },
-              { label: 'Total vendido', value: money(report.totales.total_vendido) },
+              { label: 'Bruto', value: money(report.totales.total_bruto) },
+              { label: 'Descuentos', value: money(report.totales.total_descuento) },
+              { label: 'Vendido final', value: money(report.totales.total_vendido) },
               { label: 'Anuladas', value: number(report.totales.ventas_anuladas) },
             ]}
           />

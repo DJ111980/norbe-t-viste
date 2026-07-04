@@ -7,12 +7,14 @@ export interface CreateCashSaleDetailInput {
   idVariante: string;
   cantidad: number;
   precioUnitario?: number;
+  descuento?: number;
 }
 
 export interface CreateCashSaleInput {
   tipoVenta: 'CONTADO';
   idCliente: string | null;
   metodoPago: PaymentMethod;
+  descuentoGeneral?: number;
   observaciones: string | null;
   detalles: CreateCashSaleDetailInput[];
 }
@@ -20,6 +22,7 @@ export interface CreateCashSaleInput {
 export interface CreateCreditSaleInput {
   tipoVenta: 'CREDITO';
   idCliente: string;
+  descuentoGeneral?: number;
   observaciones: string | null;
   detalles: CreateCashSaleDetailInput[];
 }
@@ -29,6 +32,7 @@ export interface CreateMixedSaleInput {
   idCliente: string;
   valorPagadoInicial: number;
   metodoPago: PaymentMethod;
+  descuentoGeneral?: number;
   observaciones: string | null;
   detalles: CreateCashSaleDetailInput[];
 }
@@ -76,6 +80,7 @@ export interface SaleRecord {
   saldo_pendiente: number;
   estado_venta: SaleStatus;
   observaciones: string | null;
+  fecha_venta: string | null;
   creado_en: string;
   actualizado_en: string;
   anulado_por: string | null;
@@ -145,6 +150,8 @@ export interface PublicSaleSummary {
   tipoVenta: SaleType;
   estadoVenta: SaleStatus;
   total: number;
+  subtotal: number;
+  descuento: number;
   saldoPendiente: number;
   cliente: {
     idCliente: string;
@@ -156,6 +163,7 @@ export interface PublicSaleSummary {
     correo: string;
   };
   creadoEn: string;
+  fechaVenta: string;
   cantidadItems: number;
 }
 
@@ -171,6 +179,8 @@ export interface PublicSaleDetail extends PublicSaleSummary {
   pagos: PublicSalePayment[];
   resumen: {
     subtotal: number;
+    descuentoLineas: number;
+    descuentoGeneral: number;
     descuento: number;
     total: number;
     saldoPendiente: number;
@@ -189,6 +199,8 @@ export interface PublicSaleLine {
   color: string | null;
   cantidad: number;
   precioUnitario: number;
+  descuento: number;
+  subtotalBruto: number;
   subtotal: number;
 }
 
@@ -233,7 +245,9 @@ export interface CreateCashSaleRepositoryInput {
   metodoPago: PaymentMethod;
   observaciones: string | null;
   subtotal: number;
+  descuento: number;
   total: number;
+  fechaVenta: string;
   idPagoVenta: string;
   detalles: SaleDetailToCreate[];
 }
@@ -246,7 +260,9 @@ export interface CreateCreditSaleRepositoryInput {
   idUsuario: string;
   observaciones: string | null;
   subtotal: number;
+  descuento: number;
   total: number;
+  fechaVenta: string;
   detalles: SaleDetailToCreate[];
 }
 
@@ -260,7 +276,9 @@ export interface CreateMixedSaleRepositoryInput {
   metodoPago: PaymentMethod;
   observaciones: string | null;
   subtotal: number;
+  descuento: number;
   total: number;
+  fechaVenta: string;
   valorPagadoInicial: number;
   saldoCredito: number;
   detalles: SaleDetailToCreate[];

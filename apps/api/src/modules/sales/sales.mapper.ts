@@ -21,6 +21,8 @@ export function toPublicSaleSummary(record: SaleListRecord): PublicSaleSummary {
     tipoVenta: record.tipo_venta,
     estadoVenta: record.estado_venta,
     total: record.total,
+    subtotal: record.subtotal,
+    descuento: record.descuento,
     saldoPendiente: record.saldo_pendiente,
     cliente: record.id_cliente
       ? {
@@ -34,6 +36,7 @@ export function toPublicSaleSummary(record: SaleListRecord): PublicSaleSummary {
       correo: record.vendedor_correo,
     },
     creadoEn: record.creado_en,
+    fechaVenta: record.fecha_venta ?? record.creado_en,
     cantidadItems: record.cantidad_items,
   };
 }
@@ -49,6 +52,8 @@ export function toPublicSaleLine(record: SaleDetailRecord): PublicSaleLine {
     color: record.color,
     cantidad: record.cantidad,
     precioUnitario: record.precio_unitario,
+    descuento: record.descuento,
+    subtotalBruto: record.cantidad * record.precio_unitario,
     subtotal: record.subtotal,
   };
 }
@@ -77,6 +82,8 @@ export function toPublicSaleDetail(record: SaleDetailViewRecord): PublicSaleDeta
   const summary = toPublicSaleSummary(record);
   const detalles = record.detalles.map(toPublicSaleLine);
   const pagos = record.pagos.map(toPublicSalePayment);
+  const descuentoLineas = record.detalles.reduce((sum, detail) => sum + detail.descuento, 0);
+  const descuentoGeneral = Math.max(record.descuento - descuentoLineas, 0);
 
   return {
     ...summary,
@@ -91,6 +98,8 @@ export function toPublicSaleDetail(record: SaleDetailViewRecord): PublicSaleDeta
     pagos,
     resumen: {
       subtotal: record.subtotal,
+      descuentoLineas,
+      descuentoGeneral,
       descuento: record.descuento,
       total: record.total,
       saldoPendiente: record.saldo_pendiente,

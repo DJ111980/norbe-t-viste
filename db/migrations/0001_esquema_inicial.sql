@@ -217,6 +217,7 @@ CREATE TABLE IF NOT EXISTS ventas (
   -- Las ventas con errores se conservan para historial y auditoria; no se eliminan.
   estado_venta TEXT NOT NULL DEFAULT 'COMPLETADA' CHECK (estado_venta IN ('COMPLETADA', 'ANULADA')),
   observaciones TEXT,
+  fecha_venta TEXT,
   creado_en TEXT NOT NULL DEFAULT (datetime('now')),
   actualizado_en TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (id_cliente) REFERENCES clientes (id_cliente) ON UPDATE CASCADE ON DELETE SET NULL,

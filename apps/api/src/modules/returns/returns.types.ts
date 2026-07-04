@@ -22,6 +22,7 @@ export interface ReturnSaleDetailAvailabilityRecord {
   id_variante: string;
   cantidad: number;
   precio_unitario: number;
+  subtotal: number;
   cantidad_devuelta_activa: number;
   stock_actual: number;
 }

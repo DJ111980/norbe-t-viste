@@ -56,12 +56,14 @@ function toSaleBody(values: SaleFormValues) {
     id_variante: detail.id_variante,
     cantidad: detail.cantidad,
     precio_unitario: detail.precio_unitario,
+    descuento: detail.descuento,
   }));
 
   if (values.tipo_venta === 'CREDITO') {
     return {
       tipo_venta: values.tipo_venta,
       id_cliente: values.id_cliente,
+      descuento_general: values.descuento_general,
       observaciones: values.observaciones || null,
       detalles,
     };
@@ -73,6 +75,7 @@ function toSaleBody(values: SaleFormValues) {
       id_cliente: values.id_cliente,
       valor_pagado_inicial: values.valor_pagado_inicial,
       metodo_pago: values.metodo_pago,
+      descuento_general: values.descuento_general,
       observaciones: values.observaciones || null,
       detalles,
     };
@@ -82,6 +85,7 @@ function toSaleBody(values: SaleFormValues) {
     tipo_venta: values.tipo_venta,
     id_cliente: values.id_cliente || null,
     metodo_pago: values.metodo_pago,
+    descuento_general: values.descuento_general,
     observaciones: values.observaciones || null,
     detalles,
   };

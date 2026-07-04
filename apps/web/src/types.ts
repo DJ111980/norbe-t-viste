@@ -430,6 +430,8 @@ export interface SaleSummary {
   numeroVenta: string;
   tipoVenta: SaleType;
   estadoVenta: SaleStatus;
+  subtotal: number;
+  descuento: number;
   total: number;
   saldoPendiente: number;
   cliente: {
@@ -442,6 +444,7 @@ export interface SaleSummary {
     correo: string;
   };
   creadoEn: string;
+  fechaVenta: string;
   cantidadItems: number;
 }
 
@@ -455,6 +458,8 @@ export interface SaleLine {
   color: string | null;
   cantidad: number;
   precioUnitario: number;
+  descuento: number;
+  subtotalBruto: number;
   subtotal: number;
 }
 
@@ -486,6 +491,8 @@ export interface SaleDetail extends SaleSummary {
   pagos: SalePayment[];
   resumen: {
     subtotal: number;
+    descuentoLineas: number;
+    descuentoGeneral: number;
     descuento: number;
     total: number;
     saldoPendiente: number;
@@ -498,6 +505,7 @@ export interface SaleItemFormValues {
   id_variante: string;
   cantidad: number;
   precio_unitario: number;
+  descuento: number;
 }
 
 export interface SaleFormValues {
@@ -505,6 +513,7 @@ export interface SaleFormValues {
   id_cliente: string;
   metodo_pago: PaymentMethod;
   valor_pagado_inicial: number;
+  descuento_general: number;
   observaciones: string;
   detalles: SaleItemFormValues[];
 }
@@ -789,6 +798,8 @@ export interface SalesReportRow {
 export interface SalesReportTotals {
   cantidad_total: number;
   total_vendido: number;
+  total_bruto: number;
+  total_descuento: number;
   ventas_anuladas: number;
 }
 

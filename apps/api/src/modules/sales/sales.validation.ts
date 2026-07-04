@@ -50,6 +50,18 @@ function parsePositiveInteger(value: unknown, code: string, message: string): nu
   return parsed;
 }
 
+function parseNonNegativeInteger(value: unknown, code: string, message: string): number {
+  if (value === undefined || value === null || value === '') return 0;
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new ApiError(code, message, 400);
+  }
+
+  return parsed;
+}
+
 function parseOptionalPositiveInteger(
   value: unknown,
   code: string,
@@ -92,6 +104,7 @@ export function validateCreateSaleInput(body: unknown): CreateSaleInput {
     valor_pagado_inicial?: unknown;
     metodo_pago?: unknown;
     observaciones?: unknown;
+    descuento_general?: unknown;
     detalles?: unknown;
     abonos?: unknown;
   };
@@ -130,6 +143,7 @@ export function validateCreateSaleInput(body: unknown): CreateSaleInput {
       id_variante?: unknown;
       cantidad?: unknown;
       precio_unitario?: unknown;
+      descuento?: unknown;
     };
     const idVariante = normalizeRequiredText(
       detail.id_variante,
@@ -159,8 +173,18 @@ export function validateCreateSaleInput(body: unknown): CreateSaleInput {
         'INVALID_SALE_UNIT_PRICE',
         'El precio unitario debe ser mayor que 0.',
       ),
+      descuento: parseNonNegativeInteger(
+        detail.descuento,
+        'INVALID_SALE_LINE_DISCOUNT',
+        'El descuento de linea no puede ser negativo.',
+      ),
     };
   });
+  const descuentoGeneral = parseNonNegativeInteger(
+    rawBody.descuento_general,
+    'INVALID_SALE_DISCOUNT',
+    'El descuento general no puede ser negativo.',
+  );
 
   if (rawBody.tipo_venta === 'CREDITO') {
     if (rawBody.metodo_pago !== undefined && rawBody.metodo_pago !== null) {
@@ -178,6 +202,7 @@ export function validateCreateSaleInput(body: unknown): CreateSaleInput {
         'CREDIT_SALE_CLIENT_REQUIRED',
         'El cliente es obligatorio para una venta a credito.',
       ),
+      descuentoGeneral,
       observaciones: normalizeOptionalText(rawBody.observaciones),
       detalles,
     };
@@ -207,6 +232,7 @@ export function validateCreateSaleInput(body: unknown): CreateSaleInput {
         'El pago inicial de una venta mixta debe ser mayor que 0.',
       ),
       metodoPago: metodoPago as PaymentMethod,
+      descuentoGeneral,
       observaciones: normalizeOptionalText(rawBody.observaciones),
       detalles,
     };
@@ -216,6 +242,7 @@ export function validateCreateSaleInput(body: unknown): CreateSaleInput {
     tipoVenta: 'CONTADO',
     idCliente: normalizeOptionalText(rawBody.id_cliente),
     metodoPago: metodoPago as PaymentMethod,
+    descuentoGeneral,
     observaciones: normalizeOptionalText(rawBody.observaciones),
     detalles,
   };

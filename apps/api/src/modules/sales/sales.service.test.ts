@@ -73,7 +73,9 @@ vi.mock('./sales.repository', () => ({
         id_usuario: input.idUsuario,
         total: input.total,
         subtotal: input.subtotal,
+        descuento: input.descuento,
         valor_pagado_inicial: input.total,
+        fecha_venta: input.fechaVenta,
         cantidad_items: input.detalles.reduce(
           (sum: number, detail: { cantidad: number }) => sum + detail.cantidad,
           0,
@@ -106,6 +108,7 @@ vi.mock('./sales.repository', () => ({
           codigo_qr: detail.codigoQr,
           cantidad: detail.cantidad,
           precio_unitario: detail.precioUnitario,
+          descuento: detail.descuento,
           subtotal: detail.subtotal,
         }),
       );
@@ -135,8 +138,10 @@ vi.mock('./sales.repository', () => ({
         tipo_venta: 'CREDITO',
         total: input.total,
         subtotal: input.subtotal,
+        descuento: input.descuento,
         valor_pagado_inicial: 0,
         saldo_pendiente: input.total,
+        fecha_venta: input.fechaVenta,
         cantidad_items: input.detalles.reduce(
           (sum: number, detail: { cantidad: number }) => sum + detail.cantidad,
           0,
@@ -171,6 +176,7 @@ vi.mock('./sales.repository', () => ({
           codigo_qr: detail.codigoQr,
           cantidad: detail.cantidad,
           precio_unitario: detail.precioUnitario,
+          descuento: detail.descuento,
           subtotal: detail.subtotal,
         }),
       );
@@ -226,8 +232,10 @@ vi.mock('./sales.repository', () => ({
         tipo_venta: 'MIXTA',
         total: input.total,
         subtotal: input.subtotal,
+        descuento: input.descuento,
         valor_pagado_inicial: input.valorPagadoInicial,
         saldo_pendiente: input.saldoCredito,
+        fecha_venta: input.fechaVenta,
         cantidad_items: input.detalles.reduce(
           (sum: number, detail: { cantidad: number }) => sum + detail.cantidad,
           0,
@@ -270,6 +278,7 @@ vi.mock('./sales.repository', () => ({
           codigo_qr: detail.codigoQr,
           cantidad: detail.cantidad,
           precio_unitario: detail.precioUnitario,
+          descuento: detail.descuento,
           subtotal: detail.subtotal,
         }),
       );
@@ -481,6 +490,7 @@ function buildSale(overrides: Partial<SaleListRecord> = {}): SaleListRecord {
     saldo_pendiente: 0,
     estado_venta: 'COMPLETADA',
     observaciones: 'Venta de contado',
+    fecha_venta: '2026-07-02T10:00:00-05:00',
     creado_en: '2026-07-02 10:00:00',
     actualizado_en: '2026-07-02 10:00:00',
     anulado_por: null,
@@ -590,6 +600,74 @@ describe('sales service', () => {
     });
   });
 
+  it('calcula venta de contado con descuentos de linea y general', async () => {
+    mocks.sales = [];
+    mocks.payments = [];
+    mocks.details = [];
+
+    const result = await createCashSale(env, adminAuth, {
+      tipoVenta: 'CONTADO',
+      idCliente: null,
+      metodoPago: 'EFECTIVO',
+      descuentoGeneral: 5000,
+      observaciones: 'Venta con descuento',
+      detalles: [{ idVariante: 'var_1', cantidad: 2, descuento: 10000 }],
+    });
+
+    expect(result).toMatchObject({
+      tipo_venta: 'CONTADO',
+      total: 85000,
+      saldo_pendiente: 0,
+    });
+    expect(mocks.sales[0]).toMatchObject({
+      subtotal: 100000,
+      descuento: 15000,
+      total: 85000,
+      valor_pagado_inicial: 85000,
+    });
+    expect(mocks.details[0]).toMatchObject({
+      precio_unitario: 50000,
+      descuento: 10000,
+      subtotal: 90000,
+    });
+    expect(mocks.payments[0]).toMatchObject({ valor_pagado: 85000 });
+  });
+
+  it('rechaza precio manual distinto al precio de la variante', async () => {
+    await expect(
+      createCashSale(env, adminAuth, {
+        tipoVenta: 'CONTADO',
+        idCliente: null,
+        metodoPago: 'EFECTIVO',
+        observaciones: null,
+        detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 55000 }],
+      }),
+    ).rejects.toMatchObject({ code: 'SALE_PRICE_MISMATCH' });
+  });
+
+  it('rechaza descuentos mayores al subtotal disponible', async () => {
+    await expect(
+      createCashSale(env, adminAuth, {
+        tipoVenta: 'CONTADO',
+        idCliente: null,
+        metodoPago: 'EFECTIVO',
+        observaciones: null,
+        detalles: [{ idVariante: 'var_1', cantidad: 1, descuento: 50001 }],
+      }),
+    ).rejects.toMatchObject({ code: 'SALE_LINE_DISCOUNT_EXCEEDS_SUBTOTAL' });
+
+    await expect(
+      createCashSale(env, adminAuth, {
+        tipoVenta: 'CONTADO',
+        idCliente: null,
+        metodoPago: 'EFECTIVO',
+        descuentoGeneral: 50001,
+        observaciones: null,
+        detalles: [{ idVariante: 'var_1', cantidad: 1 }],
+      }),
+    ).rejects.toMatchObject({ code: 'SALE_GENERAL_DISCOUNT_EXCEEDS_TOTAL' });
+  });
+
   it('VENDEDOR puede crear venta de contado', async () => {
     mocks.sales = [];
     mocks.payments = [];
@@ -654,6 +732,32 @@ describe('sales service', () => {
     expect(mocks.adjustments).toHaveLength(0);
     expect(mocks.images).toHaveLength(0);
     expect(mocks.labels).toHaveLength(0);
+  });
+
+  it('crea credito por el total final despues de descuentos', async () => {
+    mocks.sales = [];
+    mocks.payments = [];
+    mocks.details = [];
+
+    const result = await createSale(env, adminAuth, {
+      tipoVenta: 'CREDITO',
+      idCliente: 'cli_1',
+      descuentoGeneral: 5000,
+      observaciones: 'Credito con descuento',
+      detalles: [{ idVariante: 'var_1', cantidad: 2, descuento: 10000 }],
+    });
+
+    expect(result).toMatchObject({
+      tipo_venta: 'CREDITO',
+      total: 85000,
+      saldo_pendiente: 85000,
+    });
+    expect(mocks.credits[0]).toMatchObject({
+      monto_inicial: 85000,
+      saldo_pendiente: 85000,
+    });
+    expect(mocks.installments).toHaveLength(0);
+    expect(mocks.adjustments).toHaveLength(0);
   });
 
   it('VENDEDOR puede crear venta a credito', async () => {
@@ -727,32 +831,32 @@ describe('sales service', () => {
     const result = await createSale(env, adminAuth, {
       tipoVenta: 'MIXTA',
       idCliente: 'cli_1',
-      valorPagadoInicial: 40000,
+      valorPagadoInicial: 20000,
       metodoPago: 'EFECTIVO',
       observaciones: 'Venta mixta',
-      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 100000 }],
+      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 50000 }],
     });
 
     expect(result).toMatchObject({
       tipo_venta: 'MIXTA',
-      total: 100000,
-      valor_pagado_inicial: 40000,
-      saldo_pendiente: 60000,
+      total: 50000,
+      valor_pagado_inicial: 20000,
+      saldo_pendiente: 30000,
       estado_credito: 'PENDIENTE',
       items_vendidos: 1,
       movimientos_creados: 1,
     });
     expect(mocks.payments[0]).toMatchObject({
       metodo_pago: 'EFECTIVO',
-      valor_pagado: 40000,
+      valor_pagado: 20000,
       estado_pago: 'ACTIVO',
     });
     expect(mocks.credits[0]).toMatchObject({
       origen_credito: 'VENTA',
       id_venta: result.id_venta,
-      monto_inicial: 60000,
+      monto_inicial: 30000,
       monto_abonado: 0,
-      saldo_pendiente: 60000,
+      saldo_pendiente: 30000,
       estado_credito: 'PENDIENTE',
     });
     expect(mocks.variants.find((variant) => variant.id_variante === 'var_1')?.stock_actual).toBe(2);
@@ -791,6 +895,40 @@ describe('sales service', () => {
     expect(mocks.credits[0]?.saldo_pendiente).toBe(70000);
   });
 
+  it('calcula pago inicial y saldo de mixta desde el total final con descuentos', async () => {
+    mocks.sales = [];
+    mocks.payments = [];
+    mocks.details = [];
+
+    const result = await createSale(env, adminAuth, {
+      tipoVenta: 'MIXTA',
+      idCliente: 'cli_1',
+      valorPagadoInicial: 25000,
+      metodoPago: 'NEQUI',
+      descuentoGeneral: 5000,
+      observaciones: 'Mixta con descuento',
+      detalles: [{ idVariante: 'var_1', cantidad: 2, descuento: 10000 }],
+    });
+
+    expect(result).toMatchObject({
+      total: 85000,
+      valor_pagado_inicial: 25000,
+      saldo_pendiente: 60000,
+    });
+    expect(mocks.sales[0]).toMatchObject({
+      subtotal: 100000,
+      descuento: 15000,
+      total: 85000,
+      valor_pagado_inicial: 25000,
+      saldo_pendiente: 60000,
+    });
+    expect(mocks.payments[0]).toMatchObject({ valor_pagado: 25000 });
+    expect(mocks.credits[0]).toMatchObject({
+      monto_inicial: 60000,
+      saldo_pendiente: 60000,
+    });
+  });
+
   it('venta mixta rechaza pago inicial mayor o igual al total', async () => {
     await expect(
       createSale(env, adminAuth, {
@@ -812,10 +950,10 @@ describe('sales service', () => {
     const result = await createSale(env, adminAuth, {
       tipoVenta: 'MIXTA',
       idCliente: 'cli_1',
-      valorPagadoInicial: 40000,
+      valorPagadoInicial: 20000,
       metodoPago: 'TRANSFERENCIA',
       observaciones: 'Venta mixta',
-      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 100000 }],
+      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 50000 }],
     });
 
     const sale = await getSaleById(env, adminAuth, result.id_venta);
@@ -823,14 +961,14 @@ describe('sales service', () => {
 
     expect(sale).toMatchObject({
       tipoVenta: 'MIXTA',
-      total: 100000,
-      valorPagadoInicial: 40000,
-      saldoPendiente: 60000,
+      total: 50000,
+      valorPagadoInicial: 20000,
+      saldoPendiente: 30000,
     });
     expect(payments).toHaveLength(1);
     expect(payments[0]).toMatchObject({
       metodoPago: 'TRANSFERENCIA',
-      monto: 40000,
+      monto: 20000,
     });
   });
 
@@ -917,7 +1055,7 @@ describe('sales service', () => {
       idCliente: null,
       metodoPago: 'EFECTIVO',
       observaciones: null,
-      detalles: [{ idVariante: 'var_1', cantidad: 1, precioUnitario: 55000 }],
+      detalles: [{ idVariante: 'var_1', cantidad: 1 }],
     });
 
     expect(mocks.details[0]).toMatchObject({
@@ -926,8 +1064,8 @@ describe('sales service', () => {
       talla: 'M',
       color: 'Azul',
       codigo_qr: 'NTV-VAR-000001',
-      precio_unitario: 55000,
-      subtotal: 55000,
+      precio_unitario: 50000,
+      subtotal: 50000,
     });
   });
 

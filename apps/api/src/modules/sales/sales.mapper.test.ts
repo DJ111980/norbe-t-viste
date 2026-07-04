@@ -40,6 +40,7 @@ describe('sales mapper', () => {
       saldo_pendiente: 0,
       estado_venta: 'COMPLETADA',
       observaciones: null,
+      fecha_venta: '2026-07-02T10:00:00-05:00',
       creado_en: '2026-07-02',
       actualizado_en: '2026-07-02',
       anulado_por: null,

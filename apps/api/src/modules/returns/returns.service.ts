@@ -74,13 +74,15 @@ export async function createSaleReturn(
       );
     }
 
+    const precioUnitarioNeto = Math.round(saleDetail.subtotal / saleDetail.cantidad);
+
     detailsToCreate.push({
       idDetalleDevolucion: createId('devdet'),
       idDetalleVenta: saleDetail.id_detalle_venta,
       idVariante: saleDetail.id_variante,
       cantidadDevuelta: requestedDetail.cantidadDevuelta,
-      precioUnitario: saleDetail.precio_unitario,
-      subtotalDevuelto: requestedDetail.cantidadDevuelta * saleDetail.precio_unitario,
+      precioUnitario: precioUnitarioNeto,
+      subtotalDevuelto: requestedDetail.cantidadDevuelta * precioUnitarioNeto,
       stockAntes: saleDetail.stock_actual,
       stockDespues: saleDetail.stock_actual + requestedDetail.cantidadDevuelta,
       idMovimiento: createId('mov'),
