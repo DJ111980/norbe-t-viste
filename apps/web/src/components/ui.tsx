@@ -1,4 +1,4 @@
-import { useEffect, useRef, type FocusEvent, type ReactNode } from 'react';
+import { useEffect, useRef, type FocusEvent, type MouseEvent, type ReactNode } from 'react';
 
 export function PageHeader({
   title,
@@ -75,14 +75,26 @@ export function SuccessMessage({ message }: { message: string }) {
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const active = status === 'ACTIVO' || status === 'ACTIVA';
+  const normalizedStatus = status.toUpperCase();
+  const tone =
+    normalizedStatus === 'ACTIVO' ||
+    normalizedStatus === 'ACTIVA' ||
+    normalizedStatus === 'CONFIRMADO' ||
+    normalizedStatus === 'COMPLETADA' ||
+    normalizedStatus === 'PAGADO'
+      ? 'bg-emerald-100 text-emerald-800'
+      : normalizedStatus === 'ANULADO' || normalizedStatus === 'ANULADA'
+        ? 'bg-red-100 text-red-800'
+        : normalizedStatus === 'PENDIENTE'
+          ? 'bg-orange-100 text-orange-800'
+          : normalizedStatus === 'PARCIAL'
+            ? 'bg-blue-100 text-blue-800'
+            : normalizedStatus === 'BORRADOR'
+              ? 'bg-amber-100 text-amber-800'
+              : 'bg-stone-200 text-stone-700';
 
   return (
-    <span
-      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-        active ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-700'
-      }`}
-    >
+    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${tone}`}>
       {status}
     </span>
   );
@@ -110,6 +122,9 @@ export function Field({
 
 export const numberInputFocusProps = {
   onFocus: (event: FocusEvent<HTMLInputElement>) => event.currentTarget.select(),
+  onClick: (event: MouseEvent<HTMLInputElement>) => {
+    if (event.currentTarget.value === '0') event.currentTarget.select();
+  },
 };
 
 export const inputClassName =

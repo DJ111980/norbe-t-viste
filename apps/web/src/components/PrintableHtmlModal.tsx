@@ -25,7 +25,7 @@ export function PrintableHtmlModal({
           ref={frameRef}
           title={title}
           srcDoc={html}
-          className="mx-auto aspect-[3/2] w-full max-w-[420px] rounded-md border border-stone-200 bg-white"
+          className="mx-auto aspect-[9/5] w-full max-w-[360px] rounded-md border border-stone-200 bg-white"
         />
         <div className="flex flex-wrap justify-center gap-2">
           <button type="button" onClick={printFrame} className={primaryButtonClassName}>

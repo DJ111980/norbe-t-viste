@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
 import { EntityImageThumb } from '../components/EntityImageThumb';
 import { Modal } from '../components/Modal';
@@ -250,6 +250,88 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
     }));
   }
 
+  function findVariantByScannedCode(code: string): Variant | null {
+    const query = code.trim().toLowerCase();
+    if (!query) return null;
+
+    return (
+      variants.find((variant) => {
+        const qr = variant.codigoQr.toLowerCase();
+        const sku = variant.sku.toLowerCase();
+        return (
+          variant.idVariante.toLowerCase() === query ||
+          qr === query ||
+          sku === query ||
+          qr.endsWith(query) ||
+          sku.endsWith(query)
+        );
+      }) ?? null
+    );
+  }
+
+  function addScannedVariant(code: string) {
+    const scannedVariant = findVariantByScannedCode(code);
+
+    if (!scannedVariant) {
+      setFormError('No existe una variante con ese codigo QR.');
+      return;
+    }
+    if (scannedVariant.estado !== 'ACTIVA') {
+      setFormError('La variante escaneada esta inactiva.');
+      return;
+    }
+    if (scannedVariant.stockActual <= 0) {
+      setFormError('La variante escaneada no tiene stock disponible.');
+      return;
+    }
+
+    let blocked = false;
+    setForm((current) => {
+      const existing = current.detalles.find(
+        (item) => item.id_variante === scannedVariant.idVariante,
+      );
+
+      if (existing) {
+        if (existing.cantidad + 1 > scannedVariant.stockActual) {
+          blocked = true;
+          return current;
+        }
+
+        return {
+          ...current,
+          detalles: current.detalles.map((item) =>
+            item.id_variante === scannedVariant.idVariante
+              ? { ...item, cantidad: item.cantidad + 1 }
+              : item,
+          ),
+        };
+      }
+
+      return {
+        ...current,
+        detalles: [
+          ...current.detalles,
+          {
+            id_variante: scannedVariant.idVariante,
+            cantidad: 1,
+            precio_unitario: scannedVariant.precioVenta,
+            descuento: 0,
+          },
+        ],
+      };
+    });
+
+    setLine({
+      ...emptyLine,
+      id_variante: scannedVariant.idVariante,
+      precio_unitario: scannedVariant.precioVenta,
+      descuento: 0,
+    });
+    setFormError(
+      blocked ? 'No se puede sumar otra unidad porque supera el stock disponible.' : null,
+    );
+  }
+
   async function saveSale(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
@@ -394,6 +476,7 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
             onFormChange={setForm}
             onLineChange={setLine}
             onAddLine={addLine}
+            onScanVariant={addScannedVariant}
             onRemoveLine={removeLine}
             onSubmit={(event) => void saveSale(event)}
           />
@@ -440,6 +523,7 @@ function SaleForm({
   onFormChange,
   onLineChange,
   onAddLine,
+  onScanVariant,
   onRemoveLine,
   onSubmit,
 }: {
@@ -453,11 +537,27 @@ function SaleForm({
   onFormChange: (form: SaleFormValues) => void;
   onLineChange: (line: SaleItemFormValues) => void;
   onAddLine: () => void;
+  onScanVariant: (code: string) => void;
   onRemoveLine: (idVariante: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const scanInputRef = useRef<HTMLInputElement | null>(null);
+  const [scanCode, setScanCode] = useState('');
   const selectedVariant = variants.find((variant) => variant.idVariante === line.id_variante);
   const creditBalance = form.tipo_venta === 'MIXTA' ? total - form.valor_pagado_inicial : total;
+
+  function submitScan() {
+    if (!scanCode.trim()) return;
+    onScanVariant(scanCode);
+    setScanCode('');
+    window.setTimeout(() => scanInputRef.current?.focus(), 0);
+  }
+
+  function handleScanKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    submitScan();
+  }
 
   return (
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
@@ -538,6 +638,24 @@ function SaleForm({
           Esta venta creará un crédito por el total final de la venta.
         </p>
       )}
+
+      <div className="mt-4 rounded-md border border-stone-200 bg-stone-50 p-3">
+        <Field label="Escanear QR o codigo de variante">
+          <div className="flex gap-2">
+            <input
+              ref={scanInputRef}
+              value={scanCode}
+              onChange={(event) => setScanCode(event.target.value)}
+              onKeyDown={handleScanKeyDown}
+              placeholder="NTV-VAR-000015 o 000015"
+              className={inputClassName}
+            />
+            <button type="button" onClick={submitScan} className={secondaryButtonClassName}>
+              Agregar
+            </button>
+          </div>
+        </Field>
+      </div>
 
       <div className="mt-4 rounded-md border border-stone-200 p-4">
         <h3 className="text-sm font-semibold text-stone-950">Detalles</h3>
@@ -745,6 +863,8 @@ function SalesTable({
   userRole: 'ADMINISTRADOR' | 'VENDEDOR';
   onSelect: (sale: SaleSummary) => void;
 }) {
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+
   return (
     <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
       <table className="w-full min-w-[920px] text-left text-sm">
@@ -928,21 +1048,45 @@ function SaleDetailPanel({
         {canCancel && (
           <div className="rounded-md border border-stone-200 bg-white p-4">
             <h2 className="text-sm font-semibold text-stone-950">Anular venta</h2>
-            <Field label="Motivo obligatorio" required>
-              <textarea
-                value={cancelReason}
-                onChange={(event) => onCancelReason(event.target.value)}
-                className={textareaClassName}
-              />
-            </Field>
-            <button
-              type="button"
-              disabled={!cancelReason.trim()}
-              onClick={onCancelSale}
-              className={secondaryButtonClassName}
-            >
-              Anular venta
-            </button>
+            {!isCancelOpen ? (
+              <button
+                type="button"
+                onClick={() => setIsCancelOpen(true)}
+                className={secondaryButtonClassName}
+              >
+                Anular
+              </button>
+            ) : (
+              <div className="mt-3 space-y-3">
+                <Field label="Motivo obligatorio" required>
+                  <textarea
+                    value={cancelReason}
+                    onChange={(event) => onCancelReason(event.target.value)}
+                    className={textareaClassName}
+                  />
+                </Field>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={!cancelReason.trim()}
+                    onClick={onCancelSale}
+                    className={secondaryButtonClassName}
+                  >
+                    Confirmar anulacion
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onCancelReason('');
+                      setIsCancelOpen(false);
+                    }}
+                    className={secondaryButtonClassName}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

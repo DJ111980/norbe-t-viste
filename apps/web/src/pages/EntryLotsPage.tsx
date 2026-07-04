@@ -659,6 +659,8 @@ function LotsTable({
   selected: EntryLot | null;
   onSelect: (lot: EntryLotSummary) => void;
 }) {
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+
   return (
     <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
       <table className="w-full min-w-[860px] text-left text-sm">
@@ -919,21 +921,45 @@ function LotActions({
             Ver etiquetas
           </button>
         )}
-        <Field label="Motivo de anulacion">
-          <textarea
-            value={cancelReason}
-            onChange={(event) => onCancelReason(event.target.value)}
-            className={textareaClassName}
-          />
-        </Field>
-        <button
-          type="button"
-          disabled={!cancelReason.trim()}
-          onClick={onCancelLot}
-          className={secondaryButtonClassName}
-        >
-          Anular lote
-        </button>
+        {!isCancelOpen ? (
+          <button
+            type="button"
+            onClick={() => setIsCancelOpen(true)}
+            className={secondaryButtonClassName}
+          >
+            Anular
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <Field label="Motivo de anulacion">
+              <textarea
+                value={cancelReason}
+                onChange={(event) => onCancelReason(event.target.value)}
+                className={textareaClassName}
+              />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!cancelReason.trim()}
+                onClick={onCancelLot}
+                className={secondaryButtonClassName}
+              >
+                Confirmar anulacion
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onCancelReason('');
+                  setIsCancelOpen(false);
+                }}
+                className={secondaryButtonClassName}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

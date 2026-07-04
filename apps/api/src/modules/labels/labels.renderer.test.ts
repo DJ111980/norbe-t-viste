@@ -6,7 +6,7 @@ import {
 } from './labels.renderer';
 
 describe('labels html', () => {
-  it('renderiza una etiqueta HTML imprimible de 60mm por 40mm', () => {
+  it('renderiza una etiqueta HTML imprimible de 2.25in por 1.25in', () => {
     const html = renderVariantLabelHtml({
       codigoQr: 'NTV-VAR-000001',
       talla: 'TALLA M',
@@ -17,9 +17,9 @@ describe('labels html', () => {
     expect(html).toContain('<meta charset="utf-8">');
     expect(html).toContain('<title>NORBE T VISTE - Etiqueta QR</title>');
     expect(html).toContain('@page');
-    expect(html).toContain('size: 60mm 40mm');
-    expect(html).toContain('width: 60mm');
-    expect(html).toContain('height: 40mm');
+    expect(html).toContain('size: 2.25in 1.25in');
+    expect(html).toContain('width: 2.25in');
+    expect(html).toContain('height: 1.25in');
     expect(html).toContain('@media print');
     expect(html).toContain('NORBE T VISTE');
     expect(html).toContain('LOGO');
@@ -31,9 +31,9 @@ describe('labels html', () => {
     expect(html).toContain('<header class="title">NORBE T VISTE</header>');
     expect(html).toContain('<section class="visuals"');
     expect(html).toContain('<section class="details"');
-    expect(html).toContain('grid-template-rows: 6mm 23mm 5mm');
+    expect(html).toContain('grid-template-rows: 0.18in 0.76in 0.16in');
     expect(html).toContain('grid-template-columns: 1fr 1fr');
-    expect(html).toContain('width: 21mm');
+    expect(html).toContain('width: 0.72in');
     expect(html).not.toContain('Escanea para consultar la variante');
   });
 
@@ -101,9 +101,9 @@ describe('labels html', () => {
     expect(html).toContain('NTV-VAR-000002');
     expect(html).toContain('TALLA M');
     expect(html).toContain('TALLA L');
-    expect(html).toContain('size: 60mm 40mm');
-    expect(html).toContain('width: 60mm');
-    expect(html).toContain('height: 40mm');
+    expect(html).toContain('size: 2.25in 1.25in');
+    expect(html).toContain('width: 2.25in');
+    expect(html).toContain('height: 1.25in');
     expect(html).toContain('break-after: page');
     expect(html).toContain('page-break-after: always');
     expect(html).toContain('@media print');

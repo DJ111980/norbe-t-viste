@@ -43,6 +43,9 @@ const emptyVariantForm: VariantFormValues = {
   stock_minimo: 0,
 };
 
+const compactActionButtonClassName =
+  'h-8 rounded-md border border-stone-300 px-2 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50';
+
 function currency(value: number): string {
   return new Intl.NumberFormat('es-CO', {
     style: 'currency',
@@ -54,6 +57,16 @@ function currency(value: number): string {
 function handleImageSaveMessage(error: unknown): string {
   if (isForbiddenError(error)) return 'No tienes permisos para subir la imagen.';
   return error instanceof ApiClientError ? error.message : 'No se pudo guardar la imagen.';
+}
+
+function getQrCandidates(value: string): string[] {
+  const query = value.trim();
+  if (!query) return [];
+  const candidates = [query];
+  if (/^\d+$/.test(query)) {
+    candidates.push(`NTV-VAR-${query.padStart(6, '0')}`);
+  }
+  return Array.from(new Set(candidates));
 }
 
 export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => void }) {
@@ -107,7 +120,20 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
         listVariants(token, nextFilters),
         listProducts(token, { estado: 'ACTIVO' }),
       ]);
-      setVariants(variantsData);
+      let resolvedVariants = variantsData;
+      const search = nextFilters.buscar?.trim() ?? '';
+      if (search && variantsData.length === 0) {
+        for (const qrCandidate of getQrCandidates(search)) {
+          try {
+            const variant = await getVariantByQr(token, qrCandidate);
+            resolvedVariants = [variant];
+            break;
+          } catch {
+            // La busqueda general ya cubre coincidencias comunes; este intento resuelve QR abreviados.
+          }
+        }
+      }
+      setVariants(resolvedVariants);
       setProducts(productsData);
       if (!form.id_producto && productsData[0]) {
         setForm((current) => ({ ...current, id_producto: productsData[0].idProducto }));
@@ -130,6 +156,14 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
   useEffect(() => {
     void loadData({ buscar: '', producto: '', estado: '', codigoQr: '', sku: '' });
   }, [token]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadData(filters);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [filters.buscar, filters.producto, filters.estado, token]);
 
   function startEdit(variant: Variant) {
     setEditing(variant);
@@ -207,20 +241,6 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
     }
   }
 
-  async function findByQr() {
-    if (!token || !filters.codigoQr?.trim()) return;
-    setFormError(null);
-    setSuccess(null);
-
-    try {
-      const variant = await getVariantByQr(token, filters.codigoQr);
-      setVariants([variant]);
-      setSuccess('Variante encontrada por codigo QR.');
-    } catch (qrError) {
-      await handleError(qrError);
-    }
-  }
-
   function configureLabel(variant: Variant) {
     setLabelTarget(variant);
     setLabelQuantity(Math.max(variant.stockActual, 1));
@@ -270,7 +290,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
 
       <div className="rounded-md border border-stone-200 bg-white p-4">
         <form
-          className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_160px_160px_auto_auto]"
+          className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_160px_auto]"
           onSubmit={(event) => {
             event.preventDefault();
             void loadData();
@@ -279,7 +299,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
           <input
             value={filters.buscar ?? ''}
             onChange={(event) => setFilters({ ...filters, buscar: event.target.value })}
-            placeholder="Buscar variante"
+            placeholder="Buscar por producto, SKU o QR"
             className={inputClassName}
           />
           <select
@@ -305,21 +325,8 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
             <option value="ACTIVA">Activa</option>
             <option value="INACTIVA">Inactiva</option>
           </select>
-          <input
-            value={filters.codigoQr ?? ''}
-            onChange={(event) => setFilters({ ...filters, codigoQr: event.target.value })}
-            placeholder="Codigo QR"
-            className={inputClassName}
-          />
           <button type="submit" className={secondaryButtonClassName}>
             Buscar
-          </button>
-          <button
-            type="button"
-            onClick={() => void findByQr()}
-            className={secondaryButtonClassName}
-          >
-            Buscar QR
           </button>
         </form>
       </div>
@@ -456,23 +463,23 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
                       <button
                         type="button"
                         onClick={() => configureLabel(variant)}
-                        className={secondaryButtonClassName}
+                        className={compactActionButtonClassName}
                       >
-                        Ver etiqueta
+                        Etiqueta
                       </button>
                       {canManage && (
                         <>
                           <button
                             type="button"
                             onClick={() => startEdit(variant)}
-                            className={secondaryButtonClassName}
+                            className={compactActionButtonClassName}
                           >
                             Editar
                           </button>
                           <button
                             type="button"
                             onClick={() => void toggleStatus(variant)}
-                            className={secondaryButtonClassName}
+                            className={compactActionButtonClassName}
                           >
                             {variant.estado === 'ACTIVA' ? 'Inactivar' : 'Activar'}
                           </button>

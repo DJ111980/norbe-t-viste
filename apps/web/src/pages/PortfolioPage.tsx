@@ -924,6 +924,8 @@ function CreditDetailPanel({
   onCancelPayment: () => void;
   onCancelCredit: () => void;
 }) {
+  const [isCancelCreditOpen, setIsCancelCreditOpen] = useState(false);
+
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-4">
@@ -1016,21 +1018,45 @@ function CreditDetailPanel({
         {canShowCreditCancel(role, credit) && (
           <div className="rounded-md border border-stone-200 bg-white p-4">
             <h2 className="text-sm font-semibold text-stone-950">Anular deuda antigua</h2>
-            <Field label="Motivo obligatorio" required>
-              <textarea
-                value={cancelCreditReason}
-                onChange={(event) => onCancelCreditReason(event.target.value)}
-                className={textareaClassName}
-              />
-            </Field>
-            <button
-              type="button"
-              disabled={!cancelCreditReason.trim()}
-              onClick={onCancelCredit}
-              className={secondaryButtonClassName}
-            >
-              Anular credito
-            </button>
+            {isCancelCreditOpen ? (
+              <div className="mt-3 space-y-3">
+                <Field label="Motivo obligatorio" required>
+                  <textarea
+                    value={cancelCreditReason}
+                    onChange={(event) => onCancelCreditReason(event.target.value)}
+                    className={textareaClassName}
+                  />
+                </Field>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={!cancelCreditReason.trim()}
+                    onClick={onCancelCredit}
+                    className={secondaryButtonClassName}
+                  >
+                    Confirmar anulacion
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onCancelCreditReason('');
+                      setIsCancelCreditOpen(false);
+                    }}
+                    className={secondaryButtonClassName}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsCancelCreditOpen(true)}
+                className={`${secondaryButtonClassName} mt-3`}
+              >
+                Anular credito
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -8,6 +8,7 @@ import {
   Field,
   inputClassName,
   LoadingState,
+  numberInputFocusProps,
   PageHeader,
   primaryButtonClassName,
   secondaryButtonClassName,
@@ -366,6 +367,7 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
                 step={1}
                 value={individualQuantity}
                 onChange={(event) => setIndividualQuantity(Number(event.target.value))}
+                {...numberInputFocusProps}
                 className={inputClassName}
               />
             </Field>
@@ -412,6 +414,7 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
                 onChange={(event) =>
                   setBatchItem({ ...batchItem, cantidad: Number(event.target.value) })
                 }
+                {...numberInputFocusProps}
                 className={inputClassName}
               />
             </Field>
@@ -430,7 +433,7 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
               {batchItems.map((item, index) => (
                 <div
                   key={`${item.id_variante}-${index}`}
-                  className="grid gap-3 rounded-md border border-stone-200 p-2 text-sm md:grid-cols-[minmax(0,1fr)_110px_auto]"
+                  className="grid items-center gap-2 rounded-md border border-stone-200 p-2 text-sm md:grid-cols-[minmax(0,1fr)_80px_auto]"
                 >
                   <VariantPreview variant={item.variant} quantity={item.cantidad} compact />
                   <input
@@ -439,12 +442,13 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
                     step={1}
                     value={item.cantidad}
                     onChange={(event) => updateBatchQuantity(index, Number(event.target.value))}
+                    {...numberInputFocusProps}
                     className={inputClassName}
                   />
                   <button
                     type="button"
                     onClick={() => removeBatchItem(index)}
-                    className="h-10 rounded-md border border-stone-300 px-3 text-xs text-stone-700"
+                    className="h-8 rounded-md border border-stone-300 px-2 text-xs text-stone-700 hover:bg-stone-50"
                   >
                     Quitar
                   </button>
@@ -533,8 +537,8 @@ function VariantPreview({
 }) {
   return (
     <div
-      className={`flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-3 ${
-        compact ? 'border-0 bg-transparent p-0' : ''
+      className={`flex min-w-0 items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-3 ${
+        compact ? 'gap-2 border-0 bg-transparent p-0' : ''
       }`}
     >
       <EntityImageThumb
@@ -546,13 +550,24 @@ function VariantPreview({
         <p className="truncate font-semibold text-stone-950">
           {variant.producto.nombreProducto ?? 'Producto sin nombre'}
         </p>
-        <p className="text-xs text-stone-500">
-          Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} / SKU{' '}
-          {variant.sku}
-        </p>
-        <p className="text-xs text-stone-500">
-          QR {variant.codigoQr} / Stock {variant.stockActual} / Cantidad {quantity}
-        </p>
+        {compact ? (
+          <>
+            <p className="truncate font-mono text-xs text-stone-600">QR {variant.codigoQr}</p>
+            <p className="truncate text-xs text-stone-500">
+              SKU {variant.sku} / Talla {variant.talla ?? 'Unica'} / Stock {variant.stockActual}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-stone-500">
+              Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} / SKU{' '}
+              {variant.sku}
+            </p>
+            <p className="text-xs text-stone-500">
+              QR {variant.codigoQr} / Stock {variant.stockActual} / Cantidad {quantity}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

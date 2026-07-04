@@ -39,10 +39,10 @@ function renderVariantLabelMarkup(label: PrintableVariantLabel): string {
 function renderLabelStyles(pageMode: 'single' | 'batch'): string {
   const bodySize =
     pageMode === 'single'
-      ? `width: 60mm;
-      height: 40mm;`
-      : `min-width: 60mm;
-      min-height: 40mm;`;
+      ? `width: 2.25in;
+      height: 1.25in;`
+      : `min-width: 2.25in;
+      min-height: 1.25in;`;
   const bodyDisplay =
     pageMode === 'single'
       ? `display: flex;
@@ -51,7 +51,7 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
       : '';
 
   return `@page {
-      size: 60mm 40mm;
+      size: 2.25in 1.25in;
       margin: 0;
     }
 
@@ -78,13 +78,13 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
     }
 
     .label {
-      width: 60mm;
-      height: 40mm;
-      padding: 3mm;
+      width: 2.25in;
+      height: 1.25in;
+      padding: 0.08in;
       display: grid;
       grid-template-columns: 1fr;
-      grid-template-rows: 6mm 23mm 5mm;
-      row-gap: 1.5mm;
+      grid-template-rows: 0.18in 0.76in 0.16in;
+      row-gap: 0.03in;
       overflow: hidden;
       border: 0.2mm solid #111111;
       break-inside: avoid;
@@ -98,7 +98,7 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
       align-items: center;
       justify-content: center;
       text-align: center;
-      font-size: 10pt;
+      font-size: 7pt;
       font-weight: 700;
       line-height: 1;
       letter-spacing: 0;
@@ -108,21 +108,21 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
     .visuals {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      column-gap: 4mm;
+      column-gap: 0.08in;
       align-items: center;
       justify-items: center;
       min-width: 0;
     }
 
     .logo {
-      width: 21mm;
-      height: 21mm;
+      width: 0.58in;
+      height: 0.58in;
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      font-size: 6pt;
+      font-size: 5pt;
       font-weight: 700;
       letter-spacing: 0;
     }
@@ -141,16 +141,16 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
     }
 
     .qr {
-      width: 21mm;
-      height: 21mm;
+      width: 0.72in;
+      height: 0.72in;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
     .qr svg {
-      width: 21mm;
-      height: 21mm;
+      width: 0.72in;
+      height: 0.72in;
       display: block;
     }
 
@@ -158,14 +158,14 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
       min-width: 0;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      column-gap: 4mm;
+      column-gap: 0.08in;
       align-items: center;
       justify-items: center;
     }
 
     .code {
-      max-width: 24mm;
-      font-size: 7pt;
+      max-width: 0.95in;
+      font-size: 6pt;
       font-weight: 700;
       line-height: 1.1;
       text-align: center;
@@ -173,8 +173,8 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
     }
 
     .size {
-      max-width: 24mm;
-      font-size: 9pt;
+      max-width: 0.8in;
+      font-size: 6.5pt;
       font-weight: 700;
       line-height: 1.1;
       text-align: center;
