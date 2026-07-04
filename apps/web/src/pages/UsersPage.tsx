@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { FileImagePreview } from '../components/FileImagePreview';
 import { Modal } from '../components/Modal';
 import {
   EmptyState,
@@ -17,8 +18,10 @@ import {
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
 import {
   createUser,
+  deleteUserAvatar,
   listUsers,
   resetUserPassword,
+  uploadUserAvatar,
   updateUser,
   updateUserStatus,
 } from '../services/users';
@@ -57,7 +60,7 @@ function handleMessage(error: unknown, fallback: string): string {
 }
 
 export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }) {
-  const { token, logout } = useAuth();
+  const { token, user: sessionUser, logout, refreshUser } = useAuth();
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [selected, setSelected] = useState<UserAccount | null>(null);
   const [form, setForm] = useState<UserFormValues>(emptyUserForm);
@@ -65,6 +68,8 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
   const [passwordForm, setPasswordForm] = useState<UserPasswordFormValues>(emptyPasswordForm);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [createAvatarFile, setCreateAvatarFile] = useState<File | null>(null);
+  const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -113,8 +118,12 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
 
     try {
       const user = await createUser(token, form);
+      if (createAvatarFile) {
+        await uploadUserAvatar(token, user.idUsuario, createAvatarFile);
+      }
       setSuccess(`Usuario ${user.nombreUsuario} creado.`);
       setForm(emptyUserForm);
+      setCreateAvatarFile(null);
       setIsCreateOpen(false);
       await loadUsers();
     } catch (saveError) {
@@ -133,11 +142,16 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
     setSuccess(null);
 
     try {
-      const user = await updateUser(token, selected.idUsuario, editForm);
+      let user = await updateUser(token, selected.idUsuario, editForm);
+      if (editAvatarFile) {
+        user = await uploadUserAvatar(token, selected.idUsuario, editAvatarFile);
+        setEditAvatarFile(null);
+      }
       setSuccess(`Usuario ${user.nombreUsuario} actualizado.`);
       setSelected(user);
       setEditForm(toUserUpdateForm(user));
       await loadUsers();
+      if (sessionUser?.idUsuario === selected.idUsuario) await refreshUser();
     } catch (saveError) {
       if (await expireIfNeeded(saveError)) return;
       setFormError(handleMessage(saveError, 'No se pudo actualizar el usuario.'));
@@ -182,6 +196,26 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
     }
   }
 
+  async function removeSelectedAvatar() {
+    if (!token || !selected) return;
+    setIsSaving(true);
+    setFormError(null);
+    setSuccess(null);
+
+    try {
+      const user = await deleteUserAvatar(token, selected.idUsuario);
+      setSelected(user);
+      setSuccess('Avatar eliminado.');
+      await loadUsers();
+      if (sessionUser?.idUsuario === selected.idUsuario) await refreshUser();
+    } catch (deleteError) {
+      if (await expireIfNeeded(deleteError)) return;
+      setFormError(handleMessage(deleteError, 'No se pudo eliminar el avatar.'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <section className="space-y-6">
       <PageHeader
@@ -203,8 +237,21 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
       {success && <SuccessMessage message={success} />}
 
       {isCreateOpen && (
-        <Modal title="Crear usuario" onClose={() => setIsCreateOpen(false)}>
-          <UserForm form={form} isSaving={isSaving} onChange={setForm} onSubmit={saveUser} />
+        <Modal
+          title="Crear usuario"
+          onClose={() => {
+            setIsCreateOpen(false);
+            setCreateAvatarFile(null);
+          }}
+        >
+          <UserForm
+            form={form}
+            isSaving={isSaving}
+            avatarFile={createAvatarFile}
+            onAvatarChange={setCreateAvatarFile}
+            onChange={setForm}
+            onSubmit={saveUser}
+          />
         </Modal>
       )}
 
@@ -228,6 +275,9 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
               user={selected}
               form={editForm}
               isSaving={isSaving}
+              avatarFile={editAvatarFile}
+              onAvatarChange={setEditAvatarFile}
+              onDeleteAvatar={() => void removeSelectedAvatar()}
               onChange={setEditForm}
               onSubmit={saveSelectedUser}
             />
@@ -260,11 +310,15 @@ function RoleSelect({ value, onChange }: { value: UserRole; onChange: (value: Us
 function UserForm({
   form,
   isSaving,
+  avatarFile,
+  onAvatarChange,
   onChange,
   onSubmit,
 }: {
   form: UserFormValues;
   isSaving: boolean;
+  avatarFile: File | null;
+  onAvatarChange: (file: File | null) => void;
   onChange: (form: UserFormValues) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
@@ -310,6 +364,7 @@ function UserForm({
           />
         </Field>
       </div>
+      <AvatarFileField file={avatarFile} onChange={onAvatarChange} />
       <button type="submit" disabled={isSaving} className={`${primaryButtonClassName} mt-4`}>
         {isSaving ? 'Guardando...' : 'Crear usuario'}
       </button>
@@ -346,7 +401,11 @@ function UsersTable({
             <tr key={user.idUsuario}>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
-                  <UserAvatar name={user.nombreCompleto || user.nombreUsuario} />
+                  <UserAvatar
+                    idUsuario={user.idUsuario}
+                    name={user.nombreCompleto || user.nombreUsuario}
+                    hasImage={user.avatar.disponible}
+                  />
                   <div className="min-w-0">
                     <p className="truncate font-medium text-stone-950">{user.nombreCompleto}</p>
                     <p className="truncate text-xs text-stone-500">@{user.nombreUsuario}</p>
@@ -397,19 +456,30 @@ function EditUserForm({
   user,
   form,
   isSaving,
+  avatarFile,
+  onAvatarChange,
+  onDeleteAvatar,
   onChange,
   onSubmit,
 }: {
   user: UserAccount;
   form: UserUpdateFormValues;
   isSaving: boolean;
+  avatarFile: File | null;
+  onAvatarChange: (file: File | null) => void;
+  onDeleteAvatar: () => void;
   onChange: (form: UserUpdateFormValues) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
       <div className="flex items-center gap-3">
-        <UserAvatar name={user.nombreCompleto || user.nombreUsuario} size="md" />
+        <UserAvatar
+          idUsuario={user.idUsuario}
+          name={user.nombreCompleto || user.nombreUsuario}
+          hasImage={user.avatar.disponible}
+          size="md"
+        />
         <div>
           <h2 className="text-sm font-semibold text-stone-950">Editar {user.nombreUsuario}</h2>
           <p className="text-xs text-stone-500">Avatar temporal con iniciales</p>
@@ -445,10 +515,45 @@ function EditUserForm({
           <RoleSelect value={form.rol} onChange={(rol) => onChange({ ...form, rol })} />
         </Field>
       </div>
+      <AvatarFileField file={avatarFile} onChange={onAvatarChange} />
+      {user.avatar.disponible && (
+        <button
+          type="button"
+          disabled={isSaving}
+          onClick={onDeleteAvatar}
+          className={`${secondaryButtonClassName} mt-3`}
+        >
+          Quitar avatar
+        </button>
+      )}
       <button type="submit" disabled={isSaving} className={`${primaryButtonClassName} mt-4`}>
         Guardar cambios
       </button>
     </form>
+  );
+}
+
+function AvatarFileField({
+  file,
+  onChange,
+}: {
+  file: File | null;
+  onChange: (file: File | null) => void;
+}) {
+  return (
+    <div className="mt-4 rounded-md border border-stone-200 bg-stone-50 p-3">
+      <p className="text-sm font-semibold text-stone-950">Avatar</p>
+      <p className="mt-1 text-xs text-stone-500">JPG, PNG o WebP. Se sube al guardar.</p>
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+          onChange(event.target.files?.[0] ?? null)
+        }
+        className={`${inputClassName} mt-3`}
+      />
+      <FileImagePreview file={file} />
+    </div>
   );
 }
 

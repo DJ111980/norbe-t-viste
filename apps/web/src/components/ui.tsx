@@ -1,4 +1,13 @@
-import { useEffect, useRef, type FocusEvent, type MouseEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
+import { useAuth } from '../auth/auth-context';
+import { getUserAvatarObjectUrl } from '../services/users';
 
 export function PageHeader({
   title,
@@ -149,15 +158,43 @@ export function getInitials(name: string | null | undefined): string {
 }
 
 export function UserAvatar({
+  idUsuario,
   name,
-  imageUrl,
+  hasImage,
   size = 'sm',
 }: {
+  idUsuario?: string | null;
   name: string | null | undefined;
-  imageUrl?: string | null;
+  hasImage?: boolean;
   size?: 'sm' | 'md';
 }) {
+  const { token } = useAuth();
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const sizeClass = size === 'md' ? 'h-10 w-10 text-sm' : 'h-8 w-8 text-xs';
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let mounted = true;
+
+    async function loadAvatar() {
+      setImageUrl(null);
+      if (!token || !idUsuario || !hasImage) return;
+
+      try {
+        objectUrl = await getUserAvatarObjectUrl(token, idUsuario);
+        if (mounted) setImageUrl(objectUrl);
+      } catch {
+        if (mounted) setImageUrl(null);
+      }
+    }
+
+    void loadAvatar();
+
+    return () => {
+      mounted = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [hasImage, idUsuario, token]);
 
   return (
     <div

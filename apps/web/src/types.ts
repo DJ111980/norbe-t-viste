@@ -6,6 +6,10 @@ export interface AuthUser {
   nombreUsuario: string;
   correo: string;
   rol: UserRole;
+  avatar: {
+    disponible: boolean;
+    contentType: string | null;
+  };
 }
 
 export type UserStatus = 'ACTIVO' | 'INACTIVO';
@@ -23,6 +27,10 @@ export interface UserAccount {
   debeCambiarContrasena: boolean;
   contrasenaActualizadaEn: string | null;
   creadoPor: string | null;
+  avatar: {
+    disponible: boolean;
+    contentType: string | null;
+  };
 }
 
 export interface UserFormValues {

@@ -1,7 +1,9 @@
 import type { ApiEnv } from '../../config/env';
 import type { AuthContext } from '../../middleware/auth.middleware';
 import { ApiError } from '../../shared/errors';
+import { buildInternalKey, deleteObject, getObject, uploadObject } from '../../services/r2';
 import { hashPassword } from '../auth/password';
+import type { ImageUploadInput } from '../images/images.types';
 import { toPublicUser } from './users.mapper';
 import * as usersRepository from './users.repository';
 import type {
@@ -11,6 +13,8 @@ import type {
   UpdateUserInput,
   UpdateUserStatusInput,
 } from './users.types';
+
+type UserAvatarInput = ImageUploadInput;
 
 function createUserId(): string {
   return `usr_${crypto.randomUUID()}`;
@@ -140,4 +144,82 @@ export async function resetUserPassword(
   const passwordHash = await hashPassword(input.nuevaContrasena);
 
   return toPublicUser(await usersRepository.updateUserPassword(env, idUsuario, passwordHash));
+}
+
+function buildUserAvatarKey(idUsuario: string, extension: UserAvatarInput['extension']): string {
+  return buildInternalKey(['usuarios', idUsuario, 'avatar', `${crypto.randomUUID()}.${extension}`]);
+}
+
+async function deletePreviousAvatarSafely(env: ApiEnv, key: string | null): Promise<void> {
+  if (!key) return;
+
+  try {
+    await deleteObject(env, key);
+  } catch {
+    // La referencia en D1 manda. Si el objeto viejo no se borra, no rompe el flujo del usuario.
+  }
+}
+
+export async function uploadUserAvatar(
+  env: ApiEnv,
+  idUsuario: string,
+  input: UserAvatarInput,
+): Promise<PublicUser> {
+  const user = await ensureUserExists(env, idUsuario);
+  const avatarKey = buildUserAvatarKey(idUsuario, input.extension);
+
+  await uploadObject(env, {
+    key: avatarKey,
+    body: await input.file.arrayBuffer(),
+    contentType: input.contentType,
+  });
+
+  const updatedUser = await usersRepository.updateUserAvatar(
+    env,
+    idUsuario,
+    avatarKey,
+    input.contentType,
+  );
+
+  await deletePreviousAvatarSafely(env, user.avatar_key);
+
+  return toPublicUser(updatedUser);
+}
+
+export async function deleteUserAvatar(env: ApiEnv, idUsuario: string): Promise<PublicUser> {
+  const user = await ensureUserExists(env, idUsuario);
+
+  if (!user.avatar_key) {
+    throw new ApiError(
+      'USER_AVATAR_NOT_CONFIGURED',
+      'El usuario no tiene avatar configurado.',
+      404,
+    );
+  }
+
+  const updatedUser = await usersRepository.updateUserAvatar(env, idUsuario, null, null);
+  await deletePreviousAvatarSafely(env, user.avatar_key);
+
+  return toPublicUser(updatedUser);
+}
+
+export async function getUserAvatarFile(env: ApiEnv, idUsuario: string): Promise<Response> {
+  const user = await ensureUserExists(env, idUsuario);
+
+  if (!user.avatar_key) {
+    throw new ApiError(
+      'USER_AVATAR_NOT_CONFIGURED',
+      'El usuario no tiene avatar configurado.',
+      404,
+    );
+  }
+
+  const object = await getObject(env, user.avatar_key);
+
+  return new Response(object.body, {
+    headers: {
+      'content-type': user.avatar_content_type ?? object.contentType,
+      'cache-control': 'private, max-age=300',
+    },
+  });
 }

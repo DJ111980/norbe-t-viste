@@ -15,5 +15,9 @@ export function toPublicUser(user: UserRecord): PublicUser {
     debeCambiarContrasena: user.debe_cambiar_contrasena === 1,
     contrasenaActualizadaEn: user.contrasena_actualizada_en,
     creadoPor: user.creado_por,
+    avatar: {
+      disponible: Boolean(user.avatar_key),
+      contentType: user.avatar_content_type,
+    },
   };
 }

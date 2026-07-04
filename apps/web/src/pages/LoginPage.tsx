@@ -52,7 +52,7 @@ export function LoginPage({ onSuccess }: { onSuccess: () => void }) {
         style={{ backgroundColor: branding.color_principal }}
       >
         <div className="flex min-h-[70vh] flex-col items-center justify-center text-center">
-          <div className="flex h-44 w-44 items-center justify-center rounded-md bg-white p-5 shadow-sm">
+          <div className="flex h-56 w-56 items-center justify-center rounded-md bg-white p-6 shadow-sm xl:h-64 xl:w-64">
             {logoUrl ? (
               <img
                 src={logoUrl}

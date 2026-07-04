@@ -16,6 +16,8 @@ export interface UserRecord {
   debe_cambiar_contrasena?: number;
   contrasena_actualizada_en?: string | null;
   creado_por?: string | null;
+  avatar_key?: string | null;
+  avatar_content_type?: string | null;
 }
 
 export interface AuthenticatedUser {
@@ -24,6 +26,10 @@ export interface AuthenticatedUser {
   nombreUsuario: string;
   correo: string;
   rol: UserRole;
+  avatar: {
+    disponible: boolean;
+    contentType: string | null;
+  };
 }
 
 export interface LoginInput {

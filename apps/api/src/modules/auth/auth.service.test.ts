@@ -86,6 +86,10 @@ describe('auth service login', () => {
       nombreUsuario: 'admin',
       correo: 'admin@norbe.test',
       rol: 'ADMINISTRADOR',
+      avatar: {
+        disponible: false,
+        contentType: null,
+      },
     });
     expect(mocks.updatedUserIds).toEqual(['usr_1']);
   });

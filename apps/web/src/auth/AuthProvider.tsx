@@ -26,6 +26,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const activeToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!activeToken) return;
+
+    const session = await apiRequest<MeResponse>('/auth/me', { token: activeToken });
+    setUser(session.user);
+  }, []);
+
   const logout = useCallback(async () => {
     const activeToken = localStorage.getItem(TOKEN_STORAGE_KEY);
 
@@ -92,8 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       login,
       logout,
+      refreshUser,
     }),
-    [isLoading, login, logout, token, user],
+    [isLoading, login, logout, refreshUser, token, user],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

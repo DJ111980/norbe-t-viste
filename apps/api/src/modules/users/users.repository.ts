@@ -14,7 +14,9 @@ const USER_COLUMNS = `
   actualizado_en,
   debe_cambiar_contrasena,
   contrasena_actualizada_en,
-  creado_por
+  creado_por,
+  avatar_key,
+  avatar_content_type
 `;
 
 export async function listUsers(env: ApiEnv): Promise<UserRecord[]> {
@@ -188,6 +190,27 @@ export async function updateUserPassword(
     `,
   )
     .bind(passwordHash, idUsuario)
+    .run();
+
+  return (await findUserById(env, idUsuario)) as UserRecord;
+}
+
+export async function updateUserAvatar(
+  env: ApiEnv,
+  idUsuario: string,
+  avatarKey: string | null,
+  contentType: string | null,
+): Promise<UserRecord> {
+  await env.DB.prepare(
+    `
+      UPDATE usuarios
+      SET avatar_key = ?,
+          avatar_content_type = ?,
+          actualizado_en = datetime('now')
+      WHERE id_usuario = ?
+    `,
+  )
+    .bind(avatarKey, contentType, idUsuario)
     .run();
 
   return (await findUserById(env, idUsuario)) as UserRecord;

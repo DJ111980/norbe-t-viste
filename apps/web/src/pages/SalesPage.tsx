@@ -543,8 +543,25 @@ function SaleForm({
 }) {
   const scanInputRef = useRef<HTMLInputElement | null>(null);
   const [scanCode, setScanCode] = useState('');
+  const [variantSearch, setVariantSearch] = useState('');
   const selectedVariant = variants.find((variant) => variant.idVariante === line.id_variante);
   const creditBalance = form.tipo_venta === 'MIXTA' ? total - form.valor_pagado_inicial : total;
+  const matchingVariants = variants
+    .filter((variant) => {
+      const query = variantSearch.trim().toLowerCase();
+      if (!query) return true;
+
+      return [
+        variant.producto.nombreProducto,
+        variant.talla,
+        variant.color,
+        variant.sku,
+        variant.codigoQr,
+      ]
+        .filter(Boolean)
+        .some((value) => value?.toLowerCase().includes(query));
+    })
+    .slice(0, 12);
 
   function submitScan() {
     if (!scanCode.trim()) return;
@@ -557,6 +574,49 @@ function SaleForm({
     if (event.key !== 'Enter') return;
     event.preventDefault();
     submitScan();
+  }
+
+  function selectVariant(variant: Variant) {
+    onLineChange({
+      ...line,
+      id_variante: variant.idVariante,
+      precio_unitario: variant.precioVenta,
+      descuento: 0,
+    });
+    setVariantSearch(variantLabel(variant));
+  }
+
+  function submitVariantSearch() {
+    const query = variantSearch.trim();
+    if (!query) return;
+
+    if (/^\d+$/.test(query) || query.toUpperCase().startsWith('NTV-VAR-')) {
+      onScanVariant(query);
+      setVariantSearch('');
+      return;
+    }
+
+    const exact = variants.find(
+      (variant) =>
+        variant.codigoQr.toLowerCase() === query.toLowerCase() ||
+        variant.sku.toLowerCase() === query.toLowerCase(),
+    );
+
+    if (exact) {
+      onScanVariant(exact.codigoQr);
+      setVariantSearch('');
+      return;
+    }
+
+    if (matchingVariants.length === 1) {
+      selectVariant(matchingVariants[0]);
+    }
+  }
+
+  function handleVariantSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    submitVariantSearch();
   }
 
   return (
@@ -660,27 +720,47 @@ function SaleForm({
       <div className="mt-4 rounded-md border border-stone-200 p-4">
         <h3 className="text-sm font-semibold text-stone-950">Detalles</h3>
         <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_120px_160px_160px_auto]">
-          <Field label="Variante" required>
-            <select
-              value={line.id_variante}
-              onChange={(event) => {
-                const next = variants.find((variant) => variant.idVariante === event.target.value);
-                onLineChange({
-                  ...line,
-                  id_variante: event.target.value,
-                  precio_unitario: next?.precioVenta ?? line.precio_unitario,
-                  descuento: 0,
-                });
-              }}
-              className={inputClassName}
-            >
-              <option value="">Selecciona variante</option>
-              {variants.map((variant) => (
-                <option key={variant.idVariante} value={variant.idVariante}>
-                  {variantLabel(variant)}
-                </option>
-              ))}
-            </select>
+          <Field label="Buscar variante" required>
+            <div className="space-y-2">
+              <input
+                value={variantSearch}
+                onChange={(event) => setVariantSearch(event.target.value)}
+                onKeyDown={handleVariantSearchKeyDown}
+                placeholder="Producto, talla, color, SKU o QR"
+                className={inputClassName}
+              />
+              <div className="max-h-48 overflow-y-auto rounded-md border border-stone-200 bg-white">
+                {matchingVariants.length === 0 ? (
+                  <p className="px-3 py-2 text-xs text-stone-500">Sin variantes coincidentes.</p>
+                ) : (
+                  matchingVariants.map((variant) => (
+                    <button
+                      key={variant.idVariante}
+                      type="button"
+                      onClick={() => selectVariant(variant)}
+                      className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-stone-50 ${
+                        line.id_variante === variant.idVariante ? 'bg-stone-100' : ''
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium text-stone-900">
+                          {variant.producto.nombreProducto ?? 'Producto'}
+                        </span>
+                        <span className="block truncate text-stone-500">
+                          Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} /
+                          SKU {variant.sku} / QR {variant.codigoQr}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right text-stone-600">
+                        Stock {variant.stockActual}
+                        <br />
+                        {currency(variant.precioVenta)}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
           </Field>
           <Field label="Cantidad" required>
             <input
@@ -863,8 +943,6 @@ function SalesTable({
   userRole: 'ADMINISTRADOR' | 'VENDEDOR';
   onSelect: (sale: SaleSummary) => void;
 }) {
-  const [isCancelOpen, setIsCancelOpen] = useState(false);
-
   return (
     <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
       <table className="w-full min-w-[920px] text-left text-sm">
@@ -942,6 +1020,8 @@ function SaleDetailPanel({
   onCancelReason: (value: string) => void;
   onCancelSale: () => void;
 }) {
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="overflow-x-auto rounded-md border border-stone-200 bg-white">

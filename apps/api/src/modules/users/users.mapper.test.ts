@@ -18,9 +18,13 @@ describe('users mapper', () => {
       debe_cambiar_contrasena: 1,
       contrasena_actualizada_en: null,
       creado_por: 'usr_admin',
+      avatar_key: 'usuarios/usr_1/avatar/a.png',
+      avatar_content_type: 'image/png',
     } satisfies UserRecord);
 
     expect(publicUser).not.toHaveProperty('contrasena_hash');
+    expect(JSON.stringify(publicUser)).not.toContain('usuarios/usr_1/avatar/a.png');
+    expect(publicUser.avatar).toEqual({ disponible: true, contentType: 'image/png' });
     expect(publicUser.nombreUsuario).toBe('usuario');
     expect(JSON.stringify(publicUser)).not.toContain('hash-secreto');
   });

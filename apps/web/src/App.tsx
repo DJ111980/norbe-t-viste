@@ -3,6 +3,7 @@ import { AuthProvider } from './auth/AuthProvider';
 import { useAuth } from './auth/auth-context';
 import { BrandingProvider } from './branding/BrandingProvider';
 import { AppLayout } from './components/AppLayout';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginPage } from './pages/LoginPage';
 import { BrandingPage } from './pages/BrandingPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -84,7 +85,7 @@ function AppShell() {
 
   return (
     <AppLayout currentPath={path} onNavigate={navigate}>
-      {renderProtectedPage(path, user.rol, handleSessionExpired)}
+      <ErrorBoundary>{renderProtectedPage(path, user.rol, handleSessionExpired)}</ErrorBoundary>
     </AppLayout>
   );
 }

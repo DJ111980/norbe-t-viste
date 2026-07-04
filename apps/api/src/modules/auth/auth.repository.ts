@@ -11,7 +11,9 @@ export async function findUserByLogin(env: ApiEnv, login: string): Promise<UserR
         correo,
         contrasena_hash,
         rol,
-        estado
+        estado,
+        avatar_key,
+        avatar_content_type
       FROM usuarios
       WHERE nombre_usuario = ?
          OR correo = ?
@@ -32,7 +34,9 @@ export async function findUserById(env: ApiEnv, idUsuario: string): Promise<User
         correo,
         contrasena_hash,
         rol,
-        estado
+        estado,
+        avatar_key,
+        avatar_content_type
       FROM usuarios
       WHERE id_usuario = ?
       LIMIT 1

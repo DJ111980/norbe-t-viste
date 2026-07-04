@@ -1,4 +1,4 @@
-import { apiRequest } from '../lib/api';
+import { apiBlobRequest, apiFormRequest, apiRequest } from '../lib/api';
 import type {
   UserAccount,
   UserFormValues,
@@ -103,6 +103,32 @@ export async function resetUserPassword(
       body: values,
     },
   );
+
+  return data.usuario;
+}
+
+export async function getUserAvatarObjectUrl(token: string, idUsuario: string): Promise<string> {
+  const blob = await apiBlobRequest(`/usuarios/${idUsuario}/avatar/file`, token);
+  return URL.createObjectURL(blob);
+}
+
+export async function uploadUserAvatar(
+  token: string,
+  idUsuario: string,
+  file: File,
+): Promise<UserAccount> {
+  const formData = new FormData();
+  formData.set('file', file);
+
+  const data = await apiFormRequest<UserResponse>(`/usuarios/${idUsuario}/avatar`, formData, token);
+  return data.usuario;
+}
+
+export async function deleteUserAvatar(token: string, idUsuario: string): Promise<UserAccount> {
+  const data = await apiRequest<UserResponse>(`/usuarios/${idUsuario}/avatar`, {
+    method: 'DELETE',
+    token,
+  });
 
   return data.usuario;
 }

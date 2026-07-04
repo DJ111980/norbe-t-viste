@@ -25,7 +25,8 @@
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config ./apps/api/wrangler.toml",
     "db:seed": "wrangler d1 execute DB --local --config ./apps/api/wrangler.toml --file=./db/seeds/dev.sql",
     "db:schema": "wrangler d1 execute DB --local --config ./apps/api/wrangler.toml --command \"SELECT name, type FROM sqlite_master WHERE type IN ('table', 'index') ORDER BY type, name;\"",
-    "admin:create": "tsx apps/api/scripts/create-admin.ts"
+    "admin:create": "tsx apps/api/scripts/create-admin.ts",
+    "db:reset:local": "tsx apps/api/scripts/reset-local-db-keep-admin.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

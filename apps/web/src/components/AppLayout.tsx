@@ -95,7 +95,11 @@ export function AppLayout({
         <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 backdrop-blur">
           <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-6">
             <div className="flex items-center gap-3">
-              <UserAvatar name={user?.nombreCompleto ?? user?.nombreUsuario} />
+              <UserAvatar
+                idUsuario={user?.idUsuario}
+                name={user?.nombreCompleto ?? user?.nombreUsuario}
+                hasImage={user?.avatar.disponible}
+              />
               <div>
                 <p className="text-xs font-semibold uppercase text-red-700 lg:hidden">
                   {branding.nombre_negocio}

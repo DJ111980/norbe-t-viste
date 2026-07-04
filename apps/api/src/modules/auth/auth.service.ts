@@ -12,6 +12,10 @@ function toAuthenticatedUser(user: UserRecord): AuthenticatedUser {
     nombreUsuario: user.nombre_usuario,
     correo: user.correo,
     rol: user.rol,
+    avatar: {
+      disponible: Boolean(user.avatar_key),
+      contentType: user.avatar_content_type ?? null,
+    },
   };
 }
 
