@@ -52,6 +52,7 @@ export async function findEntryLotDetailsForLabels(
       SELECT
         d.id_detalle_lote,
         d.id_variante,
+        d.cantidad,
         d.cantidad_etiquetas_qr,
         v.id_variante AS variante_id_variante,
         v.codigo_qr,

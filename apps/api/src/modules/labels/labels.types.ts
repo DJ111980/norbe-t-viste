@@ -25,6 +25,7 @@ export interface EntryLotForLabelsRecord {
 export interface EntryLotDetailForLabelsRecord {
   id_detalle_lote: string;
   id_variante: string;
+  cantidad: number;
   cantidad_etiquetas_qr: number | null;
   variante_id_variante: string | null;
   codigo_qr: string | null;

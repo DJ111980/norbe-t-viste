@@ -55,7 +55,6 @@ const emptyDetailForm: EntryLotDetailFormValues = {
   cantidad: 1,
   costo_unitario: 0,
   precio_venta_sugerido: 0,
-  cantidad_etiquetas_qr: 1,
   observaciones: '',
 };
 
@@ -87,7 +86,6 @@ function fillDetailForm(detail: EntryLotDetail): EntryLotDetailFormValues {
     cantidad: detail.cantidad,
     costo_unitario: detail.costoUnitario ?? 0,
     precio_venta_sugerido: detail.precioVentaSugerido,
-    cantidad_etiquetas_qr: detail.cantidadEtiquetasQr,
     observaciones: detail.observaciones ?? '',
   };
 }
@@ -113,6 +111,12 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
   const [editingDetail, setEditingDetail] = useState<EntryLotDetail | null>(null);
   const [isLotFormOpen, setIsLotFormOpen] = useState(false);
   const [labelPreview, setLabelPreview] = useState<{ title: string; html: string } | null>(null);
+  const [confirmationPrompt, setConfirmationPrompt] = useState<{
+    numeroLote: string;
+    idLote: string;
+    totalEtiquetas: number;
+    detalles: Array<{ label: string; cantidad: number }>;
+  } | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -224,7 +228,6 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
       setDetailForm({
         ...emptyDetailForm,
         id_variante: detailForm.id_variante,
-        cantidad_etiquetas_qr: 1,
       });
       setEditingDetail(null);
       await loadLot(selected.idLote);
@@ -257,12 +260,23 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
     if (!token || !selected || !canManage) return;
     setFormError(null);
     setSuccess(null);
+    const promptDetails = selected.detalles.map((detail) => ({
+      label: `${detail.producto.nombreProducto} / ${detail.variante.sku}`,
+      cantidad: detail.cantidad,
+    }));
+    const totalEtiquetas = promptDetails.reduce((total, detail) => total + detail.cantidad, 0);
 
     try {
       const result = await confirmEntryLot(token, selected.idLote);
       setSuccess(`Lote confirmado: ${result.total_unidades_ingresadas} unidades ingresadas.`);
       await loadLot(selected.idLote);
       await loadData();
+      setConfirmationPrompt({
+        numeroLote: selected.numeroLote,
+        idLote: selected.idLote,
+        totalEtiquetas,
+        detalles: promptDetails,
+      });
     } catch (confirmError) {
       if (await expireIfNeeded(confirmError)) return;
       setFormError(handleMessage(confirmError, 'No se pudo confirmar el lote.'));
@@ -286,13 +300,14 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
     }
   }
 
-  async function openLabels() {
-    if (!token || !selected) return;
+  async function openLabels(idLote = selected?.idLote, numeroLote = selected?.numeroLote) {
+    if (!token || !idLote || !numeroLote) return;
     setFormError(null);
 
     try {
-      const html = await getEntryLotLabelPreview(token, selected.idLote);
-      setLabelPreview({ title: `Etiquetas ${selected.numeroLote}`, html });
+      const html = await getEntryLotLabelPreview(token, idLote);
+      setLabelPreview({ title: `Etiquetas ${numeroLote}`, html });
+      setConfirmationPrompt(null);
     } catch (labelError) {
       if (await expireIfNeeded(labelError)) return;
       setFormError(handleMessage(labelError, 'No se pudieron abrir etiquetas del lote.'));
@@ -371,6 +386,7 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
             selected={null}
             isSaving={isSaving}
             editable
+            onCancel={() => setIsLotFormOpen(false)}
             onChange={setLotForm}
             onSubmit={(event) => void saveLot(event)}
             onNew={() => {
@@ -400,13 +416,36 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
           }}
           size="xl"
         >
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="space-y-4">
+            <LotHeader lot={selected} />
+
+            {canManage && (
+              <LotForm
+                form={lotForm}
+                providers={activeProviders}
+                selected={selected}
+                isSaving={isSaving}
+                editable={selectedEditable}
+                onCancel={() => {
+                  setLotForm(fillLotForm(selected));
+                  setEditingDetail(null);
+                }}
+                onChange={setLotForm}
+                onSubmit={(event) => void saveLot(event)}
+                onNew={() => {
+                  setSelected(null);
+                  setLotForm(emptyLotForm);
+                  setEditingDetail(null);
+                  setCancelReason('');
+                  setIsLotFormOpen(true);
+                }}
+              />
+            )}
+
             <LotDetail
               lot={selected}
               canManage={canManage}
               editable={selectedEditable}
-              canOpenLabels={canOpenLabels}
-              onOpenLabels={() => void openLabels()}
               onEditDetail={(detail) => {
                 setEditingDetail(detail);
                 setDetailForm(fillDetailForm(detail));
@@ -414,26 +453,7 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
               onDeleteDetail={(detail) => void removeDetail(detail)}
             />
 
-            <div className="space-y-4">
-              {canManage && (
-                <LotForm
-                  form={lotForm}
-                  providers={activeProviders}
-                  selected={selected}
-                  isSaving={isSaving}
-                  editable={selectedEditable}
-                  onChange={setLotForm}
-                  onSubmit={(event) => void saveLot(event)}
-                  onNew={() => {
-                    setSelected(null);
-                    setLotForm(emptyLotForm);
-                    setEditingDetail(null);
-                    setCancelReason('');
-                    setIsLotFormOpen(true);
-                  }}
-                />
-              )}
-
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
               {selectedEditable && (
                 <DetailForm
                   form={detailForm}
@@ -452,14 +472,59 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
               {canManage && selected.estadoLote !== 'ANULADO' && (
                 <LotActions
                   lot={selected}
+                  canOpenLabels={canOpenLabels}
                   cancelReason={cancelReason}
                   onCancelReason={setCancelReason}
                   onConfirm={() => void confirmSelectedLot()}
                   onCancelLot={() => void cancelSelectedLot()}
+                  onOpenLabels={() => void openLabels()}
                 />
               )}
             </div>
           </section>
+        </Modal>
+      )}
+
+      {confirmationPrompt && (
+        <Modal
+          title="Lote confirmado correctamente"
+          onClose={() => setConfirmationPrompt(null)}
+          size="md"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-stone-700">
+              Etiquetas disponibles para imprimir: {confirmationPrompt.totalEtiquetas}
+            </p>
+            <div className="space-y-2 rounded-md border border-stone-200 bg-stone-50 p-3">
+              {confirmationPrompt.detalles.map((detail, index) => (
+                <p
+                  key={`${detail.label}-${index}`}
+                  className="flex justify-between gap-3 text-sm text-stone-700"
+                >
+                  <span>{detail.label}</span>
+                  <strong>{detail.cantidad}</strong>
+                </p>
+              ))}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  void openLabels(confirmationPrompt.idLote, confirmationPrompt.numeroLote)
+                }
+                className={primaryButtonClassName}
+              >
+                Imprimir etiquetas
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmationPrompt(null)}
+                className={secondaryButtonClassName}
+              >
+                No imprimir ahora
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
 
@@ -480,6 +545,7 @@ function LotForm({
   selected,
   isSaving,
   editable,
+  onCancel,
   onChange,
   onSubmit,
   onNew,
@@ -489,6 +555,7 @@ function LotForm({
   selected: EntryLot | null;
   isSaving: boolean;
   editable: boolean;
+  onCancel: () => void;
   onChange: (form: EntryLotFormValues) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onNew: () => void;
@@ -500,7 +567,7 @@ function LotForm({
     return (
       <section className="rounded-md border border-stone-200 bg-white p-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-stone-950">Datos del lote</h2>
+          <h2 className="text-sm font-semibold text-stone-950">Formulario lote</h2>
           <button type="button" onClick={onNew} className={secondaryButtonClassName}>
             Nuevo lote
           </button>
@@ -520,16 +587,9 @@ function LotForm({
   return (
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-stone-950">
-          {creating ? 'Crear lote' : editable ? 'Editar lote borrador' : 'Lote solo lectura'}
-        </h2>
-        {!creating && (
-          <button type="button" onClick={onNew} className={secondaryButtonClassName}>
-            Nuevo lote
-          </button>
-        )}
+        <h2 className="text-sm font-semibold text-stone-950">Formulario lote</h2>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2">
         <Field label="Proveedor">
           <select
             disabled={disabled}
@@ -572,10 +632,18 @@ function LotForm({
         </Field>
       </div>
       {!disabled && (
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
           <button type="submit" disabled={isSaving} className={primaryButtonClassName}>
             {isSaving ? 'Guardando...' : creating ? 'Crear lote' : 'Guardar lote'}
           </button>
+          <button type="button" onClick={onCancel} className={secondaryButtonClassName}>
+            Cancelar
+          </button>
+          {!creating && (
+            <button type="button" onClick={onNew} className={secondaryButtonClassName}>
+              Nuevo lote
+            </button>
+          )}
         </div>
       )}
     </form>
@@ -638,43 +706,41 @@ function LotsTable({
   );
 }
 
+function LotHeader({ lot }: { lot: EntryLot }) {
+  return (
+    <div className="rounded-md border border-stone-200 bg-white p-4">
+      <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <Info label="Codigo lote" value={lot.numeroLote} />
+        <div>
+          <dt className="text-xs uppercase text-stone-500">Estado</dt>
+          <dd className="mt-1">
+            <StatusBadge status={lot.estadoLote} />
+          </dd>
+        </div>
+        <Info label="Proveedor" value={lot.proveedor?.nombreProveedor ?? 'Sin proveedor'} />
+        <Info label="Fecha lote" value={lot.fechaLote.slice(0, 10)} />
+      </div>
+    </div>
+  );
+}
+
 function LotDetail({
   lot,
   canManage,
   editable,
-  canOpenLabels,
-  onOpenLabels,
   onEditDetail,
   onDeleteDetail,
 }: {
   lot: EntryLot;
   canManage: boolean;
   editable: boolean;
-  canOpenLabels: boolean;
-  onOpenLabels: () => void;
   onEditDetail: (detail: EntryLotDetail) => void;
   onDeleteDetail: (detail: EntryLotDetail) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
       <div className="border-b border-stone-100 p-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-stone-950">{lot.numeroLote}</h2>
-            <p className="mt-1 text-sm text-stone-600">
-              {lot.proveedor?.nombreProveedor ?? 'Sin proveedor'}
-            </p>
-            <p className="mt-1 text-xs text-stone-500">Fecha {lot.fechaLote.slice(0, 10)}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={lot.estadoLote} />
-            {canOpenLabels && (
-              <button type="button" onClick={onOpenLabels} className={secondaryButtonClassName}>
-                Ver etiquetas
-              </button>
-            )}
-          </div>
-        </div>
+        <h2 className="text-sm font-semibold text-stone-950">Detalles del lote</h2>
       </div>
 
       {lot.detalles.length === 0 ? (
@@ -688,8 +754,7 @@ function LotDetail({
               <tr>
                 <th className="px-4 py-3">Variante</th>
                 <th className="px-4 py-3">Cantidad</th>
-                <th className="px-4 py-3">Costo</th>
-                <th className="px-4 py-3">Etiquetas</th>
+                <th className="px-4 py-3">Costo de compra unitario</th>
                 <th className="px-4 py-3">Acciones</th>
               </tr>
             </thead>
@@ -707,7 +772,6 @@ function LotDetail({
                   <td className="px-4 py-3 text-stone-700">
                     {detail.costoUnitario !== undefined ? currency(detail.costoUnitario) : 'Oculto'}
                   </td>
-                  <td className="px-4 py-3 text-stone-700">{detail.cantidadEtiquetasQr}</td>
                   <td className="px-4 py-3">
                     {canManage && editable ? (
                       <div className="flex flex-wrap gap-2">
@@ -797,37 +861,13 @@ function DetailForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Costo unitario">
+        <Field label="Costo de compra unitario">
           <input
             type="number"
             min={0}
             step={1}
             value={form.costo_unitario}
             onChange={(event) => onChange({ ...form, costo_unitario: Number(event.target.value) })}
-            className={inputClassName}
-          />
-        </Field>
-        <Field label="Precio venta sugerido">
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={form.precio_venta_sugerido}
-            onChange={(event) =>
-              onChange({ ...form, precio_venta_sugerido: Number(event.target.value) })
-            }
-            className={inputClassName}
-          />
-        </Field>
-        <Field label="Cantidad etiquetas QR">
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={form.cantidad_etiquetas_qr}
-            onChange={(event) =>
-              onChange({ ...form, cantidad_etiquetas_qr: Number(event.target.value) })
-            }
             className={inputClassName}
           />
         </Field>
@@ -848,24 +888,35 @@ function DetailForm({
 
 function LotActions({
   lot,
+  canOpenLabels,
   cancelReason,
   onCancelReason,
   onConfirm,
   onCancelLot,
+  onOpenLabels,
 }: {
   lot: EntryLot;
+  canOpenLabels: boolean;
   cancelReason: string;
   onCancelReason: (value: string) => void;
   onConfirm: () => void;
   onCancelLot: () => void;
+  onOpenLabels: () => void;
 }) {
   return (
     <div className="rounded-md border border-stone-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-stone-950">Acciones del lote</h2>
       <div className="mt-4 space-y-3">
         {lot.estadoLote === 'BORRADOR' && (
-          <button type="button" onClick={onConfirm} className={primaryButtonClassName}>
-            Confirmar lote
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={onConfirm} className={primaryButtonClassName}>
+              Confirmar lote
+            </button>
+          </div>
+        )}
+        {canOpenLabels && (
+          <button type="button" onClick={onOpenLabels} className={secondaryButtonClassName}>
+            Ver etiquetas
           </button>
         )}
         <Field label="Motivo de anulacion">

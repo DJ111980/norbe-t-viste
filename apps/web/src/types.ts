@@ -416,7 +416,6 @@ export interface EntryLotDetailFormValues {
   cantidad: number;
   costo_unitario: number;
   precio_venta_sugerido: number;
-  cantidad_etiquetas_qr: number;
   observaciones: string;
 }
 

@@ -251,7 +251,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
     <section className="space-y-6">
       <PageHeader
         title="Variantes"
-        description="Gestiona tallas, colores, precios de referencia y etiquetas. El stock actual es solo consultivo."
+        description="Gestiona tallas, colores, precio de venta y costo de compra de referencia. El stock actual es solo consultivo."
         action={
           canManage && (
             <button
@@ -586,7 +586,7 @@ function VariantForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Precio compra referencia">
+        <Field label="Costo de compra de referencia">
           <input
             type="number"
             min={0}

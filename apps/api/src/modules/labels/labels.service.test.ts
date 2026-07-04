@@ -59,6 +59,7 @@ function buildEntryLotDetail(
   return {
     id_detalle_lote: 'det_1',
     id_variante: 'var_1',
+    cantidad: 1,
     cantidad_etiquetas_qr: 1,
     variante_id_variante: 'var_1',
     codigo_qr: 'NTV-VAR-000001',
@@ -224,14 +225,14 @@ describe('labels service', () => {
 
     const html = await getEntryLotLabelPreviewHtml({} as ApiEnv, 'lot_1');
 
-    expect(html.match(/class="label"/g)).toHaveLength(3);
+    expect(html.match(/class="label"/g)).toHaveLength(4);
     expect(html).toContain('class="labels-pages"');
     expect(html).toContain('break-after: page');
     expect(html).not.toContain('class="labels-grid"');
     expect(html.match(/NTV-VAR-000001/g)?.length).toBeGreaterThanOrEqual(2);
     expect(html).toContain('NTV-VAR-000002');
-    expect(html).not.toContain('NTV-VAR-000003');
-    expect(mocks.qrCalls).toEqual(['NTV-VAR-000001', 'NTV-VAR-000002']);
+    expect(html).toContain('NTV-VAR-000003');
+    expect(mocks.qrCalls).toEqual(['NTV-VAR-000001', 'NTV-VAR-000002', 'NTV-VAR-000003']);
   });
 
   it('permite variante y producto inactivos desde lote confirmado', async () => {
@@ -275,7 +276,7 @@ describe('labels service', () => {
     });
   });
 
-  it('rechaza lote sin detalles y lote sin etiquetas configuradas', async () => {
+  it('rechaza lote sin detalles y usa cantidad si no hay etiquetas configuradas', async () => {
     mocks.entryLotDetails = [];
 
     await expect(getEntryLotLabelPreviewHtml({} as ApiEnv, 'lot_1')).rejects.toMatchObject({
@@ -284,14 +285,20 @@ describe('labels service', () => {
     });
 
     mocks.entryLotDetails = [
-      buildEntryLotDetail({ cantidad_etiquetas_qr: 0 }),
-      buildEntryLotDetail({ id_detalle_lote: 'det_2', cantidad_etiquetas_qr: null }),
+      buildEntryLotDetail({ cantidad: 2, cantidad_etiquetas_qr: 0 }),
+      buildEntryLotDetail({
+        id_detalle_lote: 'det_2',
+        codigo_qr: 'NTV-VAR-000002',
+        cantidad: 1,
+        cantidad_etiquetas_qr: null,
+      }),
     ];
 
-    await expect(getEntryLotLabelPreviewHtml({} as ApiEnv, 'lot_1')).rejects.toMatchObject({
-      code: 'LOTE_SIN_ETIQUETAS_QR',
-      status: 409,
-    });
+    const html = await getEntryLotLabelPreviewHtml({} as ApiEnv, 'lot_1');
+
+    expect(html.match(/class="label"/g)).toHaveLength(3);
+    expect(html.match(/NTV-VAR-000001/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(html).toContain('NTV-VAR-000002');
   });
 
   it('rechaza si total de etiquetas del lote supera el limite', async () => {

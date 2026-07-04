@@ -53,7 +53,6 @@ describe('lots service', () => {
         cantidad: 3,
         costo_unitario: 1000,
         precio_venta_sugerido: 2000,
-        cantidad_etiquetas_qr: 3,
         observaciones: null,
       },
     });

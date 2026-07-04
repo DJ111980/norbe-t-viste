@@ -137,7 +137,10 @@ export async function getEntryLotLabelPreviewHtml(env: ApiEnv, idLote: string): 
   const labels: PrintableVariantLabel[] = [];
 
   for (const detail of details) {
-    const cantidad = detail.cantidad_etiquetas_qr ?? 0;
+    const cantidad =
+      detail.cantidad_etiquetas_qr && detail.cantidad_etiquetas_qr > 0
+        ? detail.cantidad_etiquetas_qr
+        : detail.cantidad;
 
     if (cantidad <= 0) {
       continue;

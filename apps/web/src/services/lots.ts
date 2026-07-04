@@ -60,7 +60,6 @@ function toDetailBody(values: EntryLotDetailFormValues) {
     cantidad: values.cantidad,
     costo_unitario: values.costo_unitario,
     precio_venta_sugerido: values.precio_venta_sugerido,
-    cantidad_etiquetas_qr: values.cantidad_etiquetas_qr,
     observaciones: values.observaciones || null,
   };
 }
@@ -139,7 +138,6 @@ export async function updateEntryLotDetail(
     cantidad: values.cantidad,
     costo_unitario: values.costo_unitario,
     precio_venta_sugerido: values.precio_venta_sugerido,
-    cantidad_etiquetas_qr: values.cantidad_etiquetas_qr,
     observaciones: values.observaciones || null,
   };
   const data = await apiRequest<EntryLotDetailResponse, typeof body>(
