@@ -12,6 +12,7 @@ import {
   secondaryButtonClassName,
   StatusBadge,
   SuccessMessage,
+  UserAvatar,
 } from '../components/ui';
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
 import {
@@ -344,8 +345,13 @@ function UsersTable({
           {users.map((user) => (
             <tr key={user.idUsuario}>
               <td className="px-4 py-3">
-                <p className="font-medium text-stone-950">{user.nombreCompleto}</p>
-                <p className="text-xs text-stone-500">@{user.nombreUsuario}</p>
+                <div className="flex items-center gap-3">
+                  <UserAvatar name={user.nombreCompleto || user.nombreUsuario} />
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-stone-950">{user.nombreCompleto}</p>
+                    <p className="truncate text-xs text-stone-500">@{user.nombreUsuario}</p>
+                  </div>
+                </div>
               </td>
               <td className="px-4 py-3 text-stone-700">{user.correo}</td>
               <td className="px-4 py-3 text-stone-700">{user.rol}</td>
@@ -402,7 +408,13 @@ function EditUserForm({
 }) {
   return (
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
-      <h2 className="text-sm font-semibold text-stone-950">Editar {user.nombreUsuario}</h2>
+      <div className="flex items-center gap-3">
+        <UserAvatar name={user.nombreCompleto || user.nombreUsuario} size="md" />
+        <div>
+          <h2 className="text-sm font-semibold text-stone-950">Editar {user.nombreUsuario}</h2>
+          <p className="text-xs text-stone-500">Avatar temporal con iniciales</p>
+        </div>
+      </div>
       <div className="mt-4 space-y-3">
         <Field label="Nombre completo" required>
           <input

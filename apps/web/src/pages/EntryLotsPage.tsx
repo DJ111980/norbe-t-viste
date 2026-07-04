@@ -71,6 +71,21 @@ function handleMessage(error: unknown, fallback: string): string {
   return error instanceof ApiClientError ? error.message : fallback;
 }
 
+function lotLabelSummary(lot: EntryLot): {
+  total: number;
+  items: Array<{ label: string; cantidad: number }>;
+} {
+  const items = lot.detalles.map((detail) => ({
+    label: `${detail.producto.nombreProducto} / Talla ${detail.variante.talla ?? 'Unica'}`,
+    cantidad: detail.cantidad,
+  }));
+
+  return {
+    total: items.reduce((total, item) => total + item.cantidad, 0),
+    items,
+  };
+}
+
 function fillLotForm(lot: EntryLot): EntryLotFormValues {
   return {
     id_proveedor: lot.idProveedor ?? '',
@@ -110,7 +125,11 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
   const [detailForm, setDetailForm] = useState<EntryLotDetailFormValues>(emptyDetailForm);
   const [editingDetail, setEditingDetail] = useState<EntryLotDetail | null>(null);
   const [isLotFormOpen, setIsLotFormOpen] = useState(false);
-  const [labelPreview, setLabelPreview] = useState<{ title: string; html: string } | null>(null);
+  const [labelPreview, setLabelPreview] = useState<{
+    title: string;
+    html: string;
+    summary: { total: number; items: Array<{ label: string; cantidad: number }> };
+  } | null>(null);
   const [confirmationPrompt, setConfirmationPrompt] = useState<{
     numeroLote: string;
     idLote: string;
@@ -260,11 +279,7 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
     if (!token || !selected || !canManage) return;
     setFormError(null);
     setSuccess(null);
-    const promptDetails = selected.detalles.map((detail) => ({
-      label: `${detail.producto.nombreProducto} / ${detail.variante.sku}`,
-      cantidad: detail.cantidad,
-    }));
-    const totalEtiquetas = promptDetails.reduce((total, detail) => total + detail.cantidad, 0);
+    const summary = lotLabelSummary(selected);
 
     try {
       const result = await confirmEntryLot(token, selected.idLote);
@@ -274,8 +289,8 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
       setConfirmationPrompt({
         numeroLote: selected.numeroLote,
         idLote: selected.idLote,
-        totalEtiquetas,
-        detalles: promptDetails,
+        totalEtiquetas: summary.total,
+        detalles: summary.items,
       });
     } catch (confirmError) {
       if (await expireIfNeeded(confirmError)) return;
@@ -305,8 +320,11 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
     setFormError(null);
 
     try {
-      const html = await getEntryLotLabelPreview(token, idLote);
-      setLabelPreview({ title: `Etiquetas ${numeroLote}`, html });
+      const [html, lot] = await Promise.all([
+        getEntryLotLabelPreview(token, idLote),
+        getEntryLot(token, idLote),
+      ]);
+      setLabelPreview({ title: `Etiquetas ${numeroLote}`, html, summary: lotLabelSummary(lot) });
       setConfirmationPrompt(null);
     } catch (labelError) {
       if (await expireIfNeeded(labelError)) return;
@@ -532,6 +550,7 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
         <PrintableHtmlModal
           title={labelPreview.title}
           html={labelPreview.html}
+          summary={labelPreview.summary}
           onClose={() => setLabelPreview(null)}
         />
       )}

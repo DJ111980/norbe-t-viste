@@ -42,14 +42,14 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`flex max-h-[90vh] w-full ${sizeClassNames[size]} flex-col rounded-md bg-white shadow-xl`}
+        className={`flex max-h-[92vh] w-full ${sizeClassNames[size]} flex-col rounded-md bg-white shadow-xl`}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3">
-          <h2 className="text-base font-semibold text-stone-950">{title}</h2>
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-red-100 bg-red-50/40 px-4 py-2.5">
+          <h2 className="text-sm font-semibold text-stone-950">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-stone-300 text-xl leading-none text-stone-700 hover:bg-stone-50"
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-red-100 bg-white text-lg leading-none text-red-800 hover:bg-red-50"
             aria-label="Cerrar"
           >
             x

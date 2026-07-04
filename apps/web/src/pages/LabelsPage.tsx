@@ -29,6 +29,11 @@ interface LabelBatchRow extends LabelBatchItemFormValues {
   variant: Variant;
 }
 
+interface LabelPreviewSummary {
+  total: number;
+  items: Array<{ label: string; cantidad: number }>;
+}
+
 export function isValidLabelQuantity(value: number): boolean {
   return Number.isInteger(value) && value > 0;
 }
@@ -46,6 +51,10 @@ function lotLabel(lot: EntryLotSummary): string {
   return `${lot.numeroLote} / ${lot.nombreProveedor ?? 'Sin proveedor'} / ${lot.estadoLote}`;
 }
 
+function variantSummaryLabel(variant: Variant): string {
+  return `${variant.producto.nombreProducto ?? 'Producto'} / Talla ${variant.talla ?? 'Unica'}`;
+}
+
 export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void }) {
   const { token, logout } = useAuth();
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -58,7 +67,11 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
   const [batchItems, setBatchItems] = useState<LabelBatchRow[]>([]);
   const [entryLotInput, setEntryLotInput] = useState('');
   const [selectedLot, setSelectedLot] = useState<EntryLotSummary | null>(null);
-  const [preview, setPreview] = useState<{ title: string; html: string } | null>(null);
+  const [preview, setPreview] = useState<{
+    title: string;
+    html: string;
+    summary: LabelPreviewSummary;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -179,7 +192,11 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
     setEntryLotInput(lot.numeroLote);
   }
 
-  async function openPreview(action: () => Promise<string>, title: string) {
+  async function openPreview(
+    action: () => Promise<string>,
+    title: string,
+    summary: LabelPreviewSummary,
+  ) {
     if (!token) return;
     setIsLoading(true);
     setError(null);
@@ -187,7 +204,7 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
 
     try {
       const html = await action();
-      setPreview({ title, html });
+      setPreview({ title, html, summary });
       setSuccess('Preview generado.');
     } catch (labelError) {
       if (await expireIfNeeded(labelError)) return;
@@ -213,6 +230,10 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
           { id_variante: selectedVariant.idVariante, cantidad: individualQuantity },
         ]),
       `Etiqueta ${selectedVariant.codigoQr}`,
+      {
+        total: individualQuantity,
+        items: [{ label: variantSummaryLabel(selectedVariant), cantidad: individualQuantity }],
+      },
     );
   }
 
@@ -272,10 +293,17 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
           batchItems.map(({ id_variante, cantidad }) => ({ id_variante, cantidad })),
         ),
       'Etiquetas por lista NORBE T VISTE',
+      {
+        total: batchItems.reduce((total, item) => total + item.cantidad, 0),
+        items: batchItems.map((item) => ({
+          label: variantSummaryLabel(item.variant),
+          cantidad: item.cantidad,
+        })),
+      },
     );
   }
 
-  function submitEntryLot(event: FormEvent<HTMLFormElement>) {
+  async function submitEntryLot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !selectedLot) {
       setError('Selecciona un lote antes de generar etiquetas.');
@@ -294,10 +322,28 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
       return;
     }
 
-    void openPreview(
-      () => getEntryLotLabelPreview(token, selectedLot.idLote),
-      `Etiquetas ${selectedLot.numeroLote}`,
-    );
+    setIsLoading(true);
+    setError(null);
+    try {
+      const lot = await getEntryLot(token, selectedLot.idLote);
+      const summary = {
+        total: lot.detalles.reduce((total, detail) => total + detail.cantidad, 0),
+        items: lot.detalles.map((detail) => ({
+          label: `${detail.producto.nombreProducto} / Talla ${detail.variante.talla ?? 'Unica'}`,
+          cantidad: detail.cantidad,
+        })),
+      };
+      await openPreview(
+        () => getEntryLotLabelPreview(token, selectedLot.idLote),
+        `Etiquetas ${selectedLot.numeroLote}`,
+        summary,
+      );
+    } catch (lotError) {
+      if (await expireIfNeeded(lotError)) return;
+      setError(handleMessage(lotError, 'No se pudo preparar el resumen del lote.'));
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -519,6 +565,7 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
         <PrintableHtmlModal
           title={preview.title}
           html={preview.html}
+          summary={preview.summary}
           onClose={() => setPreview(null)}
         />
       )}

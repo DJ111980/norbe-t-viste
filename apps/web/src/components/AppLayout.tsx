@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useAuth } from '../auth/auth-context';
 import { useBranding } from '../branding/branding-context';
+import { UserAvatar } from './ui';
 import type { UserRole } from '../types';
 
 interface NavItem {
@@ -46,16 +47,16 @@ export function AppLayout({
   const visibleItems = useMemo(() => getVisibleNavItems(user?.rol ?? 'VENDEDOR'), [user?.rol]);
 
   return (
-    <div className="min-h-screen bg-stone-100 text-stone-950">
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-stone-200 bg-white lg:block">
-        <div className="border-b border-stone-200 px-6 py-5">
+    <div className="app-shell min-h-screen bg-[#f8f3f0] text-stone-950">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-red-100 bg-[#fffaf7] lg:block">
+        <div className="border-b border-red-100 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-red-100 bg-white shadow-sm">
               {logoUrl ? (
                 <img
                   src={logoUrl}
                   alt={`Logo ${branding.nombre_negocio}`}
-                  className="max-h-10 max-w-10 object-contain"
+                  className="max-h-9 max-w-9 object-contain"
                 />
               ) : (
                 <span className="text-xs font-semibold text-red-700">
@@ -67,21 +68,21 @@ export function AppLayout({
               <p className="truncate text-xs font-semibold uppercase text-red-700">
                 {branding.nombre_negocio}
               </p>
-              <p className="mt-1 truncate text-sm text-stone-600">{branding.eslogan}</p>
+              <p className="mt-1 truncate text-xs text-stone-600">{branding.eslogan}</p>
             </div>
           </div>
         </div>
 
-        <nav className="space-y-1 px-3 py-4">
+        <nav className="space-y-1 px-3 py-3">
           {visibleItems.map((item) => (
             <button
               key={item.path}
               type="button"
               onClick={() => onNavigate(item.path)}
-              className={`w-full rounded-md px-3 py-2 text-left text-sm font-medium ${
+              className={`w-full rounded-md px-3 py-1.5 text-left text-[13px] font-medium ${
                 currentPath === item.path
-                  ? 'bg-red-700 text-white'
-                  : 'text-stone-700 hover:bg-stone-100 hover:text-stone-950'
+                  ? 'bg-red-700 text-white shadow-sm'
+                  : 'text-stone-700 hover:bg-red-50 hover:text-red-900'
               }`}
             >
               {item.label}
@@ -90,38 +91,39 @@ export function AppLayout({
         </nav>
       </aside>
 
-      <div className="lg:pl-72">
-        <header className="sticky top-0 z-10 border-b border-stone-200 bg-white">
-          <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-            <div>
-              <p className="text-xs font-semibold uppercase text-red-700 lg:hidden">
-                {branding.nombre_negocio}
-              </p>
-              <p className="text-sm font-medium text-stone-950">
-                {user?.nombreCompleto ?? 'Usuario'}
-              </p>
-              <p className="text-xs text-stone-500">{user?.rol ?? 'Sin rol'}</p>
+      <div className="lg:pl-64">
+        <header className="sticky top-0 z-10 border-b border-red-100 bg-white/95 backdrop-blur">
+          <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-6">
+            <div className="flex items-center gap-3">
+              <UserAvatar name={user?.nombreCompleto ?? user?.nombreUsuario} />
+              <div>
+                <p className="text-xs font-semibold uppercase text-red-700 lg:hidden">
+                  {branding.nombre_negocio}
+                </p>
+                <p className="text-sm font-medium text-stone-950">
+                  {user?.nombreCompleto ?? 'Usuario'}
+                </p>
+                <p className="text-xs text-stone-500">{user?.rol ?? 'Sin rol'}</p>
+              </div>
             </div>
 
             <button
               type="button"
               onClick={() => void logout().then(() => onNavigate('/login'))}
-              className="h-10 rounded-md border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              className="h-9 rounded-md border border-red-100 bg-red-50/40 px-3 text-[13px] font-medium text-red-800 hover:bg-red-50"
             >
               Cerrar sesion
             </button>
           </div>
 
-          <nav className="flex gap-2 overflow-x-auto border-t border-stone-100 px-4 py-2 lg:hidden">
+          <nav className="flex gap-2 overflow-x-auto border-t border-red-50 px-4 py-2 lg:hidden">
             {visibleItems.map((item) => (
               <button
                 key={item.path}
                 type="button"
                 onClick={() => onNavigate(item.path)}
-                className={`shrink-0 rounded-md px-3 py-2 text-sm font-medium ${
-                  currentPath === item.path
-                    ? 'bg-red-700 text-white'
-                    : 'bg-stone-100 text-stone-700'
+                className={`shrink-0 rounded-md px-3 py-1.5 text-[13px] font-medium ${
+                  currentPath === item.path ? 'bg-red-700 text-white' : 'bg-red-50 text-red-800'
                 }`}
               >
                 {item.label}
@@ -130,7 +132,7 @@ export function AppLayout({
           </nav>
         </header>
 
-        <main className="px-4 py-6 lg:px-8">{children}</main>
+        <main className="px-4 py-5 lg:px-6">{children}</main>
       </div>
     </div>
   );

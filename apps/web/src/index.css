@@ -16,4 +16,30 @@
 
 body {
   margin: 0;
+  background: #f8f3f0;
+  font-size: 14px;
+}
+
+.app-shell table thead {
+  background: #fff1f1;
+  color: #7f1d1d;
+}
+
+.app-shell table tbody tr {
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.app-shell table tbody tr:hover {
+  background: #fff7ed;
+}
+
+.app-shell table th,
+.app-shell table td {
+  padding: 0.55rem 0.75rem;
+}
+
+.app-shell .soft-panel {
+  background: #fffdfb;
 }

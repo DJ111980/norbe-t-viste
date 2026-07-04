@@ -88,7 +88,11 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
   const [editing, setEditing] = useState<Variant | null>(null);
   const [labelTarget, setLabelTarget] = useState<Variant | null>(null);
   const [labelQuantity, setLabelQuantity] = useState(1);
-  const [labelPreview, setLabelPreview] = useState<{ title: string; html: string } | null>(null);
+  const [labelPreview, setLabelPreview] = useState<{
+    title: string;
+    html: string;
+    summary: { total: number; items: Array<{ label: string; cantidad: number }> };
+  } | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   const [form, setForm] = useState<VariantFormValues>(emptyVariantForm);
@@ -260,7 +264,19 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
       const html = await getBatchVariantLabelPreview(token, [
         { id_variante: labelTarget.idVariante, cantidad: labelQuantity },
       ]);
-      setLabelPreview({ title: `Etiqueta ${labelTarget.codigoQr}`, html });
+      setLabelPreview({
+        title: `Etiqueta ${labelTarget.codigoQr}`,
+        html,
+        summary: {
+          total: labelQuantity,
+          items: [
+            {
+              label: `${labelTarget.producto.nombreProducto ?? 'Producto'} / Talla ${labelTarget.talla ?? 'Unica'}`,
+              cantidad: labelQuantity,
+            },
+          ],
+        },
+      });
       setLabelTarget(null);
     } catch (labelError) {
       await handleError(labelError);
@@ -408,6 +424,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
         <PrintableHtmlModal
           title={labelPreview.title}
           html={labelPreview.html}
+          summary={labelPreview.summary}
           onClose={() => setLabelPreview(null)}
         />
       )}
