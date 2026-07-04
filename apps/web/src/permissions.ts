@@ -63,3 +63,15 @@ export function canCreateSaleReturns(role: UserRole): boolean {
 export function canViewSensitiveReports(role: UserRole): boolean {
   return role === 'ADMINISTRADOR';
 }
+
+export function canManageUsers(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}
+
+export function canManageBranding(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR';
+}
+
+export function canUseLabels(role: UserRole): boolean {
+  return role === 'ADMINISTRADOR' || role === 'VENDEDOR';
+}

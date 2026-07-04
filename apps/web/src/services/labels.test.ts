@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getEntryLotLabelPreview, getVariantLabelPreview, openPrintableHtml } from './labels';
+import {
+  getBatchVariantLabelPreview,
+  getEntryLotLabelPreview,
+  getVariantLabelPreview,
+  openPrintableHtml,
+} from './labels';
 import { apiTextRequest } from '../lib/api';
 
 vi.mock('../lib/api', () => ({
@@ -21,6 +26,17 @@ describe('labels service', () => {
     await getEntryLotLabelPreview('token', 'lot_1');
 
     expect(apiTextRequest).toHaveBeenCalledWith('/etiquetas/lotes-entrada/lot_1/preview', 'token');
+  });
+
+  it('usa endpoint de preview por lista sin generar QR en frontend', async () => {
+    vi.mocked(apiTextRequest).mockResolvedValueOnce('<html></html>');
+
+    await getBatchVariantLabelPreview('token', [{ id_variante: 'var_1', cantidad: 2 }]);
+
+    expect(apiTextRequest).toHaveBeenCalledWith('/etiquetas/variantes/preview-lote', 'token', {
+      method: 'POST',
+      body: { items: [{ id_variante: 'var_1', cantidad: 2 }] },
+    });
   });
 
   it('abre HTML imprimible en una nueva pestana', () => {

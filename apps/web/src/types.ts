@@ -7,6 +7,48 @@ export interface AuthUser {
   rol: UserRole;
 }
 
+export type UserStatus = 'ACTIVO' | 'INACTIVO';
+
+export interface UserAccount {
+  idUsuario: string;
+  nombreCompleto: string;
+  correo: string;
+  rol: UserRole;
+  estado: UserStatus;
+  ultimoAcceso: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
+  debeCambiarContrasena: boolean;
+  contrasenaActualizadaEn: string | null;
+  creadoPor: string | null;
+}
+
+export interface UserFormValues {
+  nombre_completo: string;
+  correo: string;
+  rol: UserRole;
+  contrasena: string;
+}
+
+export interface UserUpdateFormValues {
+  nombre_completo: string;
+  correo: string;
+  rol: UserRole;
+}
+
+export interface UserPasswordFormValues {
+  nueva_contrasena: string;
+}
+
+export interface BusinessLogo {
+  key: string;
+}
+
+export interface LabelBatchItemFormValues {
+  id_variante: string;
+  cantidad: number;
+}
+
 export interface DashboardSummary {
   periodo: {
     fechaDesde: string;

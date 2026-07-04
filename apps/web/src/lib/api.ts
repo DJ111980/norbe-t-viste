@@ -150,7 +150,11 @@ export async function apiFormRequest<TData>(
   return payload.data;
 }
 
-export async function apiTextRequest(path: string, token?: string | null): Promise<string> {
+export async function apiTextRequest<TBody = unknown>(
+  path: string,
+  token?: string | null,
+  options: { method?: 'GET' | 'POST'; body?: TBody } = {},
+): Promise<string> {
   if (!apiUrl) {
     throw new ApiClientError({
       status: 0,
@@ -161,6 +165,10 @@ export async function apiTextRequest(path: string, token?: string | null): Promi
 
   const headers = new Headers();
 
+  if (options.body !== undefined) {
+    headers.set('Content-Type', 'application/json');
+  }
+
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
@@ -168,7 +176,11 @@ export async function apiTextRequest(path: string, token?: string | null): Promi
   let response: Response;
 
   try {
-    response = await fetch(`${apiUrl}${path}`, { headers });
+    response = await fetch(`${apiUrl}${path}`, {
+      method: options.method ?? 'GET',
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    });
   } catch {
     throw new ApiClientError({
       status: 0,

@@ -12,9 +12,12 @@ import {
   canCancelIndependentCredits,
   canCreateSaleReturns,
   canViewSensitiveReports,
+  canManageBranding,
   canManageCreditAdjustments,
   canManageOldDebts,
+  canManageUsers,
   canRegisterCreditPayments,
+  canUseLabels,
   canViewGeneralPortfolio,
 } from './permissions';
 
@@ -76,5 +79,14 @@ describe('crud permissions', () => {
   it('solo ADMINISTRADOR ve reportes sensibles', () => {
     expect(canViewSensitiveReports('ADMINISTRADOR')).toBe(true);
     expect(canViewSensitiveReports('VENDEDOR')).toBe(false);
+  });
+
+  it('aplica permisos de usuarios, branding y etiquetas', () => {
+    expect(canManageUsers('ADMINISTRADOR')).toBe(true);
+    expect(canManageUsers('VENDEDOR')).toBe(false);
+    expect(canManageBranding('ADMINISTRADOR')).toBe(true);
+    expect(canManageBranding('VENDEDOR')).toBe(false);
+    expect(canUseLabels('ADMINISTRADOR')).toBe(true);
+    expect(canUseLabels('VENDEDOR')).toBe(true);
   });
 });

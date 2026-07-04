@@ -4,6 +4,8 @@ import { getVisibleNavItems } from './AppLayout';
 describe('AppLayout navigation', () => {
   it('oculta usuarios para vendedor', () => {
     expect(getVisibleNavItems('VENDEDOR').some((item) => item.path === '/usuarios')).toBe(false);
+    expect(getVisibleNavItems('VENDEDOR').some((item) => item.path === '/branding')).toBe(false);
+    expect(getVisibleNavItems('VENDEDOR').some((item) => item.path === '/etiquetas')).toBe(true);
   });
 
   it('muestra usuarios para administrador', () => {
@@ -22,5 +24,8 @@ describe('AppLayout navigation', () => {
     expect(paths).toContain('/cartera');
     expect(paths).toContain('/devoluciones');
     expect(paths).toContain('/reportes');
+    expect(paths).toContain('/etiquetas');
+    expect(paths).toContain('/branding');
+    expect(paths).toContain('/usuarios');
   });
 });

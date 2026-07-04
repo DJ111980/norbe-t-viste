@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
   { label: 'Devoluciones', path: '/devoluciones' },
   { label: 'Etiquetas', path: '/etiquetas' },
   { label: 'Reportes', path: '/reportes' },
+  { label: 'Branding', path: '/branding', adminOnly: true },
   { label: 'Usuarios', path: '/usuarios', adminOnly: true },
 ];
 

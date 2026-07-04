@@ -3,6 +3,7 @@ import { AuthProvider } from './auth/AuthProvider';
 import { useAuth } from './auth/auth-context';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
+import { BrandingPage } from './pages/BrandingPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { EntryLotsPage } from './pages/EntryLotsPage';
 import { InventoryPage } from './pages/InventoryPage';
@@ -14,7 +15,9 @@ import { ProductsPage } from './pages/ProductsPage';
 import { ProvidersPage } from './pages/ProvidersPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ReturnsPage } from './pages/ReturnsPage';
+import { LabelsPage } from './pages/LabelsPage';
 import { SalesPage } from './pages/SalesPage';
+import { UsersPage } from './pages/UsersPage';
 import { VariantsPage } from './pages/VariantsPage';
 import { useRoute } from './routing/useRoute';
 
@@ -32,6 +35,7 @@ const routeTitles: Record<string, string> = {
   '/devoluciones': 'Devoluciones',
   '/etiquetas': 'Etiquetas',
   '/reportes': 'Reportes',
+  '/branding': 'Branding',
   '/usuarios': 'Usuarios',
 };
 
@@ -139,8 +143,24 @@ function renderProtectedPage(
     return <ReportsPage onSessionExpired={onSessionExpired} />;
   }
 
+  if (path === '/etiquetas') {
+    return <LabelsPage onSessionExpired={onSessionExpired} />;
+  }
+
+  if (path === '/branding' && role !== 'ADMINISTRADOR') {
+    return <AccessDenied />;
+  }
+
+  if (path === '/branding') {
+    return <BrandingPage onSessionExpired={onSessionExpired} />;
+  }
+
   if (path === '/usuarios' && role !== 'ADMINISTRADOR') {
     return <AccessDenied />;
+  }
+
+  if (path === '/usuarios') {
+    return <UsersPage onSessionExpired={onSessionExpired} />;
   }
 
   return <PlaceholderPage title={routeTitles[path] ?? 'Modulo no encontrado'} />;
