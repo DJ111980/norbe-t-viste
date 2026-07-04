@@ -44,7 +44,7 @@ const emptyVariantForm: VariantFormValues = {
 };
 
 const compactActionButtonClassName =
-  'h-8 rounded-md border border-stone-300 px-2 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50';
+  'h-8 rounded-md border border-stone-300 bg-white px-2 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50';
 
 function currency(value: number): string {
   return new Intl.NumberFormat('es-CO', {

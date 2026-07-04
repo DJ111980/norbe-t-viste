@@ -47,11 +47,11 @@ export function AppLayout({
   const visibleItems = useMemo(() => getVisibleNavItems(user?.rol ?? 'VENDEDOR'), [user?.rol]);
 
   return (
-    <div className="app-shell min-h-screen bg-[#f8f3f0] text-stone-950">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-red-100 bg-[#fffaf7] lg:block">
-        <div className="border-b border-red-100 px-5 py-4">
+    <div className="app-shell min-h-screen bg-[#f7f7f8] text-stone-950">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-stone-200 bg-white lg:block">
+        <div className="border-b border-stone-200 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-red-100 bg-white shadow-sm">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-white shadow-sm">
               {logoUrl ? (
                 <img
                   src={logoUrl}
@@ -82,7 +82,7 @@ export function AppLayout({
               className={`w-full rounded-md px-3 py-1.5 text-left text-[13px] font-medium ${
                 currentPath === item.path
                   ? 'bg-red-700 text-white shadow-sm'
-                  : 'text-stone-700 hover:bg-red-50 hover:text-red-900'
+                  : 'text-stone-700 hover:bg-stone-100 hover:text-stone-950'
               }`}
             >
               {item.label}
@@ -92,7 +92,7 @@ export function AppLayout({
       </aside>
 
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-10 border-b border-red-100 bg-white/95 backdrop-blur">
+        <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 backdrop-blur">
           <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-6">
             <div className="flex items-center gap-3">
               <UserAvatar name={user?.nombreCompleto ?? user?.nombreUsuario} />
@@ -110,20 +110,22 @@ export function AppLayout({
             <button
               type="button"
               onClick={() => void logout().then(() => onNavigate('/login'))}
-              className="h-9 rounded-md border border-red-100 bg-red-50/40 px-3 text-[13px] font-medium text-red-800 hover:bg-red-50"
+              className="h-9 rounded-md border border-stone-300 bg-white px-3 text-[13px] font-medium text-stone-700 hover:bg-stone-50"
             >
               Cerrar sesion
             </button>
           </div>
 
-          <nav className="flex gap-2 overflow-x-auto border-t border-red-50 px-4 py-2 lg:hidden">
+          <nav className="flex gap-2 overflow-x-auto border-t border-stone-100 px-4 py-2 lg:hidden">
             {visibleItems.map((item) => (
               <button
                 key={item.path}
                 type="button"
                 onClick={() => onNavigate(item.path)}
                 className={`shrink-0 rounded-md px-3 py-1.5 text-[13px] font-medium ${
-                  currentPath === item.path ? 'bg-red-700 text-white' : 'bg-red-50 text-red-800'
+                  currentPath === item.path
+                    ? 'bg-red-700 text-white'
+                    : 'bg-stone-100 text-stone-700'
                 }`}
               >
                 {item.label}

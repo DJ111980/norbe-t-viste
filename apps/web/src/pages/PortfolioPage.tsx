@@ -427,8 +427,8 @@ export function PortfolioPage({
         title={isPortfolioView ? 'Cartera' : 'Créditos'}
         description={
           isPortfolioView
-            ? 'Resumen financiero de saldos pendientes y clientes con deuda.'
-            : 'Vista operativa de créditos individuales, abonos, ajustes y anulaciones permitidas.'
+            ? 'Consulta el dinero pendiente por cobrar agrupado por cliente.'
+            : 'Gestiona deudas individuales, abonos y ajustes.'
         }
         action={
           canManageOldDebts(role) &&
@@ -471,6 +471,13 @@ export function PortfolioPage({
       )}
 
       {isPortfolioView && portfolio && <PortfolioByClient credits={portfolio.creditos} />}
+
+      {isPortfolioView && (
+        <div className="rounded-md border border-stone-200 bg-white p-3 text-xs text-stone-600">
+          Cartera es una vista financiera agrupada. Para registrar abonos, ajustes o anular
+          movimientos, entra a Créditos.
+        </div>
+      )}
 
       {canManageOldDebts(role) && !isPortfolioView && isOldDebtOpen && (
         <Modal title="Nueva deuda antigua" onClose={() => setIsOldDebtOpen(false)}>
@@ -706,7 +713,7 @@ function PortfolioByClient({ credits }: { credits: PortfolioCredit[] }) {
       <div className="border-b border-stone-100 p-4">
         <h2 className="text-sm font-semibold text-stone-950">Clientes con deuda</h2>
         <p className="mt-1 text-xs text-stone-500">
-          Resumen construido desde los créditos devueltos por cartera.
+          Saldos agrupados por cliente para consulta financiera.
         </p>
       </div>
       <table className="w-full min-w-[760px] text-left text-sm">
@@ -731,7 +738,14 @@ function PortfolioByClient({ credits }: { credits: PortfolioCredit[] }) {
               <td className="px-4 py-3 text-stone-700">{row.creditos}</td>
               <td className="px-4 py-3 text-stone-700">{row.pendientes}</td>
               <td className="px-4 py-3 text-stone-700">{row.parciales}</td>
-              <td className="px-4 py-3 text-stone-700">Ir a Créditos</td>
+              <td className="px-4 py-3">
+                <a
+                  href="/creditos"
+                  className="inline-flex h-8 items-center rounded-md border border-stone-300 bg-white px-2 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                >
+                  Ver créditos
+                </a>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -742,9 +756,9 @@ function PortfolioByClient({ credits }: { credits: PortfolioCredit[] }) {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-stone-200 bg-white p-4">
+    <div className="rounded-md border border-stone-200 bg-white p-3">
       <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-stone-950">{value}</p>
+      <p className="mt-2 text-base font-semibold text-stone-950">{value}</p>
     </div>
   );
 }

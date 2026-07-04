@@ -27,7 +27,7 @@ export function PrintableHtmlModal({
     <Modal title={title} onClose={onClose} size="md">
       <div className="space-y-3">
         {summary && (
-          <div className="rounded-md border border-red-100 bg-red-50/40 p-3 text-xs text-stone-700">
+          <div className="rounded-md border border-stone-200 bg-stone-50 p-3 text-xs text-stone-700">
             <p className="font-semibold text-stone-950">Total etiquetas: {summary.total}</p>
             <div className="mt-2 max-h-24 space-y-1 overflow-y-auto pr-1">
               {summary.items.map((item, index) => (

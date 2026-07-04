@@ -16,13 +16,13 @@
 
 body {
   margin: 0;
-  background: #f8f3f0;
+  background: #f7f7f8;
   font-size: 14px;
 }
 
 .app-shell table thead {
-  background: #fff1f1;
-  color: #7f1d1d;
+  background: #f3f4f6;
+  color: #4b5563;
 }
 
 .app-shell table tbody tr {
@@ -32,14 +32,26 @@ body {
 }
 
 .app-shell table tbody tr:hover {
-  background: #fff7ed;
+  background: #f9fafb;
 }
 
 .app-shell table th,
 .app-shell table td {
-  padding: 0.55rem 0.75rem;
+  padding: 0.45rem 0.65rem;
+}
+
+.app-shell table {
+  font-size: 13px;
+}
+
+.app-shell table button {
+  min-height: 2rem;
+  height: 2rem;
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+  font-size: 12px;
 }
 
 .app-shell .soft-panel {
-  background: #fffdfb;
+  background: #ffffff;
 }

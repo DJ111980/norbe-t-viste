@@ -22,7 +22,7 @@ export function PageHeader({
 
 export function LoadingState() {
   return (
-    <div className="rounded-md border border-stone-200 bg-amber-50/40 p-4 text-sm text-stone-600">
+    <div className="rounded-md border border-stone-200 bg-white p-4 text-sm text-stone-600">
       Cargando informacion...
     </div>
   );
@@ -30,7 +30,7 @@ export function LoadingState() {
 
 export function EmptyState({ message }: { message: string }) {
   return (
-    <div className="rounded-md border border-stone-200 bg-amber-50/40 p-4 text-sm text-stone-600">
+    <div className="rounded-md border border-stone-200 bg-white p-4 text-sm text-stone-600">
       {message}
     </div>
   );
@@ -137,7 +137,7 @@ export const primaryButtonClassName =
   'h-9 rounded-md bg-red-700 px-3 text-[13px] font-semibold text-white shadow-sm hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-stone-400';
 
 export const secondaryButtonClassName =
-  'h-9 rounded-md border border-red-100 bg-red-50/40 px-3 text-[13px] font-medium text-red-800 hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-400';
+  'h-9 rounded-md border border-stone-300 bg-white px-3 text-[13px] font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-400';
 
 export function getInitials(name: string | null | undefined): string {
   const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
@@ -161,7 +161,7 @@ export function UserAvatar({
 
   return (
     <div
-      className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full bg-red-100 font-semibold text-red-800 ring-1 ring-red-200`}
+      className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone-100 font-semibold text-stone-700 ring-1 ring-stone-200`}
     >
       {imageUrl ? (
         <img src={imageUrl} alt={name ?? 'Usuario'} className="h-full w-full object-cover" />
