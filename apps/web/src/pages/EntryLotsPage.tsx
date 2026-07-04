@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { Modal } from '../components/Modal';
 import {
   EmptyState,
   ErrorMessage,
@@ -100,6 +101,7 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
   const [lotForm, setLotForm] = useState<EntryLotFormValues>(emptyLotForm);
   const [detailForm, setDetailForm] = useState<EntryLotDetailFormValues>(emptyDetailForm);
   const [editingDetail, setEditingDetail] = useState<EntryLotDetail | null>(null);
+  const [isLotFormOpen, setIsLotFormOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -183,6 +185,7 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
       setSelected(lot);
       setLotForm(fillLotForm(lot));
       setSuccess(selectedEditable ? 'Lote actualizado.' : 'Lote creado en borrador.');
+      if (!selectedEditable) setIsLotFormOpen(false);
       await loadData();
     } catch (saveError) {
       if (await expireIfNeeded(saveError)) return;
@@ -337,20 +340,36 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
       )}
 
       {canManage && (
-        <LotForm
-          form={lotForm}
-          providers={activeProviders}
-          selected={selected}
-          isSaving={isSaving}
-          editable={selectedEditable}
-          onChange={setLotForm}
-          onSubmit={(event) => void saveLot(event)}
-          onNew={() => {
+        <button
+          type="button"
+          onClick={() => {
             setSelected(null);
             setLotForm(emptyLotForm);
             setEditingDetail(null);
+            setIsLotFormOpen(true);
           }}
-        />
+          className={primaryButtonClassName}
+        >
+          Crear lote
+        </button>
+      )}
+
+      {isLotFormOpen && (
+        <Modal title="Crear lote" onClose={() => setIsLotFormOpen(false)} size="lg">
+          <LotForm
+            form={lotForm}
+            providers={activeProviders}
+            selected={null}
+            isSaving={isSaving}
+            editable
+            onChange={setLotForm}
+            onSubmit={(event) => void saveLot(event)}
+            onNew={() => {
+              setLotForm(emptyLotForm);
+              setEditingDetail(null);
+            }}
+          />
+        </Modal>
       )}
 
       {isLoading ? (
@@ -362,47 +381,77 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
       )}
 
       {selected && (
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <LotDetail
-            lot={selected}
-            canManage={canManage}
-            editable={selectedEditable}
-            canOpenLabels={canOpenLabels}
-            onOpenLabels={() => void openLabels()}
-            onEditDetail={(detail) => {
-              setEditingDetail(detail);
-              setDetailForm(fillDetailForm(detail));
-            }}
-            onDeleteDetail={(detail) => void removeDetail(detail)}
-          />
+        <Modal
+          title={`Lote ${selected.numeroLote}`}
+          onClose={() => {
+            setSelected(null);
+            setLotForm(emptyLotForm);
+            setEditingDetail(null);
+            setCancelReason('');
+          }}
+          size="xl"
+        >
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <LotDetail
+              lot={selected}
+              canManage={canManage}
+              editable={selectedEditable}
+              canOpenLabels={canOpenLabels}
+              onOpenLabels={() => void openLabels()}
+              onEditDetail={(detail) => {
+                setEditingDetail(detail);
+                setDetailForm(fillDetailForm(detail));
+              }}
+              onDeleteDetail={(detail) => void removeDetail(detail)}
+            />
 
-          <div className="space-y-4">
-            {selectedEditable && (
-              <DetailForm
-                form={detailForm}
-                variants={variants}
-                editing={editingDetail}
-                isSaving={isSaving}
-                onChange={setDetailForm}
-                onCancel={() => {
-                  setEditingDetail(null);
-                  setDetailForm(emptyDetailForm);
-                }}
-                onSubmit={(event) => void saveDetail(event)}
-              />
-            )}
+            <div className="space-y-4">
+              {canManage && (
+                <LotForm
+                  form={lotForm}
+                  providers={activeProviders}
+                  selected={selected}
+                  isSaving={isSaving}
+                  editable={selectedEditable}
+                  onChange={setLotForm}
+                  onSubmit={(event) => void saveLot(event)}
+                  onNew={() => {
+                    setSelected(null);
+                    setLotForm(emptyLotForm);
+                    setEditingDetail(null);
+                    setCancelReason('');
+                    setIsLotFormOpen(true);
+                  }}
+                />
+              )}
 
-            {canManage && selected.estadoLote !== 'ANULADO' && (
-              <LotActions
-                lot={selected}
-                cancelReason={cancelReason}
-                onCancelReason={setCancelReason}
-                onConfirm={() => void confirmSelectedLot()}
-                onCancelLot={() => void cancelSelectedLot()}
-              />
-            )}
-          </div>
-        </section>
+              {selectedEditable && (
+                <DetailForm
+                  form={detailForm}
+                  variants={variants}
+                  editing={editingDetail}
+                  isSaving={isSaving}
+                  onChange={setDetailForm}
+                  onCancel={() => {
+                    setEditingDetail(null);
+                    setDetailForm(emptyDetailForm);
+                  }}
+                  onSubmit={(event) => void saveDetail(event)}
+                />
+              )}
+
+              {canManage && selected.estadoLote !== 'ANULADO' && (
+                <LotActions
+                  lot={selected}
+                  cancelReason={cancelReason}
+                  onCancelReason={setCancelReason}
+                  onConfirm={() => void confirmSelectedLot()}
+                  onCancelLot={() => void cancelSelectedLot()}
+                />
+              )}
+            </div>
+          </section>
+        </Modal>
       )}
     </section>
   );
@@ -436,9 +485,11 @@ function LotForm({
         <h2 className="text-sm font-semibold text-stone-950">
           {creating ? 'Crear lote' : editable ? 'Editar lote borrador' : 'Lote solo lectura'}
         </h2>
-        <button type="button" onClick={onNew} className={secondaryButtonClassName}>
-          Nuevo lote
-        </button>
+        {!creating && (
+          <button type="button" onClick={onNew} className={secondaryButtonClassName}>
+            Nuevo lote
+          </button>
+        )}
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Field label="Proveedor">
@@ -587,57 +638,59 @@ function LotDetail({
           <EmptyState message="Este lote no tiene detalles." />
         </div>
       ) : (
-        <table className="w-full min-w-[900px] text-left text-sm">
-          <thead className="bg-stone-50 text-xs uppercase text-stone-500">
-            <tr>
-              <th className="px-4 py-3">Variante</th>
-              <th className="px-4 py-3">Cantidad</th>
-              <th className="px-4 py-3">Costo</th>
-              <th className="px-4 py-3">Etiquetas</th>
-              <th className="px-4 py-3">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stone-100">
-            {lot.detalles.map((detail) => (
-              <tr key={detail.idDetalleLote}>
-                <td className="px-4 py-3">
-                  <p className="font-medium text-stone-950">{detail.producto.nombreProducto}</p>
-                  <p className="text-xs text-stone-500">
-                    {detail.variante.sku} / Talla {detail.variante.talla ?? 'Unica'} / Color{' '}
-                    {detail.variante.color ?? 'Sin color'}
-                  </p>
-                </td>
-                <td className="px-4 py-3 text-stone-700">{detail.cantidad}</td>
-                <td className="px-4 py-3 text-stone-700">
-                  {detail.costoUnitario !== undefined ? currency(detail.costoUnitario) : 'Oculto'}
-                </td>
-                <td className="px-4 py-3 text-stone-700">{detail.cantidadEtiquetasQr}</td>
-                <td className="px-4 py-3">
-                  {canManage && editable ? (
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onEditDetail(detail)}
-                        className={secondaryButtonClassName}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteDetail(detail)}
-                        className={secondaryButtonClassName}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-stone-500">Solo lectura</span>
-                  )}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-left text-sm">
+            <thead className="bg-stone-50 text-xs uppercase text-stone-500">
+              <tr>
+                <th className="px-4 py-3">Variante</th>
+                <th className="px-4 py-3">Cantidad</th>
+                <th className="px-4 py-3">Costo</th>
+                <th className="px-4 py-3">Etiquetas</th>
+                <th className="px-4 py-3">Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {lot.detalles.map((detail) => (
+                <tr key={detail.idDetalleLote}>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-stone-950">{detail.producto.nombreProducto}</p>
+                    <p className="text-xs text-stone-500">
+                      {detail.variante.sku} / Talla {detail.variante.talla ?? 'Unica'} / Color{' '}
+                      {detail.variante.color ?? 'Sin color'}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3 text-stone-700">{detail.cantidad}</td>
+                  <td className="px-4 py-3 text-stone-700">
+                    {detail.costoUnitario !== undefined ? currency(detail.costoUnitario) : 'Oculto'}
+                  </td>
+                  <td className="px-4 py-3 text-stone-700">{detail.cantidadEtiquetasQr}</td>
+                  <td className="px-4 py-3">
+                    {canManage && editable ? (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onEditDetail(detail)}
+                          className={secondaryButtonClassName}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteDetail(detail)}
+                          className={secondaryButtonClassName}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-stone-500">Solo lectura</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { EntityImageThumb } from '../components/EntityImageThumb';
 import { Modal } from '../components/Modal';
 import {
   EmptyState,
@@ -381,7 +382,7 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
       {success && <SuccessMessage message={success} />}
 
       {isFormOpen && (
-        <Modal title="Crear venta" onClose={() => setIsFormOpen(false)}>
+        <Modal title="Crear venta" onClose={() => setIsFormOpen(false)} size="xl">
           <SaleForm
             form={form}
             line={line}
@@ -413,7 +414,7 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
       )}
 
       {selected && (
-        <Modal title={`Venta ${selected.numeroVenta}`} onClose={() => setSelected(null)}>
+        <Modal title={`Venta ${selected.numeroVenta}`} onClose={() => setSelected(null)} size="xl">
           <SaleDetailPanel
             sale={selected}
             payments={payments}
@@ -594,21 +595,26 @@ function SaleForm({
           </button>
         </div>
         {selectedVariant && (
-          <div className="mt-3 rounded-md bg-stone-100 p-3 text-sm text-stone-700">
-            <p className="font-medium">{selectedVariant.producto.nombreProducto}</p>
-            <p className="mt-1 text-xs">
-              SKU {selectedVariant.sku} / QR {selectedVariant.codigoQr} / Talla{' '}
-              {selectedVariant.talla ?? 'Única'} / Color {selectedVariant.color ?? 'Sin color'}
-            </p>
-            <p className="mt-2 text-xs font-semibold">
-              Stock disponible: {selectedVariant.stockActual}
-            </p>
+          <div className="mt-3 flex items-center gap-3 rounded-md bg-stone-100 p-3 text-sm text-stone-700">
+            <EntityImageThumb owner="variante" id={selectedVariant.idVariante} />
+            <div className="min-w-0">
+              <p className="font-medium text-stone-950">
+                {selectedVariant.producto.nombreProducto}
+              </p>
+              <p className="mt-1 text-xs">
+                SKU {selectedVariant.sku} / QR {selectedVariant.codigoQr} / Talla{' '}
+                {selectedVariant.talla ?? 'Única'} / Color {selectedVariant.color ?? 'Sin color'}
+              </p>
+              <p className="mt-2 text-xs font-semibold">
+                Stock disponible: {selectedVariant.stockActual}
+              </p>
+            </div>
           </div>
         )}
         {form.detalles.length === 0 ? (
           <EmptyState message="Agrega al menos un detalle para guardar la venta." />
         ) : (
-          <div className="mt-4 overflow-hidden rounded-md border border-stone-200">
+          <div className="mt-4 overflow-x-auto rounded-md border border-stone-200">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="bg-stone-50 text-xs uppercase text-stone-500">
                 <tr>
@@ -627,7 +633,14 @@ function SaleForm({
                   return (
                     <tr key={item.id_variante}>
                       <td className="px-4 py-3 text-stone-700">
-                        {variant ? variantLabel(variant) : item.id_variante}
+                        {variant ? (
+                          <div className="flex items-center gap-3">
+                            <EntityImageThumb owner="variante" id={variant.idVariante} />
+                            <span>{variantLabel(variant)}</span>
+                          </div>
+                        ) : (
+                          item.id_variante
+                        )}
                       </td>
                       <td className="px-4 py-3">{item.cantidad}</td>
                       <td className="px-4 py-3">{currency(item.precio_unitario)}</td>
@@ -811,7 +824,7 @@ function SaleDetailPanel({
 }) {
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
+      <div className="overflow-x-auto rounded-md border border-stone-200 bg-white">
         <div className="border-b border-stone-100 p-4">
           <h2 className="text-sm font-semibold text-stone-950">{sale.numeroVenta}</h2>
           <p className="mt-1 text-xs text-stone-500">
@@ -834,11 +847,16 @@ function SaleDetailPanel({
             {sale.detalles.map((line) => (
               <tr key={line.idDetalle}>
                 <td className="px-4 py-3">
-                  <p className="font-medium text-stone-950">{line.nombreProducto}</p>
-                  <p className="text-xs text-stone-500">
-                    {line.sku} / {line.codigoQr} / Talla {line.talla ?? 'Unica'} / Color{' '}
-                    {line.color ?? 'Sin color'}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <EntityImageThumb owner="variante" id={line.idVariante} />
+                    <div className="min-w-0">
+                      <p className="font-medium text-stone-950">{line.nombreProducto}</p>
+                      <p className="text-xs text-stone-500">
+                        {line.sku} / {line.codigoQr} / Talla {line.talla ?? 'Unica'} / Color{' '}
+                        {line.color ?? 'Sin color'}
+                      </p>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-stone-700">{line.cantidad}</td>
                 <td className="px-4 py-3 text-stone-700">{currency(line.precioUnitario)}</td>

@@ -1,5 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { EntityImageThumb } from '../components/EntityImageThumb';
+import { FileImagePreview } from '../components/FileImagePreview';
 import { ImageManager } from '../components/ImageManager';
 import { Modal } from '../components/Modal';
 import {
@@ -265,6 +267,7 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
         <Modal
           title={`Imagen de ${imageTarget.nombreProducto}`}
           onClose={() => setImageTarget(null)}
+          size="md"
         >
           <ImageManager
             owner="producto"
@@ -295,10 +298,19 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
               {products.map((product) => (
                 <tr key={product.idProducto}>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-stone-950">{product.nombreProducto}</p>
-                    <p className="text-xs text-stone-500">
-                      {product.referencia ?? 'Sin referencia'}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <EntityImageThumb
+                        owner="producto"
+                        id={product.idProducto}
+                        alt={product.nombreProducto}
+                      />
+                      <div>
+                        <p className="font-medium text-stone-950">{product.nombreProducto}</p>
+                        <p className="text-xs text-stone-500">
+                          {product.referencia ?? 'Sin referencia'}
+                        </p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-stone-600">
                     {product.categoria.nombreCategoria ?? 'Sin categoria'}
@@ -441,6 +453,7 @@ function ProductForm({
               ? `Lista para subir: ${pendingImageFile.name}`
               : 'Opcional. Se sube al backend despues de guardar.'}
           </p>
+          <FileImagePreview file={pendingImageFile} />
         </Field>
         <label className="flex items-center gap-3 self-end text-sm text-stone-700">
           <input

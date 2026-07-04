@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { EntityImageThumb } from '../components/EntityImageThumb';
+import { Modal } from '../components/Modal';
 import {
   EmptyState,
   ErrorMessage,
@@ -79,6 +81,9 @@ export function InventoryPage({ onSessionExpired }: { onSessionExpired: () => vo
   const [initialForm, setInitialForm] = useState<InitialInventoryFormValues>(emptyInitialForm);
   const [adjustmentForm, setAdjustmentForm] =
     useState<InventoryAdjustmentFormValues>(emptyAdjustmentForm);
+  const [activeInventoryForm, setActiveInventoryForm] = useState<'initial' | 'adjustment' | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isMovementsLoading, setIsMovementsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -108,7 +113,6 @@ export function InventoryPage({ onSessionExpired }: { onSessionExpired: () => vo
       const data = await listInventoryVariants(token, nextFilters);
       setVariants(data);
       const first = data[0];
-      if (!selected && first) setSelected(first);
       if (!initialForm.id_variante && first) {
         setInitialForm((current) => ({ ...current, id_variante: first.idVariante }));
         setAdjustmentForm((current) => ({ ...current, id_variante: first.idVariante }));
@@ -174,6 +178,7 @@ export function InventoryPage({ onSessionExpired }: { onSessionExpired: () => vo
       setInitialForm({ ...emptyInitialForm, id_variante: initialForm.id_variante });
       await loadInventory();
       await loadMovements();
+      setActiveInventoryForm(null);
     } catch (saveError) {
       if (await expireIfNeeded(saveError)) return;
       setFormError(handleMessage(saveError, 'No se pudo registrar inventario inicial.'));
@@ -195,6 +200,7 @@ export function InventoryPage({ onSessionExpired }: { onSessionExpired: () => vo
       setAdjustmentForm({ ...emptyAdjustmentForm, id_variante: adjustmentForm.id_variante });
       await loadInventory();
       await loadMovements();
+      setActiveInventoryForm(null);
     } catch (saveError) {
       if (await expireIfNeeded(saveError)) return;
       setFormError(handleMessage(saveError, 'No se pudo registrar ajuste.'));
@@ -246,7 +252,26 @@ export function InventoryPage({ onSessionExpired }: { onSessionExpired: () => vo
       {success && <SuccessMessage message={success} />}
 
       {canManage && (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveInventoryForm('initial')}
+            className={secondaryButtonClassName}
+          >
+            Inventario inicial
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveInventoryForm('adjustment')}
+            className={secondaryButtonClassName}
+          >
+            Ajuste de inventario
+          </button>
+        </div>
+      )}
+
+      {activeInventoryForm === 'initial' && (
+        <Modal title="Inventario inicial" onClose={() => setActiveInventoryForm(null)} size="md">
           <InventoryInitialForm
             form={initialForm}
             variants={selectableVariants}
@@ -254,6 +279,11 @@ export function InventoryPage({ onSessionExpired }: { onSessionExpired: () => vo
             onChange={setInitialForm}
             onSubmit={(event) => void submitInitialInventory(event)}
           />
+        </Modal>
+      )}
+
+      {activeInventoryForm === 'adjustment' && (
+        <Modal title="Ajuste de inventario" onClose={() => setActiveInventoryForm(null)} size="md">
           <InventoryAdjustmentForm
             form={adjustmentForm}
             variants={selectableVariants}
@@ -261,7 +291,7 @@ export function InventoryPage({ onSessionExpired }: { onSessionExpired: () => vo
             onChange={setAdjustmentForm}
             onSubmit={(event) => void submitAdjustment(event)}
           />
-        </div>
+        </Modal>
       )}
 
       {!canManage && (
@@ -279,11 +309,13 @@ export function InventoryPage({ onSessionExpired }: { onSessionExpired: () => vo
       )}
 
       {selected && (
-        <InventoryDetail
-          variant={selected}
-          movements={variantMovements}
-          showMovements={canManage}
-        />
+        <Modal title={`Inventario ${selected.sku}`} onClose={() => setSelected(null)} size="xl">
+          <InventoryDetail
+            variant={selected}
+            movements={variantMovements}
+            showMovements={canManage}
+          />
+        </Modal>
       )}
 
       {canManage && (
@@ -335,7 +367,7 @@ function InventoryTable({
   onSelect: (variant: InventoryVariant) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
+    <div className="overflow-x-auto rounded-md border border-stone-200 bg-white">
       <table className="w-full min-w-[980px] text-left text-sm">
         <thead className="bg-stone-50 text-xs uppercase text-stone-500">
           <tr>
@@ -350,11 +382,16 @@ function InventoryTable({
           {variants.map((variant) => (
             <tr key={variant.idVariante}>
               <td className="px-4 py-3">
-                <p className="font-medium text-stone-950">{variant.producto.nombreProducto}</p>
-                <p className="text-xs text-stone-500">
-                  Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} / SKU{' '}
-                  {variant.sku}
-                </p>
+                <div className="flex items-center gap-3">
+                  <EntityImageThumb owner="variante" id={variant.idVariante} />
+                  <div className="min-w-0">
+                    <p className="font-medium text-stone-950">{variant.producto.nombreProducto}</p>
+                    <p className="text-xs text-stone-500">
+                      Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} / SKU{' '}
+                      {variant.sku}
+                    </p>
+                  </div>
+                </div>
               </td>
               <td className="px-4 py-3 font-mono text-xs text-stone-700">{variant.codigoQr}</td>
               <td className="px-4 py-3 text-stone-700">
@@ -398,6 +435,9 @@ function InventoryDetail({
     <section className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
       <div className="rounded-md border border-stone-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-stone-950">Detalle de variante</h2>
+        <div className="mt-4">
+          <EntityImageThumb owner="variante" id={variant.idVariante} />
+        </div>
         <dl className="mt-4 space-y-3 text-sm">
           <Info label="Producto" value={variant.producto.nombreProducto} />
           <Info label="SKU" value={variant.sku} />
@@ -429,7 +469,7 @@ function MovementList({
   if (movements.length === 0) return <EmptyState message={emptyMessage} />;
 
   return (
-    <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
+    <div className="overflow-x-auto rounded-md border border-stone-200 bg-white">
       <table className="w-full min-w-[820px] text-left text-sm">
         <thead className="bg-stone-50 text-xs uppercase text-stone-500">
           <tr>

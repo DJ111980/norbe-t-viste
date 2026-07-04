@@ -8,6 +8,7 @@ import {
   type ImageOwner,
   uploadImage,
 } from '../services/images';
+import { FileImagePreview } from './FileImagePreview';
 import { secondaryButtonClassName } from './ui';
 
 export function ImageManager({
@@ -23,6 +24,7 @@ export function ImageManager({
 }) {
   const { token, logout } = useAuth();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -75,6 +77,7 @@ export function ImageManager({
     if (!token || !file) return;
 
     setError(null);
+    setPendingFile(file);
     setIsLoading(true);
 
     try {
@@ -82,6 +85,7 @@ export function ImageManager({
       const nextUrl = await getImageObjectUrl(token, owner, id);
       if (imageUrl) URL.revokeObjectURL(imageUrl);
       setImageUrl(nextUrl);
+      setPendingFile(null);
     } catch (uploadError) {
       if (isUnauthorizedError(uploadError)) {
         await logout();
@@ -149,6 +153,7 @@ export function ImageManager({
           </p>
           {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
           {isLoading && <p className="mt-2 text-xs text-stone-500">Procesando imagen...</p>}
+          <FileImagePreview file={pendingFile} />
           {canManage && (
             <div className="mt-3 flex flex-wrap gap-2">
               <label className={secondaryButtonClassName}>

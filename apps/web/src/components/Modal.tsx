@@ -1,13 +1,24 @@
 import { useEffect, type ReactNode } from 'react';
 
+type ModalSize = 'md' | 'lg' | 'xl' | 'fullscreen';
+
+const sizeClassNames: Record<ModalSize, string> = {
+  md: 'max-w-2xl',
+  lg: 'max-w-5xl',
+  xl: 'max-w-[95vw]',
+  fullscreen: 'max-w-[98vw]',
+};
+
 export function Modal({
   title,
   children,
   onClose,
+  size = 'lg',
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  size?: ModalSize;
 }) {
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -31,7 +42,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-md bg-white shadow-xl"
+        className={`flex max-h-[90vh] w-full ${sizeClassNames[size]} flex-col rounded-md bg-white shadow-xl`}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3">
           <h2 className="text-base font-semibold text-stone-950">{title}</h2>
@@ -44,7 +55,7 @@ export function Modal({
             x
           </button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
       </section>
     </div>
   );

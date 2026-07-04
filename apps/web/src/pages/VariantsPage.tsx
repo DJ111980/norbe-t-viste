@@ -1,5 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { EntityImageThumb } from '../components/EntityImageThumb';
+import { FileImagePreview } from '../components/FileImagePreview';
 import { ImageManager } from '../components/ImageManager';
 import { Modal } from '../components/Modal';
 import {
@@ -321,6 +323,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
         <Modal
           title={`Imagen de ${imageTarget.producto.nombreProducto ?? imageTarget.sku}`}
           onClose={() => setImageTarget(null)}
+          size="md"
         >
           <ImageManager
             owner="variante"
@@ -352,13 +355,22 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
               {variants.map((variant) => (
                 <tr key={variant.idVariante}>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-stone-950">
-                      {variant.producto.nombreProducto ?? 'Producto sin nombre'}
-                    </p>
-                    <p className="text-xs text-stone-500">
-                      Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} / SKU{' '}
-                      {variant.sku}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <EntityImageThumb
+                        owner="variante"
+                        id={variant.idVariante}
+                        alt={variant.producto.nombreProducto ?? variant.sku}
+                      />
+                      <div>
+                        <p className="font-medium text-stone-950">
+                          {variant.producto.nombreProducto ?? 'Producto sin nombre'}
+                        </p>
+                        <p className="text-xs text-stone-500">
+                          Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} /
+                          SKU {variant.sku}
+                        </p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-stone-700">{variant.codigoQr}</td>
                   <td className="px-4 py-3 text-stone-600">{currency(variant.precioVenta)}</td>
@@ -535,6 +547,7 @@ function VariantForm({
               ? `Lista para subir: ${pendingImageFile.name}`
               : 'Opcional. Se sube al backend despues de guardar.'}
           </p>
+          <FileImagePreview file={pendingImageFile} />
         </Field>
       </div>
 

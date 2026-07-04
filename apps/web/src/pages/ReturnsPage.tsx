@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { EntityImageThumb } from '../components/EntityImageThumb';
+import { Modal } from '../components/Modal';
 import {
   EmptyState,
   ErrorMessage,
@@ -256,44 +258,50 @@ export function ReturnsPage({ onSessionExpired }: { onSessionExpired: () => void
       />
 
       {selectedSale && (
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="space-y-4">
-            <ReturnSaleDetail sale={selectedSale} returns={returns} />
-            <ReturnHistoryList sale={selectedSale} returns={returns} />
-          </div>
-
-          <div className="space-y-4">
-            <div className="rounded-md border border-stone-200 bg-white p-4 text-sm text-stone-700">
-              {impactMessageForSaleType(selectedSale.tipoVenta)}
+        <Modal
+          title={`Devoluciones ${selectedSale.numeroVenta}`}
+          onClose={() => setSelectedSale(null)}
+          size="xl"
+        >
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="space-y-4">
+              <ReturnSaleDetail sale={selectedSale} returns={returns} />
+              <ReturnHistoryList sale={selectedSale} returns={returns} />
             </div>
 
-            {selectedSale.estadoVenta === 'ANULADA' && (
-              <ErrorMessage message="Esta venta esta anulada. No se permite registrar devoluciones desde la UI." />
-            )}
-
-            {canShowReturnForm(role, selectedSale) ? (
-              <ReturnForm
-                sale={selectedSale}
-                returns={returns}
-                form={form}
-                item={item}
-                selectableLines={selectableLines}
-                isSaving={isSaving}
-                onFormChange={setForm}
-                onItemChange={setItem}
-                onAddItem={addReturnItem}
-                onRemoveItem={removeReturnItem}
-                onSubmit={(event) => void saveReturn(event)}
-              />
-            ) : (
-              <div className="rounded-md border border-stone-200 bg-white p-4 text-sm text-stone-600">
-                {role === 'VENDEDOR'
-                  ? 'Tu usuario puede consultar devoluciones, pero no registrar nuevas.'
-                  : 'No hay acciones disponibles para esta venta.'}
+            <div className="space-y-4">
+              <div className="rounded-md border border-stone-200 bg-white p-4 text-sm text-stone-700">
+                {impactMessageForSaleType(selectedSale.tipoVenta)}
               </div>
-            )}
-          </div>
-        </section>
+
+              {selectedSale.estadoVenta === 'ANULADA' && (
+                <ErrorMessage message="Esta venta esta anulada. No se permite registrar devoluciones desde la UI." />
+              )}
+
+              {canShowReturnForm(role, selectedSale) ? (
+                <ReturnForm
+                  sale={selectedSale}
+                  returns={returns}
+                  form={form}
+                  item={item}
+                  selectableLines={selectableLines}
+                  isSaving={isSaving}
+                  onFormChange={setForm}
+                  onItemChange={setItem}
+                  onAddItem={addReturnItem}
+                  onRemoveItem={removeReturnItem}
+                  onSubmit={(event) => void saveReturn(event)}
+                />
+              ) : (
+                <div className="rounded-md border border-stone-200 bg-white p-4 text-sm text-stone-600">
+                  {role === 'VENDEDOR'
+                    ? 'Tu usuario puede consultar devoluciones, pero no registrar nuevas.'
+                    : 'No hay acciones disponibles para esta venta.'}
+                </div>
+              )}
+            </div>
+          </section>
+        </Modal>
       )}
     </section>
   );
@@ -425,7 +433,7 @@ function SaleSelector({
 
 function ReturnSaleDetail({ sale, returns }: { sale: SaleDetail; returns: SaleReturn[] }) {
   return (
-    <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
+    <div className="overflow-x-auto rounded-md border border-stone-200 bg-white">
       <div className="border-b border-stone-100 p-4">
         <h2 className="text-sm font-semibold text-stone-950">{sale.numeroVenta}</h2>
         <p className="mt-1 text-xs text-stone-500">
@@ -448,11 +456,16 @@ function ReturnSaleDetail({ sale, returns }: { sale: SaleDetail; returns: SaleRe
           {sale.detalles.map((line) => (
             <tr key={line.idDetalle}>
               <td className="px-4 py-3">
-                <p className="font-medium text-stone-950">{line.nombreProducto}</p>
-                <p className="text-xs text-stone-500">
-                  {line.codigoQr} / {line.sku} / Talla {line.talla ?? 'Unica'} / Color{' '}
-                  {line.color ?? 'Sin color'}
-                </p>
+                <div className="flex items-center gap-3">
+                  <EntityImageThumb owner="variante" id={line.idVariante} />
+                  <div className="min-w-0">
+                    <p className="font-medium text-stone-950">{line.nombreProducto}</p>
+                    <p className="text-xs text-stone-500">
+                      {line.codigoQr} / {line.sku} / Talla {line.talla ?? 'Unica'} / Color{' '}
+                      {line.color ?? 'Sin color'}
+                    </p>
+                  </div>
+                </div>
               </td>
               <td className="px-4 py-3 text-stone-700">{line.cantidad}</td>
               <td className="px-4 py-3 text-stone-700">
