@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { Modal } from '../components/Modal';
 import {
   EmptyState,
   ErrorMessage,
@@ -66,6 +67,7 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   async function expireIfNeeded(actionError: unknown): Promise<boolean> {
     if (!isUnauthorizedError(actionError)) return false;
@@ -112,6 +114,7 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
       const user = await createUser(token, form);
       setSuccess(`Usuario ${user.nombreUsuario} creado.`);
       setForm(emptyUserForm);
+      setIsCreateOpen(false);
       await loadUsers();
     } catch (saveError) {
       if (await expireIfNeeded(saveError)) return;
@@ -182,6 +185,15 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
     <section className="space-y-6">
       <PageHeader
         title="Usuarios"
+        action={
+          <button
+            type="button"
+            className={primaryButtonClassName}
+            onClick={() => setIsCreateOpen(true)}
+          >
+            Crear usuario
+          </button>
+        }
         description="Administra usuarios, roles, estado y cambio de contraseña."
       />
 
@@ -189,7 +201,11 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
       {formError && <ErrorMessage message={formError} />}
       {success && <SuccessMessage message={success} />}
 
-      <UserForm form={form} isSaving={isSaving} onChange={setForm} onSubmit={saveUser} />
+      {isCreateOpen && (
+        <Modal title="Crear usuario" onClose={() => setIsCreateOpen(false)}>
+          <UserForm form={form} isSaving={isSaving} onChange={setForm} onSubmit={saveUser} />
+        </Modal>
+      )}
 
       {isLoading ? (
         <LoadingState />
@@ -205,21 +221,23 @@ export function UsersPage({ onSessionExpired }: { onSessionExpired: () => void }
       )}
 
       {selected && editForm && (
-        <section className="grid gap-4 lg:grid-cols-2">
-          <EditUserForm
-            user={selected}
-            form={editForm}
-            isSaving={isSaving}
-            onChange={setEditForm}
-            onSubmit={saveSelectedUser}
-          />
-          <PasswordForm
-            form={passwordForm}
-            isSaving={isSaving}
-            onChange={setPasswordForm}
-            onSubmit={changePassword}
-          />
-        </section>
+        <Modal title={`Editar ${selected.nombreUsuario}`} onClose={() => setSelected(null)}>
+          <section className="grid gap-4 lg:grid-cols-2">
+            <EditUserForm
+              user={selected}
+              form={editForm}
+              isSaving={isSaving}
+              onChange={setEditForm}
+              onSubmit={saveSelectedUser}
+            />
+            <PasswordForm
+              form={passwordForm}
+              isSaving={isSaving}
+              onChange={setPasswordForm}
+              onSubmit={changePassword}
+            />
+          </section>
+        </Modal>
       )}
     </section>
   );
@@ -253,7 +271,7 @@ function UserForm({
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
       <h2 className="text-sm font-semibold text-stone-950">Crear usuario</h2>
       <div className="mt-4 grid gap-4 lg:grid-cols-5">
-        <Field label="Nombre completo">
+        <Field label="Nombre completo" required>
           <input
             required
             value={form.nombre_completo}
@@ -261,7 +279,7 @@ function UserForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Usuario">
+        <Field label="Usuario" required>
           <input
             required
             value={form.nombre_usuario}
@@ -269,7 +287,7 @@ function UserForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Correo">
+        <Field label="Correo" required>
           <input
             required
             type="email"
@@ -278,10 +296,10 @@ function UserForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Rol">
+        <Field label="Rol" required>
           <RoleSelect value={form.rol} onChange={(rol) => onChange({ ...form, rol })} />
         </Field>
-        <Field label="Contraseña">
+        <Field label="Contraseña" required>
           <input
             required
             type="password"
@@ -386,7 +404,7 @@ function EditUserForm({
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
       <h2 className="text-sm font-semibold text-stone-950">Editar {user.nombreUsuario}</h2>
       <div className="mt-4 space-y-3">
-        <Field label="Nombre completo">
+        <Field label="Nombre completo" required>
           <input
             required
             value={form.nombre_completo}
@@ -394,7 +412,7 @@ function EditUserForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Usuario">
+        <Field label="Usuario" required>
           <input
             required
             value={form.nombre_usuario}
@@ -402,7 +420,7 @@ function EditUserForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Correo">
+        <Field label="Correo" required>
           <input
             required
             type="email"
@@ -411,7 +429,7 @@ function EditUserForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Rol">
+        <Field label="Rol" required>
           <RoleSelect value={form.rol} onChange={(rol) => onChange({ ...form, rol })} />
         </Field>
       </div>
@@ -436,7 +454,7 @@ function PasswordForm({
   return (
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
       <h2 className="text-sm font-semibold text-stone-950">Cambiar contraseña</h2>
-      <Field label="Nueva contraseña">
+      <Field label="Nueva contraseña" required>
         <input
           required
           type="password"

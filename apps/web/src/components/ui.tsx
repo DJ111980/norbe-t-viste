@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type FocusEvent, type ReactNode } from 'react';
 
 export function PageHeader({
   title,
@@ -37,16 +37,38 @@ export function EmptyState({ message }: { message: string }) {
 }
 
 export function ErrorMessage({ message }: { message: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    ref.current?.focus({ preventScroll: true });
+  }, [message]);
+
   return (
-    <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    <div
+      ref={ref}
+      tabIndex={-1}
+      className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 outline-none"
+    >
       {message}
     </div>
   );
 }
 
 export function SuccessMessage({ message }: { message: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    ref.current?.focus({ preventScroll: true });
+  }, [message]);
+
   return (
-    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+    <div
+      ref={ref}
+      tabIndex={-1}
+      className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 outline-none"
+    >
       {message}
     </div>
   );
@@ -66,14 +88,29 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({
+  label,
+  required = false,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: ReactNode;
+}) {
   return (
     <label className="block">
-      <span className="text-sm font-medium text-stone-700">{label}</span>
+      <span className="text-sm font-medium text-stone-700">
+        {label}
+        {required && <span className="ml-1 text-red-700">*</span>}
+      </span>
       <div className="mt-1">{children}</div>
     </label>
   );
 }
+
+export const numberInputFocusProps = {
+  onFocus: (event: FocusEvent<HTMLInputElement>) => event.currentTarget.select(),
+};
 
 export const inputClassName =
   'h-10 w-full rounded-md border border-stone-300 px-3 text-sm outline-none focus:border-red-700 focus:ring-2 focus:ring-red-100';

@@ -1,11 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { Modal } from '../components/Modal';
 import {
   EmptyState,
   ErrorMessage,
   Field,
   inputClassName,
   LoadingState,
+  numberInputFocusProps,
   PageHeader,
   primaryButtonClassName,
   secondaryButtonClassName,
@@ -171,6 +173,7 @@ export function PortfolioPage({
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isOldDebtOpen, setIsOldDebtOpen] = useState(false);
   const activeClients = useMemo(
     () => clients.filter((client) => client.estado === 'ACTIVO'),
     [clients],
@@ -293,8 +296,12 @@ export function PortfolioPage({
     setFormError(null);
     setSuccess(null);
 
-    if (!oldDebtForm.id_cliente || !isPositiveAmount(oldDebtForm.monto_inicial)) {
-      setFormError('Selecciona cliente y monto mayor que 0.');
+    if (
+      !oldDebtForm.id_cliente ||
+      !isPositiveAmount(oldDebtForm.monto_inicial) ||
+      !oldDebtForm.descripcion.trim()
+    ) {
+      setFormError('Selecciona cliente, monto mayor que 0 y descripcion.');
       setIsSaving(false);
       return;
     }
@@ -303,6 +310,7 @@ export function PortfolioPage({
       const result = await createOldDebt(token, oldDebtForm);
       setSuccess(`Deuda antigua creada por ${currency(result.saldo_pendiente)}.`);
       setOldDebtForm(emptyOldDebtForm);
+      setIsOldDebtOpen(false);
       await refreshCurrentScope();
       await loadCredit(result.id_credito);
     } catch (saveError) {
@@ -422,6 +430,18 @@ export function PortfolioPage({
             ? 'Resumen financiero de saldos pendientes y clientes con deuda.'
             : 'Vista operativa de créditos individuales, abonos, ajustes y anulaciones permitidas.'
         }
+        action={
+          canManageOldDebts(role) &&
+          !isPortfolioView && (
+            <button
+              type="button"
+              className={primaryButtonClassName}
+              onClick={() => setIsOldDebtOpen(true)}
+            >
+              Nueva deuda
+            </button>
+          )
+        }
       />
 
       {!canViewGeneral && (
@@ -452,14 +472,16 @@ export function PortfolioPage({
 
       {isPortfolioView && portfolio && <PortfolioByClient credits={portfolio.creditos} />}
 
-      {canManageOldDebts(role) && !isPortfolioView && (
-        <OldDebtForm
-          form={oldDebtForm}
-          clients={activeClients}
-          isSaving={isSaving}
-          onChange={setOldDebtForm}
-          onSubmit={(event) => void saveOldDebt(event)}
-        />
+      {canManageOldDebts(role) && !isPortfolioView && isOldDebtOpen && (
+        <Modal title="Nueva deuda antigua" onClose={() => setIsOldDebtOpen(false)}>
+          <OldDebtForm
+            form={oldDebtForm}
+            clients={activeClients}
+            isSaving={isSaving}
+            onChange={setOldDebtForm}
+            onSubmit={(event) => void saveOldDebt(event)}
+          />
+        </Modal>
       )}
 
       {!isPortfolioView && isLoading ? (
@@ -475,23 +497,25 @@ export function PortfolioPage({
       ) : null}
 
       {selected && !isPortfolioView && (
-        <CreditDetailPanel
-          role={role}
-          credit={selected}
-          paymentForm={paymentForm}
-          adjustmentForm={adjustmentForm}
-          cancelPayment={cancelPayment}
-          cancelCreditReason={cancelCreditReason}
-          isSaving={isSaving}
-          onPaymentChange={setPaymentForm}
-          onAdjustmentChange={setAdjustmentForm}
-          onCancelPaymentChange={setCancelPayment}
-          onCancelCreditReason={setCancelCreditReason}
-          onSavePayment={(event) => void savePayment(event)}
-          onSaveAdjustment={(event) => void saveAdjustment(event)}
-          onCancelPayment={() => void cancelPaymentAction()}
-          onCancelCredit={() => void cancelCreditAction()}
-        />
+        <Modal title={`Credito ${selected.idCredito}`} onClose={() => setSelected(null)}>
+          <CreditDetailPanel
+            role={role}
+            credit={selected}
+            paymentForm={paymentForm}
+            adjustmentForm={adjustmentForm}
+            cancelPayment={cancelPayment}
+            cancelCreditReason={cancelCreditReason}
+            isSaving={isSaving}
+            onPaymentChange={setPaymentForm}
+            onAdjustmentChange={setAdjustmentForm}
+            onCancelPaymentChange={setCancelPayment}
+            onCancelCreditReason={setCancelCreditReason}
+            onSavePayment={(event) => void savePayment(event)}
+            onSaveAdjustment={(event) => void saveAdjustment(event)}
+            onCancelPayment={() => void cancelPaymentAction()}
+            onCancelCredit={() => void cancelCreditAction()}
+          />
+        </Modal>
       )}
     </section>
   );
@@ -584,7 +608,7 @@ function CreditFiltersPanel({
           </button>
         </form>
       ) : (
-        <Field label="Cliente">
+        <Field label="Cliente" required>
           <select
             value={selectedClient}
             onChange={(event) => onSelectClient(event.target.value)}
@@ -757,7 +781,7 @@ function OldDebtForm({
             ))}
           </select>
         </Field>
-        <Field label="Monto inicial">
+        <Field label="Monto inicial" required>
           <input
             required
             type="number"
@@ -765,10 +789,11 @@ function OldDebtForm({
             step={1}
             value={form.monto_inicial}
             onChange={(event) => onChange({ ...form, monto_inicial: Number(event.target.value) })}
+            {...numberInputFocusProps}
             className={inputClassName}
           />
         </Field>
-        <Field label="Tipo">
+        <Field label="Tipo" required>
           <select
             value={form.tipo_deuda_antigua}
             onChange={(event) =>
@@ -785,8 +810,9 @@ function OldDebtForm({
         </Field>
       </div>
       <div className="mt-4">
-        <Field label="Descripcion">
+        <Field label="Descripcion" required>
           <textarea
+            required
             value={form.descripcion}
             onChange={(event) => onChange({ ...form, descripcion: event.target.value })}
             className={textareaClassName}
@@ -990,7 +1016,7 @@ function CreditDetailPanel({
         {canShowCreditCancel(role, credit) && (
           <div className="rounded-md border border-stone-200 bg-white p-4">
             <h2 className="text-sm font-semibold text-stone-950">Anular deuda antigua</h2>
-            <Field label="Motivo obligatorio">
+            <Field label="Motivo obligatorio" required>
               <textarea
                 value={cancelCreditReason}
                 onChange={(event) => onCancelCreditReason(event.target.value)}
@@ -1030,7 +1056,7 @@ function CreditPaymentForm({
       <h2 className="text-sm font-semibold text-stone-950">Registrar abono</h2>
       <p className="mt-1 text-xs text-stone-500">Saldo actual: {currency(saldoPendiente)}</p>
       <div className="mt-4 space-y-3">
-        <Field label="Valor abono">
+        <Field label="Valor abono" required>
           <input
             required
             type="number"
@@ -1039,10 +1065,11 @@ function CreditPaymentForm({
             step={1}
             value={form.valor_abono}
             onChange={(event) => onChange({ ...form, valor_abono: Number(event.target.value) })}
+            {...numberInputFocusProps}
             className={inputClassName}
           />
         </Field>
-        <Field label="Metodo">
+        <Field label="Metodo" required>
           <select
             value={form.metodo_pago}
             onChange={(event) =>
@@ -1094,7 +1121,7 @@ function CreditAdjustmentForm({
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
       <h2 className="text-sm font-semibold text-stone-950">Ajuste administrativo</h2>
       <div className="mt-4 space-y-3">
-        <Field label="Tipo">
+        <Field label="Tipo" required>
           <select
             value={form.tipo_ajuste}
             onChange={(event) =>
@@ -1111,7 +1138,7 @@ function CreditAdjustmentForm({
           </select>
         </Field>
         {form.tipo_ajuste === 'CORRECCION' ? (
-          <Field label="Saldo final">
+          <Field label="Saldo final" required>
             <input
               required
               type="number"
@@ -1119,11 +1146,12 @@ function CreditAdjustmentForm({
               step={1}
               value={form.saldo_final}
               onChange={(event) => onChange({ ...form, saldo_final: Number(event.target.value) })}
+              {...numberInputFocusProps}
               className={inputClassName}
             />
           </Field>
         ) : (
-          <Field label="Valor ajuste">
+          <Field label="Valor ajuste" required>
             <input
               required
               type="number"
@@ -1131,11 +1159,12 @@ function CreditAdjustmentForm({
               step={1}
               value={form.valor_ajuste}
               onChange={(event) => onChange({ ...form, valor_ajuste: Number(event.target.value) })}
+              {...numberInputFocusProps}
               className={inputClassName}
             />
           </Field>
         )}
-        <Field label="Motivo">
+        <Field label="Motivo" required>
           <textarea
             required
             value={form.motivo}

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { Modal } from '../components/Modal';
 import {
   EmptyState,
   ErrorMessage,
@@ -38,6 +39,7 @@ export function CategoriesPage({ onSessionExpired }: { onSessionExpired: () => v
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editing, setEditing] = useState<Category | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<CategoryFormValues>(emptyCategoryForm);
   const canManage = user ? canManageCategories(user.rol) : false;
 
@@ -95,10 +97,12 @@ export function CategoriesPage({ onSessionExpired }: { onSessionExpired: () => v
     });
     setFormError(null);
     setSuccess(null);
+    setIsFormOpen(true);
   }
 
   function resetForm() {
     setEditing(null);
+    setIsFormOpen(false);
     setForm(emptyCategoryForm);
     setFormError(null);
   }
@@ -150,7 +154,24 @@ export function CategoriesPage({ onSessionExpired }: { onSessionExpired: () => v
 
   return (
     <section className="space-y-6">
-      <PageHeader title="Categorias" description="Consulta y administra categorias de producto." />
+      <PageHeader
+        title="Categorias"
+        description="Consulta y administra categorias de producto."
+        action={
+          canManage && (
+            <button
+              type="button"
+              className={primaryButtonClassName}
+              onClick={() => {
+                resetForm();
+                setIsFormOpen(true);
+              }}
+            >
+              Crear categoria
+            </button>
+          )
+        }
+      />
 
       <div className="rounded-md border border-stone-200 bg-white p-4">
         <form
@@ -176,15 +197,17 @@ export function CategoriesPage({ onSessionExpired }: { onSessionExpired: () => v
       {formError && <ErrorMessage message={formError} />}
       {success && <SuccessMessage message={success} />}
 
-      {canManage && (
-        <CategoryForm
-          form={form}
-          isSaving={isSaving}
-          editing={editing}
-          onCancel={resetForm}
-          onChange={setForm}
-          onSubmit={(event) => void handleSubmit(event)}
-        />
+      {canManage && isFormOpen && (
+        <Modal title={editing ? 'Editar categoria' : 'Crear categoria'} onClose={resetForm}>
+          <CategoryForm
+            form={form}
+            isSaving={isSaving}
+            editing={editing}
+            onCancel={resetForm}
+            onChange={setForm}
+            onSubmit={(event) => void handleSubmit(event)}
+          />
+        </Modal>
       )}
 
       {!canManage && (
@@ -280,7 +303,7 @@ function CategoryForm({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Nombre categoria">
+        <Field label="Nombre categoria" required>
           <input
             required
             value={form.nombre_categoria}

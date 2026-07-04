@@ -95,7 +95,9 @@ export function LoginPage({ onSuccess }: { onSuccess: () => void }) {
 
             <form className="space-y-4" onSubmit={handleSubmit}>
               <label className="block">
-                <span className="text-sm font-medium text-stone-700">Usuario</span>
+                <span className="text-sm font-medium text-stone-700">
+                  Usuario <span className="text-red-700">*</span>
+                </span>
                 <input
                   value={usuario}
                   onChange={(event) => setUsuario(event.target.value)}
@@ -107,7 +109,9 @@ export function LoginPage({ onSuccess }: { onSuccess: () => void }) {
               </label>
 
               <label className="block">
-                <span className="text-sm font-medium text-stone-700">Contraseña</span>
+                <span className="text-sm font-medium text-stone-700">
+                  Contraseña <span className="text-red-700">*</span>
+                </span>
                 <input
                   value={contrasena}
                   onChange={(event) => setContrasena(event.target.value)}

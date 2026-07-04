@@ -1,11 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { Modal } from '../components/Modal';
 import {
   EmptyState,
   ErrorMessage,
   Field,
   inputClassName,
   LoadingState,
+  numberInputFocusProps,
   PageHeader,
   primaryButtonClassName,
   secondaryButtonClassName,
@@ -124,6 +126,7 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
   const [filters, setFilters] = useState<SaleFilters>({ buscar: '', estado: '', tipoVenta: '' });
   const [form, setForm] = useState<SaleFormValues>(emptySaleForm);
   const [line, setLine] = useState<SaleItemFormValues>(emptyLine);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -288,6 +291,7 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
       setForm(emptySaleForm);
       setSelected(null);
       setPayments([]);
+      setIsFormOpen(false);
       await loadData();
     } catch (saveError) {
       if (await expireIfNeeded(saveError)) return;
@@ -318,6 +322,15 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
       <PageHeader
         title="Ventas"
         description="Registra ventas de contado, credito y mixtas. El stock y la cartera los actualiza el backend."
+        action={
+          <button
+            type="button"
+            className={primaryButtonClassName}
+            onClick={() => setIsFormOpen(true)}
+          >
+            Crear venta
+          </button>
+        }
       />
 
       <div className="rounded-md border border-stone-200 bg-white p-4">
@@ -367,20 +380,24 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
       {formError && <ErrorMessage message={formError} />}
       {success && <SuccessMessage message={success} />}
 
-      <SaleForm
-        form={form}
-        line={line}
-        clients={activeClients}
-        variants={activeVariants}
-        total={total}
-        totals={totals}
-        isSaving={isSaving}
-        onFormChange={setForm}
-        onLineChange={setLine}
-        onAddLine={addLine}
-        onRemoveLine={removeLine}
-        onSubmit={(event) => void saveSale(event)}
-      />
+      {isFormOpen && (
+        <Modal title="Crear venta" onClose={() => setIsFormOpen(false)}>
+          <SaleForm
+            form={form}
+            line={line}
+            clients={activeClients}
+            variants={activeVariants}
+            total={total}
+            totals={totals}
+            isSaving={isSaving}
+            onFormChange={setForm}
+            onLineChange={setLine}
+            onAddLine={addLine}
+            onRemoveLine={removeLine}
+            onSubmit={(event) => void saveSale(event)}
+          />
+        </Modal>
+      )}
 
       {isLoading ? (
         <LoadingState />
@@ -396,14 +413,16 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
       )}
 
       {selected && (
-        <SaleDetailPanel
-          sale={selected}
-          payments={payments}
-          canCancel={canCancel && selected.estadoVenta !== 'ANULADA'}
-          cancelReason={cancelReason}
-          onCancelReason={setCancelReason}
-          onCancelSale={() => void cancelSelectedSale()}
-        />
+        <Modal title={`Venta ${selected.numeroVenta}`} onClose={() => setSelected(null)}>
+          <SaleDetailPanel
+            sale={selected}
+            payments={payments}
+            canCancel={canCancel && selected.estadoVenta !== 'ANULADA'}
+            cancelReason={cancelReason}
+            onCancelReason={setCancelReason}
+            onCancelSale={() => void cancelSelectedSale()}
+          />
+        </Modal>
       )}
     </section>
   );
@@ -443,7 +462,7 @@ function SaleForm({
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
       <h2 className="text-sm font-semibold text-stone-950">Nueva venta</h2>
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Field label="Tipo de venta">
+        <Field label="Tipo de venta" required>
           <select
             value={form.tipo_venta}
             onChange={(event) =>
@@ -460,7 +479,10 @@ function SaleForm({
             <option value="MIXTA">Mixta</option>
           </select>
         </Field>
-        <Field label={form.tipo_venta === 'CONTADO' ? 'Cliente opcional' : 'Cliente obligatorio'}>
+        <Field
+          label={form.tipo_venta === 'CONTADO' ? 'Cliente opcional' : 'Cliente obligatorio'}
+          required={form.tipo_venta !== 'CONTADO'}
+        >
           <select
             required={form.tipo_venta !== 'CONTADO'}
             value={form.id_cliente}
@@ -476,7 +498,7 @@ function SaleForm({
           </select>
         </Field>
         {form.tipo_venta !== 'CREDITO' && (
-          <Field label="Metodo de pago">
+          <Field label="Metodo de pago" required>
             <select
               value={form.metodo_pago}
               onChange={(event) =>
@@ -493,7 +515,7 @@ function SaleForm({
           </Field>
         )}
         {form.tipo_venta === 'MIXTA' && (
-          <Field label="Pago inicial">
+          <Field label="Pago inicial" required>
             <input
               required
               type="number"
@@ -503,6 +525,7 @@ function SaleForm({
               onChange={(event) =>
                 onFormChange({ ...form, valor_pagado_inicial: Number(event.target.value) })
               }
+              {...numberInputFocusProps}
               className={inputClassName}
             />
           </Field>
@@ -518,7 +541,7 @@ function SaleForm({
       <div className="mt-4 rounded-md border border-stone-200 p-4">
         <h3 className="text-sm font-semibold text-stone-950">Detalles</h3>
         <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_120px_160px_160px_auto]">
-          <Field label="Variante">
+          <Field label="Variante" required>
             <select
               value={line.id_variante}
               onChange={(event) => {
@@ -540,13 +563,14 @@ function SaleForm({
               ))}
             </select>
           </Field>
-          <Field label="Cantidad">
+          <Field label="Cantidad" required>
             <input
               type="number"
               min={1}
               step={1}
               value={line.cantidad}
               onChange={(event) => onLineChange({ ...line, cantidad: Number(event.target.value) })}
+              {...numberInputFocusProps}
               className={inputClassName}
             />
           </Field>
@@ -561,6 +585,7 @@ function SaleForm({
               step={1}
               value={line.descuento}
               onChange={(event) => onLineChange({ ...line, descuento: Number(event.target.value) })}
+              {...numberInputFocusProps}
               className={inputClassName}
             />
           </Field>
@@ -643,6 +668,7 @@ function SaleForm({
               onChange={(event) =>
                 onFormChange({ ...form, descuento_general: Number(event.target.value) })
               }
+              {...numberInputFocusProps}
               className={inputClassName}
             />
           </Field>
@@ -884,7 +910,7 @@ function SaleDetailPanel({
         {canCancel && (
           <div className="rounded-md border border-stone-200 bg-white p-4">
             <h2 className="text-sm font-semibold text-stone-950">Anular venta</h2>
-            <Field label="Motivo obligatorio">
+            <Field label="Motivo obligatorio" required>
               <textarea
                 value={cancelReason}
                 onChange={(event) => onCancelReason(event.target.value)}

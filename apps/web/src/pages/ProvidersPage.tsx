@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { Modal } from '../components/Modal';
 import {
   EmptyState,
   ErrorMessage,
@@ -61,6 +62,7 @@ export function ProvidersPage({ onSessionExpired }: { onSessionExpired: () => vo
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editing, setEditing] = useState<Provider | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<ProviderFormValues>(emptyProviderForm);
   const canManage = user ? canManageProviders(user.rol) : false;
 
@@ -132,10 +134,12 @@ export function ProvidersPage({ onSessionExpired }: { onSessionExpired: () => vo
     });
     setFormError(null);
     setSuccess(null);
+    setIsFormOpen(true);
   }
 
   function resetForm() {
     setEditing(null);
+    setIsFormOpen(false);
     setForm(emptyProviderForm);
     setFormError(null);
   }
@@ -187,7 +191,24 @@ export function ProvidersPage({ onSessionExpired }: { onSessionExpired: () => vo
 
   return (
     <section className="space-y-6">
-      <PageHeader title="Proveedores" description="Consulta y administra proveedores de compra." />
+      <PageHeader
+        title="Proveedores"
+        description="Consulta y administra proveedores de compra."
+        action={
+          canManage && (
+            <button
+              type="button"
+              className={primaryButtonClassName}
+              onClick={() => {
+                resetForm();
+                setIsFormOpen(true);
+              }}
+            >
+              Crear proveedor
+            </button>
+          )
+        }
+      />
 
       <div className="rounded-md border border-stone-200 bg-white p-4">
         <form
@@ -213,15 +234,17 @@ export function ProvidersPage({ onSessionExpired }: { onSessionExpired: () => vo
       {formError && <ErrorMessage message={formError} />}
       {success && <SuccessMessage message={success} />}
 
-      {canManage && (
-        <ProviderForm
-          form={form}
-          isSaving={isSaving}
-          editing={editing}
-          onCancel={resetForm}
-          onChange={setForm}
-          onSubmit={(event) => void handleSubmit(event)}
-        />
+      {canManage && isFormOpen && (
+        <Modal title={editing ? 'Editar proveedor' : 'Crear proveedor'} onClose={resetForm}>
+          <ProviderForm
+            form={form}
+            isSaving={isSaving}
+            editing={editing}
+            onCancel={resetForm}
+            onChange={setForm}
+            onSubmit={(event) => void handleSubmit(event)}
+          />
+        </Modal>
       )}
 
       {!canManage && (
@@ -327,7 +350,7 @@ function ProviderForm({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Field label="Nombre proveedor">
+        <Field label="Nombre proveedor" required>
           <input
             required
             value={form.nombre_proveedor}
@@ -356,7 +379,7 @@ function ProviderForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Telefono principal">
+        <Field label="Telefono principal" required>
           <input
             value={form.telefono_principal}
             onChange={(event) => onChange({ ...form, telefono_principal: event.target.value })}

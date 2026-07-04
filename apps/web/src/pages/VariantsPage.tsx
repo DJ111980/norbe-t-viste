@@ -1,12 +1,14 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
 import { ImageManager } from '../components/ImageManager';
+import { Modal } from '../components/Modal';
 import {
   EmptyState,
   ErrorMessage,
   Field,
   inputClassName,
   LoadingState,
+  numberInputFocusProps,
   PageHeader,
   primaryButtonClassName,
   secondaryButtonClassName,
@@ -17,6 +19,7 @@ import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/ap
 import { canManageVariants } from '../permissions';
 import { getVariantLabelPreview, openPrintableHtml } from '../services/labels';
 import { listProducts } from '../services/products';
+import { uploadImage } from '../services/images';
 import {
   createVariant,
   getVariantByQr,
@@ -62,7 +65,9 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editing, setEditing] = useState<Variant | null>(null);
-  const [selected, setSelected] = useState<Variant | null>(null);
+  const [imageTarget, setImageTarget] = useState<Variant | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   const [form, setForm] = useState<VariantFormValues>(emptyVariantForm);
   const canManage = user ? canManageVariants(user.rol) : false;
 
@@ -118,7 +123,6 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
 
   function startEdit(variant: Variant) {
     setEditing(variant);
-    setSelected(variant);
     setForm({
       id_producto: variant.producto.idProducto,
       talla: variant.talla ?? '',
@@ -130,10 +134,14 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
     });
     setFormError(null);
     setSuccess(null);
+    setPendingImageFile(null);
+    setIsFormOpen(true);
   }
 
   function resetForm() {
     setEditing(null);
+    setIsFormOpen(false);
+    setPendingImageFile(null);
     setForm({ ...emptyVariantForm, id_producto: products[0]?.idProducto ?? '' });
     setFormError(null);
   }
@@ -149,8 +157,11 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
       const saved = editing
         ? await updateVariant(token, editing.idVariante, form)
         : await createVariant(token, form);
+      if (pendingImageFile) {
+        await uploadImage(token, 'variante', saved.idVariante, pendingImageFile);
+      }
       setSuccess(editing ? 'Variante actualizada.' : 'Variante creada.');
-      setSelected(saved);
+      if (pendingImageFile) setImageTarget(saved);
       resetForm();
       await loadData();
     } catch (saveError) {
@@ -169,7 +180,6 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
     try {
       const updated = await updateVariantStatus(token, variant.idVariante, nextStatus);
       setSuccess('Estado de la variante actualizado.');
-      setSelected(updated);
       await loadData();
     } catch (statusError) {
       await handleError(statusError);
@@ -184,7 +194,6 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
     try {
       const variant = await getVariantByQr(token, filters.codigoQr);
       setVariants([variant]);
-      setSelected(variant);
       setSuccess('Variante encontrada por codigo QR.');
     } catch (qrError) {
       await handleError(qrError);
@@ -210,6 +219,20 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
       <PageHeader
         title="Variantes"
         description="Gestiona tallas, colores, precios de referencia y etiquetas. El stock actual es solo consultivo."
+        action={
+          canManage && (
+            <button
+              type="button"
+              className={primaryButtonClassName}
+              onClick={() => {
+                resetForm();
+                setIsFormOpen(true);
+              }}
+            >
+              Crear variante
+            </button>
+          )
+        }
       />
 
       <div className="rounded-md border border-stone-200 bg-white p-4">
@@ -272,16 +295,20 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
       {formError && <ErrorMessage message={formError} />}
       {success && <SuccessMessage message={success} />}
 
-      {canManage && (
-        <VariantForm
-          form={form}
-          products={products}
-          editing={editing}
-          isSaving={isSaving}
-          onCancel={resetForm}
-          onChange={setForm}
-          onSubmit={(event) => void handleSubmit(event)}
-        />
+      {canManage && isFormOpen && (
+        <Modal title={editing ? 'Editar variante' : 'Crear variante'} onClose={resetForm}>
+          <VariantForm
+            form={form}
+            products={products}
+            editing={editing}
+            isSaving={isSaving}
+            pendingImageFile={pendingImageFile}
+            onCancel={resetForm}
+            onChange={setForm}
+            onImageChange={setPendingImageFile}
+            onSubmit={(event) => void handleSubmit(event)}
+          />
+        </Modal>
       )}
 
       {!canManage && (
@@ -290,13 +317,18 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
         </div>
       )}
 
-      {selected && (
-        <ImageManager
-          owner="variante"
-          id={selected.idVariante}
-          canManage={canManage}
-          onSessionExpired={onSessionExpired}
-        />
+      {imageTarget && (
+        <Modal
+          title={`Imagen de ${imageTarget.producto.nombreProducto ?? imageTarget.sku}`}
+          onClose={() => setImageTarget(null)}
+        >
+          <ImageManager
+            owner="variante"
+            id={imageTarget.idVariante}
+            canManage={canManage}
+            onSessionExpired={onSessionExpired}
+          />
+        </Modal>
       )}
 
       {isLoading ? (
@@ -340,7 +372,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setSelected(variant)}
+                        onClick={() => setImageTarget(variant)}
                         className={secondaryButtonClassName}
                       >
                         Imagen
@@ -387,16 +419,20 @@ function VariantForm({
   products,
   editing,
   isSaving,
+  pendingImageFile,
   onCancel,
   onChange,
+  onImageChange,
   onSubmit,
 }: {
   form: VariantFormValues;
   products: Product[];
   editing: Variant | null;
   isSaving: boolean;
+  pendingImageFile: File | null;
   onCancel: () => void;
   onChange: (form: VariantFormValues) => void;
+  onImageChange: (file: File | null) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
@@ -413,7 +449,7 @@ function VariantForm({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Field label="Producto">
+        <Field label="Producto" required>
           <select
             required
             disabled={!!editing}
@@ -450,13 +486,14 @@ function VariantForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Precio venta">
+        <Field label="Precio venta" required>
           <input
             type="number"
             min={0}
             step={1}
             value={form.precio_venta}
             onChange={(event) => onChange({ ...form, precio_venta: Number(event.target.value) })}
+            {...numberInputFocusProps}
             className={inputClassName}
           />
         </Field>
@@ -469,6 +506,7 @@ function VariantForm({
             onChange={(event) =>
               onChange({ ...form, precio_compra_referencia: Number(event.target.value) })
             }
+            {...numberInputFocusProps}
             className={inputClassName}
           />
         </Field>
@@ -479,8 +517,24 @@ function VariantForm({
             step={1}
             value={form.stock_minimo}
             onChange={(event) => onChange({ ...form, stock_minimo: Number(event.target.value) })}
+            {...numberInputFocusProps}
             className={inputClassName}
           />
+        </Field>
+        <Field label="Imagen">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              onImageChange(event.target.files?.[0] ?? null)
+            }
+            className={inputClassName}
+          />
+          <p className="mt-1 text-xs text-stone-500">
+            {pendingImageFile
+              ? `Lista para subir: ${pendingImageFile.name}`
+              : 'Opcional. Se sube al backend despues de guardar.'}
+          </p>
         </Field>
       </div>
 

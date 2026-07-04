@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { Modal } from '../components/Modal';
 import {
   EmptyState,
   ErrorMessage,
@@ -39,6 +40,7 @@ export function ClientsPage({ onSessionExpired }: { onSessionExpired: () => void
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editing, setEditing] = useState<Client | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<ClientFormValues>(emptyClientForm);
   const canChangeStatus = user ? canChangeClientStatus(user.rol) : false;
 
@@ -102,10 +104,12 @@ export function ClientsPage({ onSessionExpired }: { onSessionExpired: () => void
     });
     setFormError(null);
     setSuccess(null);
+    setIsFormOpen(true);
   }
 
   function resetForm() {
     setEditing(null);
+    setIsFormOpen(false);
     setForm(emptyClientForm);
     setFormError(null);
   }
@@ -160,6 +164,18 @@ export function ClientsPage({ onSessionExpired }: { onSessionExpired: () => void
       <PageHeader
         title="Clientes"
         description="Consulta, crea y edita clientes sin manejar cartera desde este modulo."
+        action={
+          <button
+            type="button"
+            className={primaryButtonClassName}
+            onClick={() => {
+              resetForm();
+              setIsFormOpen(true);
+            }}
+          >
+            Crear cliente
+          </button>
+        }
       />
 
       <div className="rounded-md border border-stone-200 bg-white p-4">
@@ -186,14 +202,18 @@ export function ClientsPage({ onSessionExpired }: { onSessionExpired: () => void
       {formError && <ErrorMessage message={formError} />}
       {success && <SuccessMessage message={success} />}
 
-      <ClientForm
-        form={form}
-        isSaving={isSaving}
-        editing={editing}
-        onCancel={resetForm}
-        onChange={setForm}
-        onSubmit={(event) => void handleSubmit(event)}
-      />
+      {isFormOpen && (
+        <Modal title={editing ? 'Editar cliente' : 'Crear cliente'} onClose={resetForm}>
+          <ClientForm
+            form={form}
+            isSaving={isSaving}
+            editing={editing}
+            onCancel={resetForm}
+            onChange={setForm}
+            onSubmit={(event) => void handleSubmit(event)}
+          />
+        </Modal>
+      )}
 
       {isLoading ? (
         <LoadingState />
@@ -285,7 +305,7 @@ function ClientForm({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Nombre completo">
+        <Field label="Nombre completo" required>
           <input
             required
             value={form.nombre_completo}

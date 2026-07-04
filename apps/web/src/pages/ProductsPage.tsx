@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
 import { ImageManager } from '../components/ImageManager';
+import { Modal } from '../components/Modal';
 import {
   EmptyState,
   ErrorMessage,
@@ -24,6 +25,7 @@ import {
   updateProductStatus,
   type ProductFilters,
 } from '../services/products';
+import { uploadImage } from '../services/images';
 import type { Category, Product, ProductFormValues, ProductStatus } from '../types';
 
 const emptyProductForm: ProductFormValues = {
@@ -46,7 +48,9 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [selected, setSelected] = useState<Product | null>(null);
+  const [imageTarget, setImageTarget] = useState<Product | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   const [form, setForm] = useState<ProductFormValues>(emptyProductForm);
   const canManage = user ? canManageProducts(user.rol) : false;
 
@@ -102,7 +106,6 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
 
   function startEdit(product: Product) {
     setEditing(product);
-    setSelected(product);
     setForm({
       nombre_producto: product.nombreProducto,
       id_categoria: product.categoria.idCategoria,
@@ -113,10 +116,14 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
     });
     setFormError(null);
     setSuccess(null);
+    setPendingImageFile(null);
+    setIsFormOpen(true);
   }
 
   function resetForm() {
     setEditing(null);
+    setIsFormOpen(false);
+    setPendingImageFile(null);
     setForm({
       ...emptyProductForm,
       id_categoria: categories[0]?.idCategoria ?? '',
@@ -135,8 +142,11 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
       const saved = editing
         ? await updateProduct(token, editing.idProducto, form)
         : await createProduct(token, form);
+      if (pendingImageFile) {
+        await uploadImage(token, 'producto', saved.idProducto, pendingImageFile);
+      }
       setSuccess(editing ? 'Producto actualizado.' : 'Producto creado.');
-      setSelected(saved);
+      if (pendingImageFile) setImageTarget(saved);
       resetForm();
       await loadData();
     } catch (saveError) {
@@ -155,7 +165,6 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
     try {
       const updated = await updateProductStatus(token, product.idProducto, nextStatus);
       setSuccess('Estado del producto actualizado.');
-      setSelected(updated);
       await loadData();
     } catch (statusError) {
       await handleError(statusError);
@@ -167,6 +176,20 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
       <PageHeader
         title="Productos"
         description="Gestiona productos base. El stock se administra unicamente desde variantes e inventario."
+        action={
+          canManage && (
+            <button
+              type="button"
+              className={primaryButtonClassName}
+              onClick={() => {
+                resetForm();
+                setIsFormOpen(true);
+              }}
+            >
+              Crear producto
+            </button>
+          )
+        }
       />
 
       <div className="rounded-md border border-stone-200 bg-white p-4">
@@ -216,16 +239,20 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
       {formError && <ErrorMessage message={formError} />}
       {success && <SuccessMessage message={success} />}
 
-      {canManage && (
-        <ProductForm
-          form={form}
-          categories={categories}
-          editing={editing}
-          isSaving={isSaving}
-          onCancel={resetForm}
-          onChange={setForm}
-          onSubmit={(event) => void handleSubmit(event)}
-        />
+      {canManage && isFormOpen && (
+        <Modal title={editing ? 'Editar producto' : 'Crear producto'} onClose={resetForm}>
+          <ProductForm
+            form={form}
+            categories={categories}
+            editing={editing}
+            isSaving={isSaving}
+            pendingImageFile={pendingImageFile}
+            onCancel={resetForm}
+            onChange={setForm}
+            onImageChange={setPendingImageFile}
+            onSubmit={(event) => void handleSubmit(event)}
+          />
+        </Modal>
       )}
 
       {!canManage && (
@@ -234,13 +261,18 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
         </div>
       )}
 
-      {selected && (
-        <ImageManager
-          owner="producto"
-          id={selected.idProducto}
-          canManage={canManage}
-          onSessionExpired={onSessionExpired}
-        />
+      {imageTarget && (
+        <Modal
+          title={`Imagen de ${imageTarget.nombreProducto}`}
+          onClose={() => setImageTarget(null)}
+        >
+          <ImageManager
+            owner="producto"
+            id={imageTarget.idProducto}
+            canManage={canManage}
+            onSessionExpired={onSessionExpired}
+          />
+        </Modal>
       )}
 
       {isLoading ? (
@@ -281,7 +313,7 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setSelected(product)}
+                        onClick={() => setImageTarget(product)}
                         className={secondaryButtonClassName}
                       >
                         Imagen
@@ -321,16 +353,20 @@ function ProductForm({
   categories,
   editing,
   isSaving,
+  pendingImageFile,
   onCancel,
   onChange,
+  onImageChange,
   onSubmit,
 }: {
   form: ProductFormValues;
   categories: Category[];
   editing: Product | null;
   isSaving: boolean;
+  pendingImageFile: File | null;
   onCancel: () => void;
   onChange: (form: ProductFormValues) => void;
+  onImageChange: (file: File | null) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
@@ -347,7 +383,7 @@ function ProductForm({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Nombre producto">
+        <Field label="Nombre producto" required>
           <input
             required
             value={form.nombre_producto}
@@ -355,7 +391,7 @@ function ProductForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Categoria">
+        <Field label="Categoria" required>
           <select
             required
             value={form.id_categoria}
@@ -390,6 +426,21 @@ function ProductForm({
             onChange={(event) => onChange({ ...form, descripcion: event.target.value })}
             className={textareaClassName}
           />
+        </Field>
+        <Field label="Imagen">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              onImageChange(event.target.files?.[0] ?? null)
+            }
+            className={inputClassName}
+          />
+          <p className="mt-1 text-xs text-stone-500">
+            {pendingImageFile
+              ? `Lista para subir: ${pendingImageFile.name}`
+              : 'Opcional. Se sube al backend despues de guardar.'}
+          </p>
         </Field>
         <label className="flex items-center gap-3 self-end text-sm text-stone-700">
           <input
