@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
 import { Modal } from '../components/Modal';
+import { PrintableHtmlModal } from '../components/PrintableHtmlModal';
 import {
   EmptyState,
   ErrorMessage,
@@ -16,7 +17,7 @@ import {
 } from '../components/ui';
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
 import { canManageEntryLots } from '../permissions';
-import { getEntryLotLabelPreview, openPrintableHtml } from '../services/labels';
+import { getEntryLotLabelPreview } from '../services/labels';
 import {
   cancelEntryLot,
   confirmEntryLot,
@@ -91,6 +92,15 @@ function fillDetailForm(detail: EntryLotDetail): EntryLotDetailFormValues {
   };
 }
 
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs uppercase text-stone-500">{label}</dt>
+      <dd className="mt-1 font-medium text-stone-900">{value}</dd>
+    </div>
+  );
+}
+
 export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => void }) {
   const { token, user, logout } = useAuth();
   const [lots, setLots] = useState<EntryLotSummary[]>([]);
@@ -102,6 +112,7 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
   const [detailForm, setDetailForm] = useState<EntryLotDetailFormValues>(emptyDetailForm);
   const [editingDetail, setEditingDetail] = useState<EntryLotDetail | null>(null);
   const [isLotFormOpen, setIsLotFormOpen] = useState(false);
+  const [labelPreview, setLabelPreview] = useState<{ title: string; html: string } | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -281,9 +292,7 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
 
     try {
       const html = await getEntryLotLabelPreview(token, selected.idLote);
-      if (!openPrintableHtml(html, `Etiquetas ${selected.numeroLote}`)) {
-        setFormError('El navegador bloqueo la nueva pestana de etiquetas.');
-      }
+      setLabelPreview({ title: `Etiquetas ${selected.numeroLote}`, html });
     } catch (labelError) {
       if (await expireIfNeeded(labelError)) return;
       setFormError(handleMessage(labelError, 'No se pudieron abrir etiquetas del lote.'));
@@ -453,6 +462,14 @@ export function EntryLotsPage({ onSessionExpired }: { onSessionExpired: () => vo
           </section>
         </Modal>
       )}
+
+      {labelPreview && (
+        <PrintableHtmlModal
+          title={labelPreview.title}
+          html={labelPreview.html}
+          onClose={() => setLabelPreview(null)}
+        />
+      )}
     </section>
   );
 }
@@ -478,6 +495,27 @@ function LotForm({
 }) {
   const creating = !selected;
   const disabled = !!selected && !editable;
+
+  if (disabled && selected) {
+    return (
+      <section className="rounded-md border border-stone-200 bg-white p-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-stone-950">Datos del lote</h2>
+          <button type="button" onClick={onNew} className={secondaryButtonClassName}>
+            Nuevo lote
+          </button>
+        </div>
+        <dl className="grid gap-4 text-sm sm:grid-cols-2">
+          <Info label="Codigo lote" value={selected.numeroLote} />
+          <Info label="Proveedor" value={selected.proveedor?.nombreProveedor ?? 'Sin proveedor'} />
+          <Info label="Estado" value={selected.estadoLote} />
+          <Info label="Fecha" value={selected.fechaLote.slice(0, 10)} />
+          <Info label="Factura" value={selected.numeroFactura ?? 'Sin factura'} />
+          <Info label="Observaciones" value={selected.observaciones ?? 'Sin observaciones'} />
+        </dl>
+      </section>
+    );
+  }
 
   return (
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
@@ -619,18 +657,24 @@ function LotDetail({
 }) {
   return (
     <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
-      <div className="flex flex-col gap-3 border-b border-stone-100 p-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-stone-950">{lot.numeroLote}</h2>
-          <p className="mt-1 text-xs text-stone-500">
-            {lot.proveedor?.nombreProveedor ?? 'Sin proveedor'} / {lot.estadoLote}
-          </p>
+      <div className="border-b border-stone-100 p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-stone-950">{lot.numeroLote}</h2>
+            <p className="mt-1 text-sm text-stone-600">
+              {lot.proveedor?.nombreProveedor ?? 'Sin proveedor'}
+            </p>
+            <p className="mt-1 text-xs text-stone-500">Fecha {lot.fechaLote.slice(0, 10)}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={lot.estadoLote} />
+            {canOpenLabels && (
+              <button type="button" onClick={onOpenLabels} className={secondaryButtonClassName}>
+                Ver etiquetas
+              </button>
+            )}
+          </div>
         </div>
-        {canOpenLabels && (
-          <button type="button" onClick={onOpenLabels} className={secondaryButtonClassName}>
-            Ver etiquetas
-          </button>
-        )}
       </div>
 
       {lot.detalles.length === 0 ? (

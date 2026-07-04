@@ -4,6 +4,7 @@ import { EntityImageThumb } from '../components/EntityImageThumb';
 import { FileImagePreview } from '../components/FileImagePreview';
 import { ImageManager } from '../components/ImageManager';
 import { Modal } from '../components/Modal';
+import { PrintableHtmlModal } from '../components/PrintableHtmlModal';
 import {
   EmptyState,
   ErrorMessage,
@@ -19,7 +20,7 @@ import {
 } from '../components/ui';
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
 import { canManageVariants } from '../permissions';
-import { getVariantLabelPreview, openPrintableHtml } from '../services/labels';
+import { getBatchVariantLabelPreview } from '../services/labels';
 import { listProducts } from '../services/products';
 import { uploadImage } from '../services/images';
 import {
@@ -50,6 +51,11 @@ function currency(value: number): string {
   }).format(value);
 }
 
+function handleImageSaveMessage(error: unknown): string {
+  if (isForbiddenError(error)) return 'No tienes permisos para subir la imagen.';
+  return error instanceof ApiClientError ? error.message : 'No se pudo guardar la imagen.';
+}
+
 export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => void }) {
   const { token, user, logout } = useAuth();
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -67,7 +73,9 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editing, setEditing] = useState<Variant | null>(null);
-  const [imageTarget, setImageTarget] = useState<Variant | null>(null);
+  const [labelTarget, setLabelTarget] = useState<Variant | null>(null);
+  const [labelQuantity, setLabelQuantity] = useState(1);
+  const [labelPreview, setLabelPreview] = useState<{ title: string; html: string } | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   const [form, setForm] = useState<VariantFormValues>(emptyVariantForm);
@@ -159,12 +167,23 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
       const saved = editing
         ? await updateVariant(token, editing.idVariante, form)
         : await createVariant(token, form);
+      let imageErrorMessage: string | null = null;
       if (pendingImageFile) {
-        await uploadImage(token, 'variante', saved.idVariante, pendingImageFile);
+        try {
+          await uploadImage(token, 'variante', saved.idVariante, pendingImageFile);
+        } catch (uploadError) {
+          imageErrorMessage = handleImageSaveMessage(uploadError);
+        }
       }
-      setSuccess(editing ? 'Variante actualizada.' : 'Variante creada.');
-      if (pendingImageFile) setImageTarget(saved);
+      setSuccess(
+        `${editing ? 'Variante actualizada.' : 'Variante creada.'}${
+          imageErrorMessage
+            ? ' La imagen no se pudo guardar; intenta subirla de nuevo desde Editar.'
+            : ''
+        }`,
+      );
       resetForm();
+      if (imageErrorMessage) setFormError(imageErrorMessage);
       await loadData();
     } catch (saveError) {
       await handleError(saveError);
@@ -202,15 +221,27 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
     }
   }
 
-  async function openLabel(variant: Variant) {
+  function configureLabel(variant: Variant) {
+    setLabelTarget(variant);
+    setLabelQuantity(Math.max(variant.stockActual, 1));
+    setFormError(null);
+  }
+
+  async function openLabel() {
     if (!token) return;
+    if (!labelTarget) return;
+    if (!Number.isInteger(labelQuantity) || labelQuantity < 1) {
+      setFormError('La cantidad de etiquetas debe ser un entero mayor que 0.');
+      return;
+    }
     setFormError(null);
 
     try {
-      const html = await getVariantLabelPreview(token, variant.idVariante);
-      if (!openPrintableHtml(html, `Etiqueta ${variant.codigoQr}`)) {
-        setFormError('El navegador bloqueo la nueva pestana de etiqueta.');
-      }
+      const html = await getBatchVariantLabelPreview(token, [
+        { id_variante: labelTarget.idVariante, cantidad: labelQuantity },
+      ]);
+      setLabelPreview({ title: `Etiqueta ${labelTarget.codigoQr}`, html });
+      setLabelTarget(null);
     } catch (labelError) {
       await handleError(labelError);
     }
@@ -305,6 +336,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
             editing={editing}
             isSaving={isSaving}
             pendingImageFile={pendingImageFile}
+            onSessionExpired={onSessionExpired}
             onCancel={resetForm}
             onChange={setForm}
             onImageChange={setPendingImageFile}
@@ -319,19 +351,58 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
         </div>
       )}
 
-      {imageTarget && (
+      {labelTarget && (
         <Modal
-          title={`Imagen de ${imageTarget.producto.nombreProducto ?? imageTarget.sku}`}
-          onClose={() => setImageTarget(null)}
+          title={`Etiqueta ${labelTarget.codigoQr}`}
+          onClose={() => setLabelTarget(null)}
           size="md"
         >
-          <ImageManager
-            owner="variante"
-            id={imageTarget.idVariante}
-            canManage={canManage}
-            onSessionExpired={onSessionExpired}
-          />
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-3">
+              <EntityImageThumb
+                owner="variante"
+                id={labelTarget.idVariante}
+                alt={labelTarget.producto.nombreProducto ?? labelTarget.sku}
+              />
+              <div className="text-sm">
+                <p className="font-semibold text-stone-950">
+                  {labelTarget.producto.nombreProducto ?? 'Producto sin nombre'}
+                </p>
+                <p className="text-xs text-stone-500">
+                  Stock {labelTarget.stockActual} / QR {labelTarget.codigoQr}
+                </p>
+              </div>
+            </div>
+            {labelTarget.stockActual === 0 && (
+              <ErrorMessage message="La variante no tiene stock. Se sugiere 1 etiqueta para revisión manual." />
+            )}
+            <Field label="Cantidad de etiquetas">
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={labelQuantity}
+                onChange={(event) => setLabelQuantity(Number(event.target.value))}
+                className={inputClassName}
+              />
+            </Field>
+            <button
+              type="button"
+              onClick={() => void openLabel()}
+              className={primaryButtonClassName}
+            >
+              Ver etiqueta
+            </button>
+          </div>
         </Modal>
+      )}
+
+      {labelPreview && (
+        <PrintableHtmlModal
+          title={labelPreview.title}
+          html={labelPreview.html}
+          onClose={() => setLabelPreview(null)}
+        />
       )}
 
       {isLoading ? (
@@ -384,14 +455,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setImageTarget(variant)}
-                        className={secondaryButtonClassName}
-                      >
-                        Imagen
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void openLabel(variant)}
+                        onClick={() => configureLabel(variant)}
                         className={secondaryButtonClassName}
                       >
                         Ver etiqueta
@@ -432,6 +496,7 @@ function VariantForm({
   editing,
   isSaving,
   pendingImageFile,
+  onSessionExpired,
   onCancel,
   onChange,
   onImageChange,
@@ -442,6 +507,7 @@ function VariantForm({
   editing: Variant | null;
   isSaving: boolean;
   pendingImageFile: File | null;
+  onSessionExpired: () => void;
   onCancel: () => void;
   onChange: (form: VariantFormValues) => void;
   onImageChange: (file: File | null) => void;
@@ -459,6 +525,17 @@ function VariantForm({
           </button>
         )}
       </div>
+
+      {editing && (
+        <div className="mb-4">
+          <ImageManager
+            owner="variante"
+            id={editing.idVariante}
+            canManage
+            onSessionExpired={onSessionExpired}
+          />
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Field label="Producto" required>

@@ -3,7 +3,6 @@ import {
   getBatchVariantLabelPreview,
   getEntryLotLabelPreview,
   getVariantLabelPreview,
-  openPrintableHtml,
 } from './labels';
 import { apiTextRequest } from '../lib/api';
 
@@ -37,29 +36,5 @@ describe('labels service', () => {
       method: 'POST',
       body: { items: [{ id_variante: 'var_1', cantidad: 2 }] },
     });
-  });
-
-  it('abre HTML imprimible en una nueva pestana', () => {
-    const write = vi.fn();
-    const close = vi.fn();
-    const open = vi.fn();
-    const target = {
-      document: {
-        open,
-        write,
-        close,
-        title: '',
-      },
-    };
-    vi.stubGlobal('window', {
-      open: vi.fn(() => target),
-    });
-
-    expect(openPrintableHtml('<html>Etiqueta</html>', 'Etiqueta demo')).toBe(true);
-    expect(open).toHaveBeenCalled();
-    expect(write).toHaveBeenCalledWith('<html>Etiqueta</html>');
-    expect(target.document.title).toBe('Etiqueta demo');
-
-    vi.unstubAllGlobals();
   });
 });

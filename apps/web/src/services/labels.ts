@@ -18,18 +18,3 @@ export async function getBatchVariantLabelPreview(
     body: { items },
   });
 }
-
-export function openPrintableHtml(html: string, title = 'Etiqueta NORBE T VISTE'): boolean {
-  const target = window.open('', '_blank', 'noopener,noreferrer');
-
-  if (!target) {
-    return false;
-  }
-
-  target.document.open();
-  target.document.write(html);
-  target.document.title = title;
-  target.document.close();
-
-  return true;
-}

@@ -1,28 +1,32 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { EntityImageThumb } from '../components/EntityImageThumb';
+import { PrintableHtmlModal } from '../components/PrintableHtmlModal';
 import {
   EmptyState,
   ErrorMessage,
   Field,
   inputClassName,
+  LoadingState,
   PageHeader,
   primaryButtonClassName,
   secondaryButtonClassName,
   SuccessMessage,
 } from '../components/ui';
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
-import {
-  getBatchVariantLabelPreview,
-  getEntryLotLabelPreview,
-  getVariantLabelPreview,
-  openPrintableHtml,
-} from '../services/labels';
-import type { LabelBatchItemFormValues } from '../types';
+import { getBatchVariantLabelPreview, getEntryLotLabelPreview } from '../services/labels';
+import { getEntryLot, listEntryLots } from '../services/lots';
+import { getVariantByQr, listVariants } from '../services/variants';
+import type { EntryLotSummary, LabelBatchItemFormValues, Variant } from '../types';
 
 const emptyBatchItem: LabelBatchItemFormValues = {
   id_variante: '',
   cantidad: 1,
 };
+
+interface LabelBatchRow extends LabelBatchItemFormValues {
+  variant: Variant;
+}
 
 export function isValidLabelQuantity(value: number): boolean {
   return Number.isInteger(value) && value > 0;
@@ -33,15 +37,35 @@ function handleMessage(error: unknown, fallback: string): string {
   return error instanceof ApiClientError ? error.message : fallback;
 }
 
+function variantLabel(variant: Variant): string {
+  return `${variant.producto.nombreProducto ?? 'Producto'} / ${variant.sku} / ${variant.codigoQr}`;
+}
+
+function lotLabel(lot: EntryLotSummary): string {
+  return `${lot.numeroLote} / ${lot.nombreProveedor ?? 'Sin proveedor'} / ${lot.estadoLote}`;
+}
+
 export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void }) {
   const { token, logout } = useAuth();
-  const [variantId, setVariantId] = useState('');
-  const [entryLotId, setEntryLotId] = useState('');
+  const [variants, setVariants] = useState<Variant[]>([]);
+  const [lots, setLots] = useState<EntryLotSummary[]>([]);
+  const [variantInput, setVariantInput] = useState('');
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
+  const [individualQuantity, setIndividualQuantity] = useState(1);
+  const [batchInput, setBatchInput] = useState('');
   const [batchItem, setBatchItem] = useState<LabelBatchItemFormValues>(emptyBatchItem);
-  const [batchItems, setBatchItems] = useState<LabelBatchItemFormValues[]>([]);
+  const [batchItems, setBatchItems] = useState<LabelBatchRow[]>([]);
+  const [entryLotInput, setEntryLotInput] = useState('');
+  const [selectedLot, setSelectedLot] = useState<EntryLotSummary | null>(null);
+  const [preview, setPreview] = useState<{ title: string; html: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const confirmedLots = useMemo(
+    () => lots.filter((lot) => lot.estadoLote === 'CONFIRMADO'),
+    [lots],
+  );
 
   async function expireIfNeeded(actionError: unknown): Promise<boolean> {
     if (!isUnauthorizedError(actionError)) return false;
@@ -50,7 +74,111 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
     return true;
   }
 
-  async function openHtml(action: () => Promise<string>, title: string) {
+  async function loadCatalogs() {
+    if (!token) return;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const [variantsData, lotsData] = await Promise.all([
+        listVariants(token, { estado: 'ACTIVA' }),
+        listEntryLots(token, {}),
+      ]);
+      setVariants(variantsData);
+      setLots(lotsData);
+    } catch (loadError) {
+      if (await expireIfNeeded(loadError)) return;
+      setError(handleMessage(loadError, 'No se pudieron cargar variantes y lotes.'));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadCatalogs();
+  }, [token]);
+
+  async function resolveVariant(value: string): Promise<Variant | null> {
+    const query = value.trim();
+    if (!token || !query) return null;
+
+    const local = variants.find(
+      (variant) =>
+        variant.idVariante === query ||
+        variant.codigoQr.toLowerCase() === query.toLowerCase() ||
+        variant.sku.toLowerCase() === query.toLowerCase(),
+    );
+    if (local) return local;
+
+    try {
+      return await getVariantByQr(token, query);
+    } catch {
+      const found = await listVariants(token, { buscar: query });
+      return found[0] ?? null;
+    }
+  }
+
+  async function resolveLot(value: string): Promise<EntryLotSummary | null> {
+    const query = value.trim();
+    if (!token || !query) return null;
+
+    const local = lots.find(
+      (lot) =>
+        lot.idLote === query ||
+        lot.numeroLote.toLowerCase() === query.toLowerCase() ||
+        (lot.numeroFactura?.toLowerCase() ?? '') === query.toLowerCase(),
+    );
+    if (local) return local;
+
+    try {
+      const lot = await getEntryLot(token, query);
+      return {
+        idLote: lot.idLote,
+        idProveedor: lot.idProveedor,
+        nombreProveedor: lot.proveedor?.nombreProveedor ?? null,
+        numeroLote: lot.numeroLote,
+        numeroFactura: lot.numeroFactura,
+        fechaLote: lot.fechaLote,
+        estadoLote: lot.estadoLote,
+        observaciones: lot.observaciones,
+        cantidadDetalles: lot.detalles.length,
+        totalEstimado: null,
+        creadoPor: lot.creadoPor,
+        actualizadoPor: lot.actualizadoPor,
+        creadoEn: lot.creadoEn,
+        actualizadoEn: lot.actualizadoEn,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async function selectVariantFromInput(value = variantInput) {
+    setError(null);
+    const variant = await resolveVariant(value);
+    if (!variant) {
+      setSelectedVariant(null);
+      setError('La variante no existe. Puedes usar selector, codigo QR o id interno.');
+      return;
+    }
+    setSelectedVariant(variant);
+    setVariantInput(variant.codigoQr);
+    setIndividualQuantity(Math.max(variant.stockActual, 1));
+  }
+
+  async function selectLotFromInput(value = entryLotInput) {
+    setError(null);
+    const lot = await resolveLot(value);
+    if (!lot) {
+      setSelectedLot(null);
+      setError('El lote no existe. Puedes usar el selector, codigo de lote o id interno.');
+      return;
+    }
+    setSelectedLot(lot);
+    setEntryLotInput(lot.numeroLote);
+  }
+
+  async function openPreview(action: () => Promise<string>, title: string) {
     if (!token) return;
     setIsLoading(true);
     setError(null);
@@ -58,11 +186,8 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
 
     try {
       const html = await action();
-      if (!openPrintableHtml(html, title)) {
-        setError('El navegador bloqueo la nueva pestana de impresion.');
-        return;
-      }
-      setSuccess('Preview generado en una nueva pestana.');
+      setPreview({ title, html });
+      setSuccess('Preview generado.');
     } catch (labelError) {
       if (await expireIfNeeded(labelError)) return;
       setError(handleMessage(labelError, 'No se pudo generar el preview de etiquetas.'));
@@ -71,8 +196,28 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
     }
   }
 
-  function addBatchItem() {
-    if (!batchItem.id_variante.trim()) {
+  function submitIndividual(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !selectedVariant) {
+      setError('Selecciona una variante antes de generar etiqueta.');
+      return;
+    }
+    if (!isValidLabelQuantity(individualQuantity)) {
+      setError('La cantidad debe ser un entero mayor que 0.');
+      return;
+    }
+    void openPreview(
+      () =>
+        getBatchVariantLabelPreview(token, [
+          { id_variante: selectedVariant.idVariante, cantidad: individualQuantity },
+        ]),
+      `Etiqueta ${selectedVariant.codigoQr}`,
+    );
+  }
+
+  async function addBatchItem() {
+    const lookup = batchInput.trim() || batchItem.id_variante.trim();
+    if (!lookup) {
       setError('Debes indicar la variante.');
       return;
     }
@@ -81,23 +226,29 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
       return;
     }
 
+    const variant = await resolveVariant(lookup);
+    if (!variant) {
+      setError('La variante no existe. Puedes escribir el codigo QR visible o escogerla.');
+      return;
+    }
+
     setError(null);
     setBatchItems((current) => [
       ...current,
-      { ...batchItem, id_variante: batchItem.id_variante.trim() },
+      { id_variante: variant.idVariante, cantidad: batchItem.cantidad, variant },
     ]);
     setBatchItem(emptyBatchItem);
+    setBatchInput('');
   }
 
   function removeBatchItem(index: number) {
     setBatchItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
 
-  function submitIndividual(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const id = variantId.trim();
-    if (!id || !token) return;
-    void openHtml(() => getVariantLabelPreview(token, id), 'Etiqueta individual NORBE T VISTE');
+  function updateBatchQuantity(index: number, cantidad: number) {
+    setBatchItems((current) =>
+      current.map((item, itemIndex) => (itemIndex === index ? { ...item, cantidad } : item)),
+    );
   }
 
   function submitBatch(event: FormEvent<HTMLFormElement>) {
@@ -107,17 +258,45 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
       setError('Agrega al menos una variante a la lista.');
       return;
     }
-    void openHtml(
-      () => getBatchVariantLabelPreview(token, batchItems),
+    const invalid = batchItems.some((item) => !isValidLabelQuantity(item.cantidad));
+    if (invalid) {
+      setError('Todas las cantidades deben ser enteros mayores que 0.');
+      return;
+    }
+
+    void openPreview(
+      () =>
+        getBatchVariantLabelPreview(
+          token,
+          batchItems.map(({ id_variante, cantidad }) => ({ id_variante, cantidad })),
+        ),
       'Etiquetas por lista NORBE T VISTE',
     );
   }
 
   function submitEntryLot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const id = entryLotId.trim();
-    if (!id || !token) return;
-    void openHtml(() => getEntryLotLabelPreview(token, id), 'Etiquetas de lote NORBE T VISTE');
+    if (!token || !selectedLot) {
+      setError('Selecciona un lote antes de generar etiquetas.');
+      return;
+    }
+    if (selectedLot.estadoLote === 'ANULADO') {
+      setError('El lote esta anulado y no puede generar etiquetas.');
+      return;
+    }
+    if (selectedLot.estadoLote !== 'CONFIRMADO') {
+      setError('Solo los lotes confirmados pueden generar etiquetas.');
+      return;
+    }
+    if (selectedLot.cantidadDetalles === 0) {
+      setError('El lote no tiene detalles para generar etiquetas.');
+      return;
+    }
+
+    void openPreview(
+      () => getEntryLotLabelPreview(token, selectedLot.idLote),
+      `Etiquetas ${selectedLot.numeroLote}`,
+    );
   }
 
   return (
@@ -129,6 +308,7 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
 
       {error && <ErrorMessage message={error} />}
       {success && <SuccessMessage message={success} />}
+      {isLoading && <LoadingState />}
 
       <div className="grid gap-4 xl:grid-cols-3">
         <form
@@ -136,14 +316,60 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
           onSubmit={submitIndividual}
         >
           <h2 className="text-sm font-semibold text-stone-950">Etiqueta individual</h2>
-          <Field label="ID variante">
-            <input
-              required
-              value={variantId}
-              onChange={(event) => setVariantId(event.target.value)}
-              className={inputClassName}
-            />
-          </Field>
+          <div className="mt-3 grid gap-3">
+            <Field label="Selector de variante">
+              <select
+                value={selectedVariant?.idVariante ?? ''}
+                onChange={(event) => {
+                  const variant = variants.find((item) => item.idVariante === event.target.value);
+                  setSelectedVariant(variant ?? null);
+                  setVariantInput(variant?.codigoQr ?? '');
+                  setIndividualQuantity(Math.max(variant?.stockActual ?? 1, 1));
+                }}
+                className={inputClassName}
+              >
+                <option value="">Selecciona variante</option>
+                {variants.map((variant) => (
+                  <option key={variant.idVariante} value={variant.idVariante}>
+                    {variantLabel(variant)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Codigo QR o id interno">
+              <div className="flex gap-2">
+                <input
+                  value={variantInput}
+                  onChange={(event) => setVariantInput(event.target.value)}
+                  placeholder="NTV-VAR-000013"
+                  className={inputClassName}
+                />
+                <button
+                  type="button"
+                  onClick={() => void selectVariantFromInput()}
+                  className={secondaryButtonClassName}
+                >
+                  Buscar
+                </button>
+              </div>
+            </Field>
+            {selectedVariant && (
+              <VariantPreview variant={selectedVariant} quantity={individualQuantity} />
+            )}
+            {selectedVariant?.stockActual === 0 && (
+              <ErrorMessage message="La variante no tiene stock. Se sugiere 1 etiqueta para revisión manual." />
+            )}
+            <Field label="Cantidad">
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={individualQuantity}
+                onChange={(event) => setIndividualQuantity(Number(event.target.value))}
+                className={inputClassName}
+              />
+            </Field>
+          </div>
           <button type="submit" disabled={isLoading} className={`${primaryButtonClassName} mt-4`}>
             Ver etiqueta
           </button>
@@ -151,13 +377,29 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
 
         <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={submitBatch}>
           <h2 className="text-sm font-semibold text-stone-950">Etiquetas por lista</h2>
-          <div className="grid gap-3">
-            <Field label="ID variante">
-              <input
+          <div className="mt-3 grid gap-3">
+            <Field label="Selector de variante">
+              <select
                 value={batchItem.id_variante}
-                onChange={(event) =>
-                  setBatchItem({ ...batchItem, id_variante: event.target.value })
-                }
+                onChange={(event) => {
+                  setBatchItem({ ...batchItem, id_variante: event.target.value });
+                  setBatchInput('');
+                }}
+                className={inputClassName}
+              >
+                <option value="">Selecciona variante</option>
+                {variants.map((variant) => (
+                  <option key={variant.idVariante} value={variant.idVariante}>
+                    {variantLabel(variant)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Codigo QR o id interno">
+              <input
+                value={batchInput}
+                onChange={(event) => setBatchInput(event.target.value)}
+                placeholder="NTV-VAR-000013"
                 className={inputClassName}
               />
             </Field>
@@ -173,7 +415,11 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
                 className={inputClassName}
               />
             </Field>
-            <button type="button" onClick={addBatchItem} className={secondaryButtonClassName}>
+            <button
+              type="button"
+              onClick={() => void addBatchItem()}
+              className={secondaryButtonClassName}
+            >
               Agregar fila
             </button>
           </div>
@@ -184,15 +430,21 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
               {batchItems.map((item, index) => (
                 <div
                   key={`${item.id_variante}-${index}`}
-                  className="flex items-center justify-between gap-3 rounded-md border border-stone-200 p-2 text-sm"
+                  className="grid gap-3 rounded-md border border-stone-200 p-2 text-sm md:grid-cols-[minmax(0,1fr)_110px_auto]"
                 >
-                  <span>
-                    {item.id_variante} / cantidad {item.cantidad}
-                  </span>
+                  <VariantPreview variant={item.variant} quantity={item.cantidad} compact />
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={item.cantidad}
+                    onChange={(event) => updateBatchQuantity(index, Number(event.target.value))}
+                    className={inputClassName}
+                  />
                   <button
                     type="button"
                     onClick={() => removeBatchItem(index)}
-                    className="h-8 rounded-md border border-stone-300 px-3 text-xs text-stone-700"
+                    className="h-10 rounded-md border border-stone-300 px-3 text-xs text-stone-700"
                   >
                     Quitar
                   </button>
@@ -207,19 +459,101 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
 
         <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={submitEntryLot}>
           <h2 className="text-sm font-semibold text-stone-950">Etiquetas desde lote</h2>
-          <Field label="ID lote de entrada">
-            <input
-              required
-              value={entryLotId}
-              onChange={(event) => setEntryLotId(event.target.value)}
-              className={inputClassName}
-            />
-          </Field>
+          <div className="mt-3 grid gap-3">
+            <Field label="Selector de lote confirmado">
+              <select
+                value={selectedLot?.idLote ?? ''}
+                onChange={(event) => {
+                  const lot = lots.find((item) => item.idLote === event.target.value);
+                  setSelectedLot(lot ?? null);
+                  setEntryLotInput(lot?.numeroLote ?? '');
+                }}
+                className={inputClassName}
+              >
+                <option value="">Selecciona lote</option>
+                {confirmedLots.map((lot) => (
+                  <option key={lot.idLote} value={lot.idLote}>
+                    {lotLabel(lot)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Codigo o id de lote">
+              <div className="flex gap-2">
+                <input
+                  value={entryLotInput}
+                  onChange={(event) => setEntryLotInput(event.target.value)}
+                  placeholder="LOTE-..."
+                  className={inputClassName}
+                />
+                <button
+                  type="button"
+                  onClick={() => void selectLotFromInput()}
+                  className={secondaryButtonClassName}
+                >
+                  Buscar
+                </button>
+              </div>
+            </Field>
+            {selectedLot && (
+              <div className="rounded-md border border-stone-200 bg-stone-50 p-3 text-sm">
+                <p className="font-semibold text-stone-950">{selectedLot.numeroLote}</p>
+                <p className="mt-1 text-xs text-stone-500">
+                  {selectedLot.nombreProveedor ?? 'Sin proveedor'} / {selectedLot.estadoLote} /{' '}
+                  {selectedLot.fechaLote.slice(0, 10)}
+                </p>
+              </div>
+            )}
+          </div>
           <button type="submit" disabled={isLoading} className={`${primaryButtonClassName} mt-4`}>
             Ver etiquetas del lote
           </button>
         </form>
       </div>
+
+      {preview && (
+        <PrintableHtmlModal
+          title={preview.title}
+          html={preview.html}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </section>
+  );
+}
+
+function VariantPreview({
+  variant,
+  quantity,
+  compact = false,
+}: {
+  variant: Variant;
+  quantity: number;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-3 ${
+        compact ? 'border-0 bg-transparent p-0' : ''
+      }`}
+    >
+      <EntityImageThumb
+        owner="variante"
+        id={variant.idVariante}
+        alt={variant.producto.nombreProducto ?? variant.sku}
+      />
+      <div className="min-w-0 text-sm">
+        <p className="truncate font-semibold text-stone-950">
+          {variant.producto.nombreProducto ?? 'Producto sin nombre'}
+        </p>
+        <p className="text-xs text-stone-500">
+          Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} / SKU{' '}
+          {variant.sku}
+        </p>
+        <p className="text-xs text-stone-500">
+          QR {variant.codigoQr} / Stock {variant.stockActual} / Cantidad {quantity}
+        </p>
+      </div>
+    </div>
   );
 }

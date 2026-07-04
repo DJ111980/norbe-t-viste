@@ -39,6 +39,11 @@ const emptyProductForm: ProductFormValues = {
   visible_catalogo: false,
 };
 
+function handleImageSaveMessage(error: unknown): string {
+  if (isForbiddenError(error)) return 'No tienes permisos para subir la imagen.';
+  return error instanceof ApiClientError ? error.message : 'No se pudo guardar la imagen.';
+}
+
 export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => void }) {
   const { token, user, logout } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
@@ -50,7 +55,6 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [imageTarget, setImageTarget] = useState<Product | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   const [form, setForm] = useState<ProductFormValues>(emptyProductForm);
@@ -144,12 +148,23 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
       const saved = editing
         ? await updateProduct(token, editing.idProducto, form)
         : await createProduct(token, form);
+      let imageErrorMessage: string | null = null;
       if (pendingImageFile) {
-        await uploadImage(token, 'producto', saved.idProducto, pendingImageFile);
+        try {
+          await uploadImage(token, 'producto', saved.idProducto, pendingImageFile);
+        } catch (uploadError) {
+          imageErrorMessage = handleImageSaveMessage(uploadError);
+        }
       }
-      setSuccess(editing ? 'Producto actualizado.' : 'Producto creado.');
-      if (pendingImageFile) setImageTarget(saved);
+      setSuccess(
+        `${editing ? 'Producto actualizado.' : 'Producto creado.'}${
+          imageErrorMessage
+            ? ' La imagen no se pudo guardar; intenta subirla de nuevo desde Editar.'
+            : ''
+        }`,
+      );
       resetForm();
+      if (imageErrorMessage) setFormError(imageErrorMessage);
       await loadData();
     } catch (saveError) {
       await handleError(saveError);
@@ -249,6 +264,7 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
             editing={editing}
             isSaving={isSaving}
             pendingImageFile={pendingImageFile}
+            onSessionExpired={onSessionExpired}
             onCancel={resetForm}
             onChange={setForm}
             onImageChange={setPendingImageFile}
@@ -261,21 +277,6 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
         <div className="rounded-md border border-stone-200 bg-white p-4 text-sm text-stone-600">
           Tu rol permite consultar productos. Crear, editar e inactivar es administrativo.
         </div>
-      )}
-
-      {imageTarget && (
-        <Modal
-          title={`Imagen de ${imageTarget.nombreProducto}`}
-          onClose={() => setImageTarget(null)}
-          size="md"
-        >
-          <ImageManager
-            owner="producto"
-            id={imageTarget.idProducto}
-            canManage={canManage}
-            onSessionExpired={onSessionExpired}
-          />
-        </Modal>
       )}
 
       {isLoading ? (
@@ -323,13 +324,6 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setImageTarget(product)}
-                        className={secondaryButtonClassName}
-                      >
-                        Imagen
-                      </button>
                       {canManage && (
                         <>
                           <button
@@ -366,6 +360,7 @@ function ProductForm({
   editing,
   isSaving,
   pendingImageFile,
+  onSessionExpired,
   onCancel,
   onChange,
   onImageChange,
@@ -376,6 +371,7 @@ function ProductForm({
   editing: Product | null;
   isSaving: boolean;
   pendingImageFile: File | null;
+  onSessionExpired: () => void;
   onCancel: () => void;
   onChange: (form: ProductFormValues) => void;
   onImageChange: (file: File | null) => void;
@@ -393,6 +389,17 @@ function ProductForm({
           </button>
         )}
       </div>
+
+      {editing && (
+        <div className="mb-4">
+          <ImageManager
+            owner="producto"
+            id={editing.idProducto}
+            canManage
+            onSessionExpired={onSessionExpired}
+          />
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre producto" required>
