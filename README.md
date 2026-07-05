@@ -1,141 +1,94 @@
 # NORBE T VISTE
 
-Plataforma web PWA para la gestion comercial de **NORBE T VISTE**, desarrollada por **Danilo Jose Castillejo Ponton**.
+NORBE T VISTE es una plataforma web de gestion comercial para una tienda de ropa.
+Permite administrar clientes, proveedores, categorias, productos, variantes,
+lotes de entrada, inventario, ventas, creditos, cartera, devoluciones,
+etiquetas QR, reportes, usuarios y branding.
 
-El proyecto esta pensado como un sistema real para administrar clientes, proveedores, productos, variantes por talla y color, lotes de entrada, inventario, ventas, creditos, abonos, imagenes, codigos QR por variante y reportes basicos.
-
-## Arquitectura Inicial
-
-La arquitectura base propuesta es cloud-first serverless:
-
-```text
-apps/web  -> React + TypeScript + Tailwind CSS + PWA
-apps/api  -> Cloudflare Workers + TypeScript
-db        -> Migraciones y seeds para Cloudflare D1
-R2        -> Imagenes de productos, variantes, logos y QR
-D1        -> Datos relacionales y rutas/keys de archivos
-```
+El proyecto fue desarrollado para **NORBE T VISTE** por **Danilo Jose
+Castillejo Ponton**.
 
 ## Estructura
 
 ```text
-norbe-t-viste/
-├── apps/
-│   ├── web/
-│   │   ├── public/
-│   │   │   └── branding/
-│   │   └── src/
-│   └── api/
-│       └── src/
-├── packages/
-│   └── shared/
-│       └── src/
-├── db/
-│   ├── migrations/
-│   └── seeds/
-├── docs/
-├── img/
-├── .env.example
-├── Makefile
-├── package.json
-└── README.md
+apps/web      Frontend React + TypeScript + Tailwind
+apps/api      API Cloudflare Worker + TypeScript
+packages      Codigo compartido
+db            Migraciones D1
+docs          Documentacion tecnica y funcional
+img           Recursos originales de marca
 ```
 
-## Comandos
+## Requisitos
 
-Instalar dependencias:
+- Node.js compatible con el proyecto.
+- npm.
+- Wrangler para Cloudflare Workers/D1/R2.
+- Make opcional para atajos.
+
+## Instalacion Local
 
 ```bash
 npm install
-```
-
-Ejecutar desarrollo web:
-
-```bash
-npm run dev
-```
-
-Formatear:
-
-```bash
-npm run format
-```
-
-Validar formato, lint, tipos, pruebas y build:
-
-```bash
-npm run check
-```
-
-Los mismos comandos existen como atajos en `Makefile`:
-
-```bash
-make install
-make dev
-make format
-make lint
-make test
-make build
-make check
-```
-
-En Windows, `make` puede ejecutarse desde Git Bash, WSL o Make para Windows. Si no esta disponible, usar directamente `npm run ...`.
-
-Crear el primer administrador local:
-
-```bash
+npm run db:migrate
 npm run admin:create
 ```
 
-O con Make:
-
-```bash
-make admin-create
-```
-
-## Variables De Entorno
-
-Copiar `.env.example` a `.env` cuando sea necesario y completar valores reales solo en el entorno local o en Cloudflare.
-
-No se deben guardar secretos, tokens, IDs reales privados ni credenciales dentro del repositorio.
-
-Para el Worker local, Wrangler puede leer secretos desde `apps/api/.dev.vars`. Ese archivo esta ignorado por Git. Para crear el primer administrador local se requieren:
+El backend local usa `apps/api/.dev.vars`. Ese archivo no debe subirse a Git.
+Variables esperadas:
 
 ```env
+JWT_SECRET=
+JWT_EXPIRES_IN=8h
 ADMIN_SEED_NAME=
 ADMIN_SEED_EMAIL=
 ADMIN_SEED_PASSWORD=
-JWT_SECRET=
-JWT_EXPIRES_IN=8h
 ```
 
-La contrasena inicial debe tener minimo 8 caracteres, al menos una letra y al menos un numero.
+El usuario admin local de desarrollo puede definirse con los valores seed del
+entorno local. No guardar secretos reales en el repositorio.
 
-## Branding
+## Correr Local
 
-La carpeta `img/` contiene los recursos originales del logo y una nota `LEEME.txt`.
+Backend:
 
-Segun esa nota:
+```bash
+npm run dev:api
+```
 
-- Logo general web recomendado: `NORBE_T_VISTE_web_512_transparente.png`.
-- Logo web de mayor calidad: `NORBE_T_VISTE_web_1024_transparente.png`.
-- Favicon recomendado: `NORBE_T_VISTE_favicon_32_transparente.png` o version 64.
-- Etiquetas pequenas: `NORBE_T_VISTE_etiqueta_128_transparente.png` o version 256.
-- Archivo maestro: `NORBE_T_VISTE_circular_borde_rojo_transparente_HD.png`.
+Frontend:
 
-En una fase posterior, con autorizacion, estos recursos deben organizarse en `apps/web/public/branding/` y conservar la documentacion de uso del logo.
+```bash
+npm run dev:web
+```
 
-## Reglas Tecnicas Base
+El frontend necesita `apps/web/.env.local` con:
 
-- Las imagenes no se guardan en D1; se guardan en R2 y en D1 solo queda la ruta o key.
-- El API espera un binding de R2 llamado `BUCKET`. El bucket real se configura en Cloudflare/Wrangler y no debe inventarse ni guardarse con credenciales reales en el repositorio.
-- El stock pertenece a variantes, no a productos.
-- El QR es por variante de producto, no por unidad fisica.
+```env
+VITE_API_URL=http://127.0.0.1:8787
+```
+
+## Validacion
+
+```bash
+npm run format
+npm run test -w apps/api
+npm run test -w apps/web
+npm run build -w apps/web
+npm run check
+make check
+```
+
+## Reglas Criticas
+
+- Producto y variante no son lo mismo.
+- El stock real vive en `variantes_producto.stock_actual`.
 - Las ventas no se eliminan; se anulan.
-- Los productos con historial no se eliminan; se desactivan.
-- Las deudas se manejan con creditos, abonos y ajustes, no como campo directo del cliente.
-- Los comentarios tecnicos del codigo deben estar en espanol y explicar reglas de negocio o decisiones no evidentes.
+- Las deudas viven en creditos, abonos y ajustes, no en clientes.
+- El QR codifica solo `codigo_qr`.
+- Imagenes, logos y avatares viven en R2; D1 guarda keys.
+- La hora comercial usa America/Bogota.
 
-## Estado Actual
+## Documentacion
 
-Esta fase solo crea la estructura inicial, documentacion y configuracion de herramientas. No hay modulos de negocio implementados todavia.
+La documentacion completa esta en [docs/README.md](docs/README.md).

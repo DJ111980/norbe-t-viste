@@ -393,7 +393,7 @@ function SaleSelector({
                     <p className="text-xs text-stone-500">{sale.idVenta}</p>
                   </td>
                   <td className="px-4 py-3 text-stone-700">
-                    {sale.cliente?.nombreCompleto ?? 'Sin cliente'}
+                    {sale.cliente?.nombreCompleto ?? 'Cliente general'}
                   </td>
                   <td className="px-4 py-3 text-stone-700">{sale.tipoVenta}</td>
                   <td className="px-4 py-3 text-stone-700">{currency(sale.total)}</td>
@@ -432,8 +432,8 @@ function ReturnSaleDetail({ sale, returns }: { sale: SaleDetail; returns: SaleRe
       <div className="border-b border-stone-100 p-4">
         <h2 className="text-sm font-semibold text-stone-950">{sale.numeroVenta}</h2>
         <p className="mt-1 text-xs text-stone-500">
-          {sale.tipoVenta} / {sale.estadoVenta} / {sale.cliente?.nombreCompleto ?? 'Sin cliente'} /{' '}
-          {currency(sale.total)}
+          {sale.tipoVenta} / {sale.estadoVenta} /{' '}
+          {sale.cliente?.nombreCompleto ?? 'Cliente general'} / {currency(sale.total)}
         </p>
       </div>
       <table className="w-full min-w-[860px] text-left text-sm">

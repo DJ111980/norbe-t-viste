@@ -94,6 +94,7 @@ export function canShowCancelButton(
 }
 
 const currency = formatMoney;
+const stockExceededMessage = 'La cantidad solicitada supera el stock disponible.';
 
 function handleMessage(error: unknown, fallback: string): string {
   if (isForbiddenError(error)) return 'No tienes permisos para esta acción.';
@@ -201,28 +202,28 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
     void loadData({ buscar: '', estado: '', tipoVenta: '' });
   }, [token]);
 
-  function addLine() {
+  function addLine(): boolean {
     const selectedVariant = variants.find((variant) => variant.idVariante === line.id_variante);
     if (!selectedVariant) {
       setFormError('Selecciona una variante valida.');
-      return;
+      return false;
     }
     const subtotalBruto = line.cantidad * selectedVariant.precioVenta;
     if (line.cantidad <= 0) {
       setFormError('La cantidad debe ser mayor que 0.');
-      return;
+      return false;
     }
     if (line.cantidad > selectedVariant.stockActual) {
-      setFormError('La cantidad supera el stock disponible mostrado.');
-      return;
+      setFormError(stockExceededMessage);
+      return false;
     }
     if (line.descuento < 0 || line.descuento > subtotalBruto) {
       setFormError('El descuento de línea no puede superar el subtotal bruto.');
-      return;
+      return false;
     }
     if (form.detalles.some((item) => item.id_variante === line.id_variante)) {
       setFormError('No puedes repetir la misma variante en una venta.');
-      return;
+      return false;
     }
 
     setFormError(null);
@@ -230,12 +231,8 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
       ...current,
       detalles: [...current.detalles, { ...line, precio_unitario: selectedVariant.precioVenta }],
     }));
-    setLine({
-      ...emptyLine,
-      id_variante: selectedVariant.idVariante,
-      precio_unitario: selectedVariant.precioVenta,
-      descuento: 0,
-    });
+    setLine(emptyLine);
+    return true;
   }
 
   function removeLine(idVariante: string) {
@@ -315,9 +312,7 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
       precio_unitario: scannedVariant.precioVenta,
       descuento: 0,
     });
-    setFormError(
-      blocked ? 'No se puede sumar otra unidad porque supera el stock disponible.' : null,
-    );
+    setFormError(blocked ? stockExceededMessage : null);
   }
 
   async function saveSale(event: FormEvent<HTMLFormElement>) {
@@ -524,7 +519,7 @@ function SaleForm({
   isSaving: boolean;
   onFormChange: (form: SaleFormValues) => void;
   onLineChange: (line: SaleItemFormValues) => void;
-  onAddLine: () => void;
+  onAddLine: () => boolean;
   onScanVariant: (code: string) => void;
   onRemoveLine: (idVariante: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -599,6 +594,12 @@ function SaleForm({
     submitVariantSearch();
   }
 
+  function submitSelectedLine() {
+    if (onAddLine()) {
+      setVariantSearch('');
+    }
+  }
+
   return (
     <form className="rounded-md border border-stone-200 bg-white p-4" onSubmit={onSubmit}>
       <h2 className="text-sm font-semibold text-stone-950">Nueva venta</h2>
@@ -621,7 +622,7 @@ function SaleForm({
           </select>
         </Field>
         <Field
-          label={form.tipo_venta === 'CONTADO' ? 'Cliente opcional' : 'Cliente obligatorio'}
+          label={form.tipo_venta === 'CONTADO' ? 'Cliente general' : 'Cliente obligatorio'}
           required={form.tipo_venta !== 'CONTADO'}
         >
           <select
@@ -630,7 +631,11 @@ function SaleForm({
             onChange={(event) => onFormChange({ ...form, id_cliente: event.target.value })}
             className={inputClassName}
           >
-            <option value="">Sin cliente asociado</option>
+            <option value="">
+              {form.tipo_venta === 'CONTADO'
+                ? 'Cliente general (sin asociar)'
+                : 'Selecciona cliente para cartera'}
+            </option>
             {clients.map((client) => (
               <option key={client.idCliente} value={client.idCliente}>
                 {clientLabel(client)}
@@ -768,7 +773,7 @@ function SaleForm({
               className={inputClassName}
             />
           </Field>
-          <button type="button" onClick={onAddLine} className={secondaryButtonClassName}>
+          <button type="button" onClick={submitSelectedLine} className={secondaryButtonClassName}>
             Agregar
           </button>
         </div>
@@ -947,7 +952,7 @@ function SalesTable({
                 <p className="text-xs text-stone-500">{sale.vendedor.nombreCompleto}</p>
               </td>
               <td className="px-4 py-3 text-stone-600">
-                {sale.cliente?.nombreCompleto ?? 'Sin cliente'}
+                {sale.cliente?.nombreCompleto ?? 'Cliente general'}
               </td>
               <td className="px-4 py-3 text-stone-700">{sale.tipoVenta}</td>
               <td className="px-4 py-3 text-stone-700">{currency(sale.subtotal)}</td>
@@ -1054,7 +1059,7 @@ function SaleDetailPanel({
           <h2 className="font-semibold text-stone-950">Resumen</h2>
           <p className="mt-3 flex justify-between">
             <span>Cliente</span>
-            <strong>{sale.cliente?.nombreCompleto ?? 'Sin cliente'}</strong>
+            <strong>{sale.cliente?.nombreCompleto ?? 'Cliente general'}</strong>
           </p>
           <p className="mt-2 flex justify-between">
             <span>Total bruto</span>

@@ -848,7 +848,7 @@ function DetailForm({
         )}
       </div>
       <div className="grid gap-3">
-        <Field label="Variante">
+        <Field label="Variante" required>
           <select
             required
             disabled={!!editing}
@@ -865,7 +865,7 @@ function DetailForm({
             ))}
           </select>
         </Field>
-        <Field label="Cantidad">
+        <Field label="Cantidad" required>
           <input
             required
             type="number"
@@ -876,7 +876,7 @@ function DetailForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Costo de compra unitario">
+        <Field label="Costo de compra unitario" required>
           <input
             required
             type="number"

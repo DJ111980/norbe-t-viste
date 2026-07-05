@@ -550,7 +550,9 @@ function SalesTable({
                 {new Date(item.creado_en).toLocaleString('es-CO')}
               </td>
               <td className="px-4 py-3 font-medium text-stone-950">{item.numero_venta}</td>
-              <td className="px-4 py-3 text-stone-700">{item.cliente_nombre ?? 'Sin cliente'}</td>
+              <td className="px-4 py-3 text-stone-700">
+                {item.cliente_nombre ?? 'Cliente general'}
+              </td>
               <td className="px-4 py-3 text-stone-700">{item.tipo_venta}</td>
               <td className="px-4 py-3">
                 <StatusBadge status={item.estado_venta} />
