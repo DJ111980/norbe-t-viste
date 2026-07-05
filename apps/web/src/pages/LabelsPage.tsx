@@ -44,7 +44,7 @@ function handleMessage(error: unknown, fallback: string): string {
 }
 
 function variantLabel(variant: Variant): string {
-  return `${variant.producto.nombreProducto ?? 'Producto'} / ${variant.sku} / ${variant.codigoQr}`;
+  return `${variant.producto.nombreProducto ?? 'Producto'} / QR ${variant.codigoQr}`;
 }
 
 function lotLabel(lot: EntryLotSummary): string {
@@ -118,9 +118,7 @@ export function LabelsPage({ onSessionExpired }: { onSessionExpired: () => void 
 
     const local = variants.find(
       (variant) =>
-        variant.idVariante === query ||
-        variant.codigoQr.toLowerCase() === query.toLowerCase() ||
-        variant.sku.toLowerCase() === query.toLowerCase(),
+        variant.idVariante === query || variant.codigoQr.toLowerCase() === query.toLowerCase(),
     );
     if (local) return local;
 
@@ -591,7 +589,7 @@ function VariantPreview({
       <EntityImageThumb
         owner="variante"
         id={variant.idVariante}
-        alt={variant.producto.nombreProducto ?? variant.sku}
+        alt={variant.producto.nombreProducto ?? variant.codigoQr}
       />
       <div className="min-w-0 text-sm">
         <p className="truncate font-semibold text-stone-950">
@@ -601,14 +599,14 @@ function VariantPreview({
           <>
             <p className="truncate font-mono text-xs text-stone-600">QR {variant.codigoQr}</p>
             <p className="truncate text-xs text-stone-500">
-              SKU {variant.sku} / Talla {variant.talla ?? 'Unica'} / Stock {variant.stockActual}
+              Talla {variant.talla ?? 'Unica'} / Stock {variant.stockActual}
             </p>
           </>
         ) : (
           <>
             <p className="text-xs text-stone-500">
-              Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} / SKU{' '}
-              {variant.sku}
+              Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} / QR{' '}
+              {variant.codigoQr}
             </p>
             <p className="text-xs text-stone-500">
               QR {variant.codigoQr} / Stock {variant.stockActual} / Cantidad {quantity}

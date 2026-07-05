@@ -46,7 +46,6 @@ export interface CancelSaleInput {
 export interface SaleVariantRecord {
   id_variante: string;
   id_producto: string;
-  sku: string;
   codigo_qr: string;
   talla: string | null;
   color: string | null;
@@ -101,7 +100,6 @@ export interface SaleDetailRecord {
   id_variante: string;
   codigo_qr: string;
   nombre_producto: string;
-  sku: string;
   talla: string | null;
   color: string | null;
   cantidad: number;
@@ -193,7 +191,6 @@ export interface PublicSaleLine {
   idDetalle: string;
   idVariante: string;
   nombreProducto: string;
-  sku: string;
   codigoQr: string;
   talla: string | null;
   color: string | null;
@@ -225,7 +222,6 @@ export interface SaleDetailToCreate {
   idVariante: string;
   codigoQr: string;
   nombreProducto: string;
-  sku: string;
   talla: string | null;
   color: string | null;
   cantidad: number;

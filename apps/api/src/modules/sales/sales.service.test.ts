@@ -102,7 +102,6 @@ vi.mock('./sales.repository', () => ({
           id_venta: input.idVenta,
           id_variante: detail.idVariante,
           nombre_producto: detail.nombreProducto,
-          sku: detail.sku,
           talla: detail.talla,
           color: detail.color,
           codigo_qr: detail.codigoQr,
@@ -170,7 +169,6 @@ vi.mock('./sales.repository', () => ({
           id_venta: input.idVenta,
           id_variante: detail.idVariante,
           nombre_producto: detail.nombreProducto,
-          sku: detail.sku,
           talla: detail.talla,
           color: detail.color,
           codigo_qr: detail.codigoQr,
@@ -272,7 +270,6 @@ vi.mock('./sales.repository', () => ({
           id_venta: input.idVenta,
           id_variante: detail.idVariante,
           nombre_producto: detail.nombreProducto,
-          sku: detail.sku,
           talla: detail.talla,
           color: detail.color,
           codigo_qr: detail.codigoQr,
@@ -463,7 +460,6 @@ function buildVariant(overrides: Partial<SaleVariantRecord> = {}): SaleVariantRe
   return {
     id_variante: 'var_1',
     id_producto: 'prd_1',
-    sku: 'SKU-1',
     codigo_qr: 'NTV-VAR-000001',
     talla: 'M',
     color: 'Azul',
@@ -511,7 +507,6 @@ function buildDetail(overrides: Partial<SaleDetailRecord> = {}): SaleDetailRecor
     id_variante: 'var_1',
     codigo_qr: 'NTV-VAR-000001',
     nombre_producto: 'Blusa congelada',
-    sku: 'SKU-CONGELADO',
     talla: 'M',
     color: 'Azul',
     cantidad: 1,
@@ -1060,7 +1055,6 @@ describe('sales service', () => {
 
     expect(mocks.details[0]).toMatchObject({
       nombre_producto: 'Blusa',
-      sku: 'SKU-1',
       talla: 'M',
       color: 'Azul',
       codigo_qr: 'NTV-VAR-000001',
@@ -1129,7 +1123,6 @@ describe('sales service', () => {
 
     expect(sale.detalles[0]).toMatchObject({
       nombreProducto: 'Blusa congelada',
-      sku: 'SKU-CONGELADO',
       codigoQr: 'NTV-VAR-000001',
       precioUnitario: 50000,
     });

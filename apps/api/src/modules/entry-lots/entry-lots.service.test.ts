@@ -228,7 +228,6 @@ function buildDetail(overrides: Partial<EntryLotDetailRecord> = {}): EntryLotDet
     observaciones: null,
     creado_en: '2026-07-02',
     actualizado_en: '2026-07-02',
-    sku: 'SKU-1',
     codigo_qr: 'NTV-VAR-000001',
     talla: 'M',
     color: 'Azul',

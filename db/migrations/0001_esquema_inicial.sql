@@ -360,9 +360,9 @@ CREATE INDEX IF NOT EXISTS idx_proveedores_nombre ON proveedores (nombre_proveed
 CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos (id_categoria);
 CREATE INDEX IF NOT EXISTS idx_productos_estado ON productos (estado);
 CREATE INDEX IF NOT EXISTS idx_variantes_producto ON variantes_producto (id_producto);
-CREATE INDEX IF NOT EXISTS idx_variantes_sku ON variantes_producto (sku);
 CREATE INDEX IF NOT EXISTS idx_variantes_qr ON variantes_producto (codigo_qr);
 CREATE INDEX IF NOT EXISTS idx_variantes_stock ON variantes_producto (stock_actual);
+CREATE INDEX IF NOT EXISTS idx_variantes_sku ON variantes_producto (sku);
 CREATE INDEX IF NOT EXISTS idx_lotes_proveedor ON lotes_entrada (id_proveedor);
 CREATE INDEX IF NOT EXISTS idx_lotes_fecha ON lotes_entrada (fecha_lote);
 CREATE INDEX IF NOT EXISTS idx_detalle_lote_lote ON detalle_lotes_entrada (id_lote);

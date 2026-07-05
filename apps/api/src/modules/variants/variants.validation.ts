@@ -13,7 +13,6 @@ const MAX_LIMIT = 100;
 const VARIANT_FIELDS = [
   'talla',
   'color',
-  'sku',
   'precio_venta',
   'precio_compra_referencia',
   'stock_minimo',
@@ -31,7 +30,6 @@ const FORBIDDEN_FIELDS = [
 interface RawVariantBody {
   talla?: unknown;
   color?: unknown;
-  sku?: unknown;
   precio_venta?: unknown;
   precio_compra_referencia?: unknown;
   stock_minimo?: unknown;
@@ -69,11 +67,6 @@ function normalizeOptionalText(value: unknown): string | null {
   }
   const normalizedValue = value.trim();
   return normalizedValue.length > 0 ? normalizedValue : null;
-}
-
-function normalizeOptionalSku(value: unknown): string | undefined {
-  const sku = normalizeOptionalText(value);
-  return sku ?? undefined;
 }
 
 function parseMoney(value: unknown, fieldName: string, fallback = 0): number {
@@ -126,7 +119,6 @@ export function validateCreateVariantInput(body: unknown): CreateVariantInput {
     color: normalizeOptionalText(rawBody?.color),
     tallaNormalizada: normalizeVariantPart(rawBody?.talla, 'unica'),
     colorNormalizado: normalizeVariantPart(rawBody?.color, 'sin-color'),
-    sku: normalizeOptionalSku(rawBody?.sku),
     precioVenta: parseMoney(rawBody?.precio_venta, 'precio_venta'),
     precioCompraReferencia: parseMoney(
       rawBody?.precio_compra_referencia,
@@ -158,7 +150,6 @@ export function validateUpdateVariantInput(body: unknown): UpdateVariantInput {
     input.color = normalizeOptionalText(rawBody.color);
     input.colorNormalizado = normalizeVariantPart(rawBody.color, 'sin-color');
   }
-  if (rawBody.sku !== undefined) input.sku = normalizeOptionalSku(rawBody.sku);
   if (rawBody.precio_venta !== undefined) {
     input.precioVenta = parseMoney(rawBody.precio_venta, 'precio_venta');
   }
@@ -198,7 +189,6 @@ export function validateListVariantsFilters(searchParams: URLSearchParams): List
     talla: normalizeOptionalText(searchParams.get('talla')) ?? undefined,
     color: normalizeOptionalText(searchParams.get('color')) ?? undefined,
     codigoQr: normalizeOptionalText(searchParams.get('codigo_qr')) ?? undefined,
-    sku: normalizeOptionalText(searchParams.get('sku')) ?? undefined,
     stockBajo: parseBooleanParam(searchParams.get('stock_bajo')),
     limit: parseNumberParam(searchParams.get('limit'), DEFAULT_LIMIT, MAX_LIMIT),
     offset: parseNumberParam(searchParams.get('offset'), 0),

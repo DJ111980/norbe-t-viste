@@ -44,7 +44,6 @@ export interface EntryLotDetailRecord {
   observaciones: string | null;
   creado_en: string;
   actualizado_en: string;
-  sku: string;
   codigo_qr: string;
   talla: string | null;
   color: string | null;
@@ -121,7 +120,6 @@ export interface PublicEntryLotDetail {
   idDetalleLote: string;
   variante: {
     idVariante: string;
-    sku: string;
     codigoQr: string;
     talla: string | null;
     color: string | null;

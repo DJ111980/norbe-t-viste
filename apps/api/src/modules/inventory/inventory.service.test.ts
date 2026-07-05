@@ -30,7 +30,7 @@ vi.mock('./inventory.repository', () => ({
       if (filters.sinStock === true && variant.stock_actual > 0) return false;
       if (
         filters.buscar &&
-        ![variant.nombre_producto, variant.sku, variant.codigo_qr, variant.talla, variant.color]
+        ![variant.nombre_producto, variant.codigo_qr, variant.talla, variant.color]
           .filter(Boolean)
           .some((value) => String(value).includes(filters.buscar))
       ) {
@@ -84,7 +84,6 @@ vi.mock('./inventory.repository', () => ({
         referencia_id: movement.idMovimiento,
         creado_por: userId,
         creado_en: '2026-07-02',
-        sku: variant.sku,
         codigo_qr: variant.codigo_qr,
         talla: variant.talla,
         color: variant.color,
@@ -112,7 +111,6 @@ vi.mock('./inventory.repository', () => ({
       referencia_id: movement.idMovimiento,
       creado_por: userId,
       creado_en: '2026-07-02',
-      sku: variant.sku,
       codigo_qr: variant.codigo_qr,
       talla: variant.talla,
       color: variant.color,
@@ -143,7 +141,6 @@ function buildVariant(overrides: Partial<InventoryVariantRecord> = {}): Inventor
   return {
     id_variante: 'var_1',
     id_producto: 'prd_1',
-    sku: 'SKU-1',
     codigo_qr: 'NTV-VAR-000001',
     talla: 'M',
     color: 'Azul',
@@ -173,7 +170,6 @@ function buildMovement(overrides: Partial<InventoryMovementRecord> = {}): Invent
     referencia_id: 'lot_1',
     creado_por: 'usr_admin',
     creado_en: '2026-07-02',
-    sku: 'SKU-1',
     codigo_qr: 'NTV-VAR-000001',
     talla: 'M',
     color: 'Azul',
@@ -187,13 +183,21 @@ describe('inventory service', () => {
   beforeEach(() => {
     mocks.variants = [
       buildVariant(),
-      buildVariant({ id_variante: 'var_inactiva', estado: 'INACTIVA' }),
-      buildVariant({ id_variante: 'var_producto_inactivo', estado_producto: 'INACTIVO' }),
+      buildVariant({
+        id_variante: 'var_inactiva',
+        estado: 'INACTIVA',
+        codigo_qr: 'NTV-VAR-000002',
+      }),
+      buildVariant({
+        id_variante: 'var_producto_inactivo',
+        estado_producto: 'INACTIVO',
+        codigo_qr: 'NTV-VAR-000003',
+      }),
       buildVariant({
         id_variante: 'var_sin_stock',
+        codigo_qr: 'NTV-VAR-000004',
         stock_actual: 0,
         stock_minimo: 1,
-        sku: 'SKU-0',
       }),
     ];
     mocks.movements = [
@@ -232,7 +236,11 @@ describe('inventory service', () => {
       await listInventoryVariants(env, adminAuth, { sinStock: true, limit: 50, offset: 0 }),
     ).toHaveLength(1);
     expect(
-      await listInventoryVariants(env, adminAuth, { buscar: 'SKU-0', limit: 50, offset: 0 }),
+      await listInventoryVariants(env, adminAuth, {
+        buscar: 'NTV-VAR-000001',
+        limit: 50,
+        offset: 0,
+      }),
     ).toHaveLength(1);
   });
 
@@ -302,7 +310,7 @@ describe('inventory service', () => {
   it('operacion con varios items crea varios movimientos', async () => {
     mocks.movements = [];
     mocks.variants.find((variant) => variant.id_variante === 'var_1')!.stock_actual = 0;
-    mocks.variants.push(buildVariant({ id_variante: 'var_2', stock_actual: 0, sku: 'SKU-2' }));
+    mocks.variants.push(buildVariant({ id_variante: 'var_2', stock_actual: 0 }));
 
     const result = await registerInitialInventory(env, adminAuth, {
       items: [

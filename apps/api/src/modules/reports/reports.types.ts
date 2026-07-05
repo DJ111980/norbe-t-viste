@@ -67,7 +67,6 @@ export interface InventoryReportRow {
   nombre_categoria: string | null;
   talla: string | null;
   color: string | null;
-  sku: string;
   codigo_qr: string;
   stock_actual: number;
   stock_minimo: number;
@@ -104,7 +103,6 @@ export interface InventoryMovementReportFilters extends PaginationInput {
 export interface InventoryMovementReportRow {
   id_movimiento: string;
   id_variante: string;
-  sku: string;
   codigo_qr: string;
   tipo_movimiento: string;
   cantidad: number;

@@ -167,10 +167,10 @@ function applyInventoryFilters(
 ): void {
   if (filters.q) {
     where.push(
-      '(p.nombre_producto LIKE ? OR v.sku LIKE ? OR v.codigo_qr LIKE ? OR v.talla LIKE ? OR v.color LIKE ?)',
+      '(p.nombre_producto LIKE ? OR v.codigo_qr LIKE ? OR v.talla LIKE ? OR v.color LIKE ?)',
     );
     const q = `%${filters.q}%`;
-    values.push(q, q, q, q, q);
+    values.push(q, q, q, q);
   }
   if (filters.idProducto) {
     where.push('v.id_producto = ?');
@@ -213,7 +213,6 @@ export async function listInventory(
         c.nombre_categoria,
         v.talla,
         v.color,
-        v.sku,
         v.codigo_qr,
         v.stock_actual,
         v.stock_minimo,
@@ -222,7 +221,7 @@ export async function listInventory(
       INNER JOIN productos p ON p.id_producto = v.id_producto
       LEFT JOIN categorias c ON c.id_categoria = p.id_categoria
       ${whereSql(where)}
-      ORDER BY p.nombre_producto ASC, v.sku ASC
+      ORDER BY p.nombre_producto ASC, v.codigo_qr ASC
       LIMIT ?
       OFFSET ?
     `,
@@ -323,7 +322,6 @@ export async function listInventoryMovements(
       SELECT
         m.id_movimiento,
         m.id_variante,
-        v.sku,
         v.codigo_qr,
         m.tipo_movimiento,
         m.cantidad,

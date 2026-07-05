@@ -57,7 +57,6 @@ describe('sales mapper', () => {
           id_variante: 'var_1',
           codigo_qr: 'NTV-VAR-000001',
           nombre_producto: 'Nombre congelado',
-          sku: 'SKU-CONGELADO',
           talla: 'M',
           color: 'Azul',
           cantidad: 1,
@@ -72,7 +71,6 @@ describe('sales mapper', () => {
 
     expect(detail.detalles[0]).toMatchObject({
       nombreProducto: 'Nombre congelado',
-      sku: 'SKU-CONGELADO',
     });
     expect(JSON.stringify(detail)).not.toContain('precio_compra');
   });

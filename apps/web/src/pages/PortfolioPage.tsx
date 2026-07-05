@@ -984,8 +984,7 @@ function CreditDetailPanel({
                     <td className="px-4 py-3">
                       <p className="font-medium text-stone-950">{line.nombre_producto}</p>
                       <p className="text-xs text-stone-500">
-                        {line.sku ?? 'Sin SKU'} / Talla {line.talla ?? 'Unica'} / Color{' '}
-                        {line.color ?? 'Sin color'}
+                        Talla {line.talla ?? 'Unica'} / Color {line.color ?? 'Sin color'}
                       </p>
                     </td>
                     <td className="px-4 py-3 text-stone-700">{line.cantidad}</td>
@@ -1124,7 +1123,7 @@ function CreditPaymentForm({
             ))}
           </select>
         </Field>
-        <Field label="Referencia">
+        <Field label="Comprobante">
           <input
             value={form.referencia_pago}
             onChange={(event) => onChange({ ...form, referencia_pago: event.target.value })}

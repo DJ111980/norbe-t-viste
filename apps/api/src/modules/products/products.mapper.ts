@@ -8,7 +8,6 @@ export function toPublicProduct(product: ProductRecord): PublicProduct {
     nombreProducto: product.nombre_producto,
     descripcion: product.descripcion,
     marca: product.marca,
-    referencia: product.referencia,
     visibleCatalogo: product.mostrar_en_catalogo === 1,
     estado: product.estado,
     categoria: {

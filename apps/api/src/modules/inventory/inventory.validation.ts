@@ -102,7 +102,6 @@ export function validateListInventoryVariantsFilters(
     categoria: normalizeOptionalText(searchParams.get('categoria')),
     talla: normalizeOptionalText(searchParams.get('talla')),
     color: normalizeOptionalText(searchParams.get('color')),
-    sku: normalizeOptionalText(searchParams.get('sku')),
     codigoQr: normalizeOptionalText(searchParams.get('codigo_qr')),
     stockBajo: parseBooleanParam(searchParams.get('stock_bajo')),
     sinStock: parseBooleanParam(searchParams.get('sin_stock')),

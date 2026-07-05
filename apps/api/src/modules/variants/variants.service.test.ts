@@ -44,10 +44,6 @@ vi.mock('./variants.repository', () => ({
           variant.color_normalizado === colorNormalizado,
       ) ?? null,
   ),
-  findVariantBySku: vi.fn(
-    async (_env: ApiEnv, sku: string) =>
-      [...mocks.variants.values()].find((variant) => variant.sku === sku) ?? null,
-  ),
   countVariants: vi.fn(async () => mocks.variants.size),
   createVariant: vi.fn(
     async (
@@ -55,14 +51,12 @@ vi.mock('./variants.repository', () => ({
       idVariante: string,
       idProducto: string,
       input: CreateVariantInput,
-      sku: string,
       codigoQr: string,
       userId: string,
     ) => {
       const variant = createVariantRecord({
         id_variante: idVariante,
         id_producto: idProducto,
-        sku,
         codigo_qr: codigoQr,
         talla: input.talla,
         color: input.color,
@@ -87,7 +81,6 @@ vi.mock('./variants.repository', () => ({
       if (input.color !== undefined) variant.color = input.color;
       if (input.tallaNormalizada !== undefined) variant.talla_normalizada = input.tallaNormalizada;
       if (input.colorNormalizado !== undefined) variant.color_normalizado = input.colorNormalizado;
-      if (input.sku !== undefined) variant.sku = input.sku;
       variant.actualizado_por = userId;
       mocks.lastUpdatedBy = userId;
       return variant;
@@ -142,7 +135,6 @@ function createVariantRecord(overrides: Partial<VariantRecord> = {}): VariantRec
   return {
     id_variante: 'var_1',
     id_producto: 'prd_1',
-    sku: 'NTV-SKU-000001',
     codigo_qr: 'NTV-VAR-000001',
     ruta_qr: null,
     talla: 'M',
@@ -217,45 +209,14 @@ describe('variants service', () => {
     });
   });
 
-  it('crear variante genera SKU y codigo QR si no vienen', async () => {
+  it('crear variante genera codigo QR si no viene', async () => {
     addProduct();
 
-    const variant = await createVariant(env, adminAuth, 'prd_1', createInput({ sku: undefined }));
-
-    expect(variant.sku).toBe('NTV-SKU-000001');
+    const variant = await createVariant(env, adminAuth, 'prd_1', createInput());
     expect(variant.codigoQr).toBe('NTV-VAR-000001');
     expect(variant.stockActual).toBe(0);
     expect(variant.creadoPor).toBe('usr_admin');
     expect(variant.actualizadoPor).toBe('usr_admin');
-  });
-
-  it('crear variante respeta SKU manual unico y rechaza duplicado', async () => {
-    addProduct();
-
-    const variant = await createVariant(
-      env,
-      adminAuth,
-      'prd_1',
-      createInput({ sku: 'SKU-MANUAL' }),
-    );
-    expect(variant.sku).toBe('SKU-MANUAL');
-
-    addProduct('prd_2');
-    await expect(
-      createVariant(
-        env,
-        adminAuth,
-        'prd_2',
-        createInput({
-          sku: 'SKU-MANUAL',
-          tallaNormalizada: 'l',
-          talla: 'L',
-        }),
-      ),
-    ).rejects.toMatchObject({
-      code: 'VARIANT_SKU_ALREADY_EXISTS',
-      status: 409,
-    });
   });
 
   it('editar variante rechaza combinacion duplicada y actualiza auditoria', async () => {
@@ -272,8 +233,7 @@ describe('variants service', () => {
       status: 409,
     });
 
-    const variant = await updateVariant(env, adminAuth, 'var_1', { sku: 'SKU-NUEVO' });
-    expect(variant.sku).toBe('SKU-NUEVO');
+    await updateVariant(env, adminAuth, 'var_1', { color: 'Azul', colorNormalizado: 'azul' });
     expect(mocks.lastUpdatedBy).toBe('usr_admin');
   });
 
@@ -331,7 +291,6 @@ describe('variants service', () => {
       talla: 'M',
       color: 'Rojo',
       codigoQr: 'NTV-VAR-000001',
-      sku: 'NTV-SKU-000001',
       stockBajo: true,
       limit: 50,
       offset: 0,
@@ -344,7 +303,6 @@ describe('variants service', () => {
       talla: 'M',
       color: 'Rojo',
       codigoQr: 'NTV-VAR-000001',
-      sku: 'NTV-SKU-000001',
       stockBajo: true,
       limit: 50,
       offset: 0,

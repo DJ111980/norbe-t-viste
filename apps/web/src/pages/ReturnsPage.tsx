@@ -461,7 +461,7 @@ function ReturnSaleDetail({ sale, returns }: { sale: SaleDetail; returns: SaleRe
                   <div className="min-w-0">
                     <p className="font-medium text-stone-950">{line.nombreProducto}</p>
                     <p className="text-xs text-stone-500">
-                      {line.codigoQr} / {line.sku} / Talla {line.talla ?? 'Unica'} / Color{' '}
+                      QR {line.codigoQr} / Talla {line.talla ?? 'Unica'} / Color{' '}
                       {line.color ?? 'Sin color'}
                     </p>
                   </div>

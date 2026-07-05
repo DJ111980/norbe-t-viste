@@ -18,10 +18,10 @@ describe('inventory service', () => {
   it('consulta inventario sin exponer edicion directa de stock', async () => {
     vi.mocked(apiRequest).mockResolvedValueOnce({ variantes: [] });
 
-    await listInventoryVariants('token', { buscar: 'sku', stockBajo: true });
+    await listInventoryVariants('token', { buscar: 'qr', stockBajo: true });
 
     expect(apiRequest).toHaveBeenCalledWith(
-      '/inventario/variantes?limit=100&offset=0&buscar=sku&stock_bajo=true',
+      '/inventario/variantes?limit=100&offset=0&buscar=qr&stock_bajo=true',
       { token: 'token' },
     );
   });

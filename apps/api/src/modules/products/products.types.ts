@@ -8,7 +8,6 @@ export interface ProductRecord {
   nombre_producto: string;
   descripcion: string | null;
   marca: string | null;
-  referencia: string | null;
   imagen_principal: string | null;
   mostrar_en_catalogo: number;
   estado: ProductStatus;
@@ -32,7 +31,6 @@ export interface PublicProduct {
   nombreProducto: string;
   descripcion: string | null;
   marca: string | null;
-  referencia: string | null;
   visibleCatalogo: boolean;
   estado: ProductStatus;
   categoria: ProductCategorySummary;
@@ -48,7 +46,6 @@ export interface CreateProductInput {
   idCategoria: string;
   descripcion: string | null;
   marca: string | null;
-  referencia: string | null;
   visibleCatalogo: boolean;
 }
 

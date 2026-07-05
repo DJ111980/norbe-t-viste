@@ -37,7 +37,6 @@ const emptyVariantForm: VariantFormValues = {
   id_producto: '',
   talla: '',
   color: '',
-  sku: '',
   precio_venta: 0,
   precio_compra_referencia: 0,
   stock_minimo: 0,
@@ -78,7 +77,6 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
     producto: '',
     estado: '',
     codigoQr: '',
-    sku: '',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -158,7 +156,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
   }
 
   useEffect(() => {
-    void loadData({ buscar: '', producto: '', estado: '', codigoQr: '', sku: '' });
+    void loadData({ buscar: '', producto: '', estado: '', codigoQr: '' });
   }, [token]);
 
   useEffect(() => {
@@ -175,7 +173,6 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
       id_producto: variant.producto.idProducto,
       talla: variant.talla ?? '',
       color: variant.color ?? '',
-      sku: variant.sku,
       precio_venta: variant.precioVenta,
       precio_compra_referencia: variant.precioCompraReferencia,
       stock_minimo: variant.stockMinimo,
@@ -287,7 +284,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
     <section className="space-y-6">
       <PageHeader
         title="Variantes"
-        description="Gestiona tallas, colores, precio de venta y costo de compra de referencia. El stock actual es solo consultivo."
+        description="Gestiona tallas, colores, precio de venta y costo de compra. El stock actual es solo consultivo."
         action={
           canManage && (
             <button
@@ -315,7 +312,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
           <input
             value={filters.buscar ?? ''}
             onChange={(event) => setFilters({ ...filters, buscar: event.target.value })}
-            placeholder="Buscar por producto, SKU o QR"
+            placeholder="Buscar por producto, talla, color o QR"
             className={inputClassName}
           />
           <select
@@ -385,7 +382,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
               <EntityImageThumb
                 owner="variante"
                 id={labelTarget.idVariante}
-                alt={labelTarget.producto.nombreProducto ?? labelTarget.sku}
+                alt={labelTarget.producto.nombreProducto ?? labelTarget.codigoQr}
               />
               <div className="text-sm">
                 <p className="font-semibold text-stone-950">
@@ -454,15 +451,14 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
                       <EntityImageThumb
                         owner="variante"
                         id={variant.idVariante}
-                        alt={variant.producto.nombreProducto ?? variant.sku}
+                        alt={variant.producto.nombreProducto ?? variant.codigoQr}
                       />
                       <div>
                         <p className="font-medium text-stone-950">
                           {variant.producto.nombreProducto ?? 'Producto sin nombre'}
                         </p>
                         <p className="text-xs text-stone-500">
-                          Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} /
-                          SKU {variant.sku}
+                          Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'}
                         </p>
                       </div>
                     </div>
@@ -592,13 +588,6 @@ function VariantForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="SKU">
-          <input
-            value={form.sku}
-            onChange={(event) => onChange({ ...form, sku: event.target.value })}
-            className={inputClassName}
-          />
-        </Field>
         <Field label="Precio venta" required>
           <input
             type="number"
@@ -610,7 +599,7 @@ function VariantForm({
             className={inputClassName}
           />
         </Field>
-        <Field label="Costo de compra de referencia">
+        <Field label="Costo de compra">
           <input
             type="number"
             min={0}

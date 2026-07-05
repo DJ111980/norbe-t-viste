@@ -46,7 +46,6 @@ export function toPublicSaleLine(record: SaleDetailRecord): PublicSaleLine {
     idDetalle: record.id_detalle_venta,
     idVariante: record.id_variante,
     nombreProducto: record.nombre_producto,
-    sku: record.sku,
     codigoQr: record.codigo_qr,
     talla: record.talla,
     color: record.color,

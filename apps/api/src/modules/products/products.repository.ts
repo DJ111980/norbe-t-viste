@@ -14,7 +14,6 @@ const PRODUCT_COLUMNS = `
   p.nombre_producto,
   p.descripcion,
   p.marca,
-  p.referencia,
   p.imagen_principal,
   p.mostrar_en_catalogo,
   p.estado,
@@ -35,11 +34,9 @@ export async function listProducts(
   const values: (string | number)[] = [];
 
   if (filters.buscar) {
-    where.push(
-      '(p.nombre_producto LIKE ? OR p.descripcion LIKE ? OR p.marca LIKE ? OR p.referencia LIKE ?)',
-    );
+    where.push('(p.nombre_producto LIKE ? OR p.descripcion LIKE ? OR p.marca LIKE ?)');
     const searchValue = `%${filters.buscar}%`;
-    values.push(searchValue, searchValue, searchValue, searchValue);
+    values.push(searchValue, searchValue, searchValue);
   }
 
   if (filters.estado) {
@@ -141,14 +138,13 @@ export async function createProduct(
         nombre_normalizado,
         descripcion,
         marca,
-        referencia,
         mostrar_en_catalogo,
         estado,
         creado_por,
         actualizado_por,
         creado_en,
         actualizado_en
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO', ?, ?, datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVO', ?, ?, datetime('now'), datetime('now'))
     `,
   )
     .bind(
@@ -158,7 +154,6 @@ export async function createProduct(
       input.nombreNormalizado,
       input.descripcion,
       input.marca,
-      input.referencia,
       input.visibleCatalogo ? 1 : 0,
       userId,
       userId,
@@ -200,11 +195,6 @@ export async function updateProduct(
   if (input.marca !== undefined) {
     assignments.push('marca = ?');
     values.push(input.marca);
-  }
-
-  if (input.referencia !== undefined) {
-    assignments.push('referencia = ?');
-    values.push(input.referencia);
   }
 
   if (input.visibleCatalogo !== undefined) {

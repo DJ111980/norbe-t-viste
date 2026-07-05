@@ -191,7 +191,6 @@ export async function listCreditDetails(
         id_credito,
         id_variante,
         nombre_producto,
-        sku,
         talla,
         color,
         cantidad,

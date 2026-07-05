@@ -37,7 +37,6 @@ function sale(overrides: Partial<SaleDetail> = {}): SaleDetail {
         idDetalle: 'det_1',
         idVariante: 'var_1',
         nombreProducto: 'Camisa',
-        sku: 'SKU-1',
         codigoQr: 'NTV-VAR-1',
         talla: 'M',
         color: 'Rojo',

@@ -14,7 +14,6 @@ const PRODUCT_FIELDS = [
   'nombre_producto',
   'descripcion',
   'marca',
-  'referencia',
   'id_categoria',
   'visible_catalogo',
 ];
@@ -31,7 +30,6 @@ interface RawProductBody {
   nombre_producto?: unknown;
   descripcion?: unknown;
   marca?: unknown;
-  referencia?: unknown;
   id_categoria?: unknown;
   visible_catalogo?: unknown;
   estado?: unknown;
@@ -159,7 +157,6 @@ export function validateCreateProductInput(body: unknown): CreateProductInput {
     idCategoria,
     descripcion: normalizeOptionalText(rawBody?.descripcion),
     marca: normalizeOptionalText(rawBody?.marca),
-    referencia: normalizeOptionalText(rawBody?.referencia),
     visibleCatalogo: normalizeOptionalBoolean(rawBody?.visible_catalogo, false),
   };
 }
@@ -197,8 +194,6 @@ export function validateUpdateProductInput(body: unknown): UpdateProductInput {
   if (rawBody.descripcion !== undefined)
     input.descripcion = normalizeOptionalText(rawBody.descripcion);
   if (rawBody.marca !== undefined) input.marca = normalizeOptionalText(rawBody.marca);
-  if (rawBody.referencia !== undefined)
-    input.referencia = normalizeOptionalText(rawBody.referencia);
   if (rawBody.visible_catalogo !== undefined) {
     input.visibleCatalogo = normalizeOptionalBoolean(rawBody.visible_catalogo, false);
   }

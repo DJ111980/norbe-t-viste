@@ -23,7 +23,6 @@ describe('products validation', () => {
       idCategoria: 'cat_1',
       descripcion: null,
       marca: null,
-      referencia: null,
       visibleCatalogo: true,
     });
   });

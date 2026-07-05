@@ -35,7 +35,6 @@ const emptyProductForm: ProductFormValues = {
   id_categoria: '',
   descripcion: '',
   marca: '',
-  referencia: '',
   visible_catalogo: false,
 };
 
@@ -117,7 +116,6 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
       id_categoria: product.categoria.idCategoria,
       descripcion: product.descripcion ?? '',
       marca: product.marca ?? '',
-      referencia: product.referencia ?? '',
       visible_catalogo: product.visibleCatalogo,
     });
     setFormError(null);
@@ -220,7 +218,7 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
           <input
             value={filters.buscar ?? ''}
             onChange={(event) => setFilters({ ...filters, buscar: event.target.value })}
-            placeholder="Buscar por nombre, marca o referencia"
+            placeholder="Buscar por nombre o marca"
             className={inputClassName}
           />
           <select
@@ -307,9 +305,7 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
                       />
                       <div>
                         <p className="font-medium text-stone-950">{product.nombreProducto}</p>
-                        <p className="text-xs text-stone-500">
-                          {product.referencia ?? 'Sin referencia'}
-                        </p>
+                        <p className="text-xs text-stone-500">{product.marca ?? 'Sin marca'}</p>
                       </div>
                     </div>
                   </td>
@@ -429,13 +425,6 @@ function ProductForm({
           <input
             value={form.marca}
             onChange={(event) => onChange({ ...form, marca: event.target.value })}
-            className={inputClassName}
-          />
-        </Field>
-        <Field label="Referencia">
-          <input
-            value={form.referencia}
-            onChange={(event) => onChange({ ...form, referencia: event.target.value })}
             className={inputClassName}
           />
         </Field>

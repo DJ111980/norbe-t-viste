@@ -14,7 +14,6 @@ describe('variants validation', () => {
       validateCreateVariantInput({
         talla: ' M ',
         color: ' Rojo Vino ',
-        sku: 'SKU-1',
         precio_venta: 50000,
         precio_compra_referencia: 25000,
         stock_minimo: 2,
@@ -24,7 +23,6 @@ describe('variants validation', () => {
       color: 'Rojo Vino',
       tallaNormalizada: 'm',
       colorNormalizado: 'rojo vino',
-      sku: 'SKU-1',
       precioVenta: 50000,
       precioCompraReferencia: 25000,
       stockMinimo: 2,
@@ -88,7 +86,6 @@ describe('variants validation', () => {
       talla: undefined,
       color: undefined,
       codigoQr: undefined,
-      sku: undefined,
       stockBajo: true,
       limit: 100,
       offset: 10,

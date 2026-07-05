@@ -691,7 +691,6 @@ function InventoryTable({
           <tr>
             <th className="px-4 py-3">Producto</th>
             <th className="px-4 py-3">Variante</th>
-            <th className="px-4 py-3">SKU</th>
             <th className="px-4 py-3">QR</th>
             <th className="px-4 py-3">Stock</th>
             <th className="px-4 py-3">Estado</th>
@@ -704,7 +703,6 @@ function InventoryTable({
               <td className="px-4 py-3 text-stone-700">
                 Talla {item.talla ?? 'Unica'} / Color {item.color ?? 'Sin color'}
               </td>
-              <td className="px-4 py-3 text-stone-700">{item.sku}</td>
               <td className="px-4 py-3 text-stone-700">{item.codigo_qr}</td>
               <td className="px-4 py-3 text-stone-700">{number(item.stock_actual)}</td>
               <td className="px-4 py-3">
@@ -799,7 +797,7 @@ function MovementFilters({
           ))}
         </select>
       </Field>
-      <Field label="Referencia">
+      <Field label="Origen">
         <select
           value={filters.referencia_tipo}
           onChange={(event) =>
@@ -851,7 +849,7 @@ function MovementTable({
             <th className="px-4 py-3">Tipo</th>
             <th className="px-4 py-3">Cantidad</th>
             <th className="px-4 py-3">Stock</th>
-            <th className="px-4 py-3">Referencia</th>
+            <th className="px-4 py-3">Origen</th>
             <th className="px-4 py-3">Usuario</th>
           </tr>
         </thead>
@@ -861,16 +859,14 @@ function MovementTable({
               <td className="px-4 py-3 text-stone-600">
                 {new Date(item.creado_en).toLocaleString('es-CO')}
               </td>
-              <td className="px-4 py-3 text-stone-700">
-                {item.sku} / {item.codigo_qr}
-              </td>
+              <td className="px-4 py-3 text-stone-700">{item.codigo_qr}</td>
               <td className="px-4 py-3 text-stone-700">{item.tipo_movimiento}</td>
               <td className="px-4 py-3 text-stone-700">{number(item.cantidad)}</td>
               <td className="px-4 py-3 text-stone-700">
                 {number(item.stock_antes)} a {number(item.stock_despues)}
               </td>
               <td className="px-4 py-3 text-stone-700">
-                {item.referencia_tipo ?? 'Sin ref.'} / {item.referencia_id ?? '-'}
+                {item.referencia_tipo ?? 'Sin origen'} / {item.referencia_id ?? '-'}
               </td>
               <td className="px-4 py-3 text-stone-700">{item.usuario_nombre ?? 'Sin usuario'}</td>
             </tr>

@@ -43,7 +43,6 @@ export function toPublicEntryLotDetail(
     idDetalleLote: detail.id_detalle_lote,
     variante: {
       idVariante: detail.id_variante,
-      sku: detail.sku,
       codigoQr: detail.codigo_qr,
       talla: detail.talla,
       color: detail.color,

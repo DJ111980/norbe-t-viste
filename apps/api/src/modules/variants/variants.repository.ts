@@ -11,7 +11,6 @@ import type {
 const VARIANT_COLUMNS = `
   v.id_variante,
   v.id_producto,
-  v.sku,
   v.codigo_qr,
   v.ruta_qr,
   v.talla,
@@ -42,10 +41,10 @@ export async function listVariants(
 
   if (filters.buscar) {
     where.push(
-      '(p.nombre_producto LIKE ? OR v.sku LIKE ? OR v.codigo_qr LIKE ? OR v.talla LIKE ? OR v.color LIKE ?)',
+      '(p.nombre_producto LIKE ? OR v.codigo_qr LIKE ? OR v.talla LIKE ? OR v.color LIKE ?)',
     );
     const searchValue = `%${filters.buscar}%`;
-    values.push(searchValue, searchValue, searchValue, searchValue, searchValue);
+    values.push(searchValue, searchValue, searchValue, searchValue);
   }
   if (filters.estado) {
     where.push('v.estado = ?');
@@ -66,10 +65,6 @@ export async function listVariants(
   if (filters.codigoQr) {
     where.push('v.codigo_qr = ?');
     values.push(filters.codigoQr);
-  }
-  if (filters.sku) {
-    where.push('v.sku = ?');
-    values.push(filters.sku);
   }
   if (filters.stockBajo !== undefined) {
     where.push(
@@ -167,20 +162,6 @@ export async function findVariantByCombination(
     .first<VariantRecord>();
 }
 
-export async function findVariantBySku(env: ApiEnv, sku: string): Promise<VariantRecord | null> {
-  return env.DB.prepare(
-    `
-      SELECT ${VARIANT_COLUMNS}
-      FROM variantes_producto v
-      INNER JOIN productos p ON p.id_producto = v.id_producto
-      WHERE v.sku = ?
-      LIMIT 1
-    `,
-  )
-    .bind(sku)
-    .first<VariantRecord>();
-}
-
 export async function countVariants(env: ApiEnv): Promise<number> {
   const row = await env.DB.prepare('SELECT COUNT(*) AS total FROM variantes_producto').first<{
     total: number;
@@ -193,7 +174,6 @@ export async function createVariant(
   idVariante: string,
   idProducto: string,
   input: CreateVariantInput,
-  sku: string,
   codigoQr: string,
   userId: string,
 ): Promise<VariantRecord> {
@@ -202,7 +182,6 @@ export async function createVariant(
       INSERT INTO variantes_producto (
         id_variante,
         id_producto,
-        sku,
         codigo_qr,
         talla,
         color,
@@ -217,13 +196,12 @@ export async function createVariant(
         actualizado_por,
         creado_en,
         actualizado_en
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVA', ?, ?, datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVA', ?, ?, datetime('now'), datetime('now'))
     `,
   )
     .bind(
       idVariante,
       idProducto,
-      sku,
       codigoQr,
       input.talla,
       input.color,
@@ -264,10 +242,6 @@ export async function updateVariant(
   if (input.colorNormalizado !== undefined) {
     assignments.push('color_normalizado = ?');
     values.push(input.colorNormalizado);
-  }
-  if (input.sku !== undefined) {
-    assignments.push('sku = ?');
-    values.push(input.sku);
   }
   if (input.precioVenta !== undefined) {
     assignments.push('precio_venta = ?');

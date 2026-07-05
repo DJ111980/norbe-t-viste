@@ -117,7 +117,6 @@ async function buildSaleDetails(
       idVariante: variant.id_variante,
       codigoQr: variant.codigo_qr,
       nombreProducto: variant.nombre_producto,
-      sku: variant.sku,
       talla: variant.talla,
       color: variant.color,
       cantidad: item.cantidad,

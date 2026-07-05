@@ -23,7 +23,6 @@ export function toPublicInventoryVariant(
           }
         : null,
     },
-    sku: variant.sku,
     codigoQr: variant.codigo_qr,
     talla: variant.talla,
     color: variant.color,
@@ -59,7 +58,6 @@ export function toPublicInventoryMovement(
     creadoEn: movement.creado_en,
     variante: {
       idVariante: movement.id_variante,
-      sku: movement.sku,
       codigoQr: movement.codigo_qr,
       talla: movement.talla,
       color: movement.color,

@@ -678,8 +678,6 @@ function LotsTable({
   selected: EntryLot | null;
   onSelect: (lot: EntryLotSummary) => void;
 }) {
-  const [isCancelOpen, setIsCancelOpen] = useState(false);
-
   return (
     <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
       <table className="w-full min-w-[860px] text-left text-sm">
@@ -758,6 +756,8 @@ function LotDetail({
   onEditDetail: (detail: EntryLotDetail) => void;
   onDeleteDetail: (detail: EntryLotDetail) => void;
 }) {
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+
   return (
     <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
       <div className="border-b border-stone-100 p-4">
@@ -785,8 +785,8 @@ function LotDetail({
                   <td className="px-4 py-3">
                     <p className="font-medium text-stone-950">{detail.producto.nombreProducto}</p>
                     <p className="text-xs text-stone-500">
-                      {detail.variante.sku} / Talla {detail.variante.talla ?? 'Unica'} / Color{' '}
-                      {detail.variante.color ?? 'Sin color'}
+                      QR {detail.variante.codigoQr} / Talla {detail.variante.talla ?? 'Unica'} /
+                      Color {detail.variante.color ?? 'Sin color'}
                     </p>
                   </td>
                   <td className="px-4 py-3 text-stone-700">{detail.cantidad}</td>
@@ -866,7 +866,8 @@ function DetailForm({
             <option value="">Selecciona variante</option>
             {variants.map((variant) => (
               <option key={variant.idVariante} value={variant.idVariante}>
-                {variant.producto.nombreProducto ?? 'Producto'} / {variant.sku}
+                {variant.producto.nombreProducto ?? 'Producto'} / QR {variant.codigoQr} / Talla{' '}
+                {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'}
               </option>
             ))}
           </select>

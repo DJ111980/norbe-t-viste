@@ -10,7 +10,6 @@ export function toPublicVariant(variant: VariantRecord): PublicVariant {
       nombreProducto: variant.nombre_producto,
       estadoProducto: variant.estado_producto,
     },
-    sku: variant.sku,
     codigoQr: variant.codigo_qr,
     talla: variant.talla,
     color: variant.color,

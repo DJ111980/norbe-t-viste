@@ -11,7 +11,6 @@ import type {
 const INVENTORY_VARIANT_COLUMNS = `
   v.id_variante,
   v.id_producto,
-  v.sku,
   v.codigo_qr,
   v.talla,
   v.color,
@@ -38,7 +37,6 @@ const MOVEMENT_COLUMNS = `
   m.referencia_id,
   m.creado_por,
   m.creado_en,
-  v.sku,
   v.codigo_qr,
   v.talla,
   v.color,
@@ -64,10 +62,10 @@ export async function listInventoryVariants(
 
   if (filters.buscar) {
     where.push(
-      '(p.nombre_producto LIKE ? OR v.sku LIKE ? OR v.codigo_qr LIKE ? OR v.talla LIKE ? OR v.color LIKE ?)',
+      '(p.nombre_producto LIKE ? OR v.codigo_qr LIKE ? OR v.talla LIKE ? OR v.color LIKE ?)',
     );
     const searchValue = `%${filters.buscar}%`;
-    values.push(searchValue, searchValue, searchValue, searchValue, searchValue);
+    values.push(searchValue, searchValue, searchValue, searchValue);
   }
   if (filters.estado && !onlyVisibleToSeller) {
     where.push('v.estado = ?');
@@ -88,10 +86,6 @@ export async function listInventoryVariants(
   if (filters.color) {
     where.push('v.color_normalizado = ?');
     values.push(filters.color.trim().toLowerCase().replace(/\s+/g, ' '));
-  }
-  if (filters.sku) {
-    where.push('v.sku = ?');
-    values.push(filters.sku);
   }
   if (filters.codigoQr) {
     where.push('v.codigo_qr = ?');

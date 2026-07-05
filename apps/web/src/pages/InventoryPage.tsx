@@ -62,7 +62,7 @@ const emptyAdjustmentForm: InventoryAdjustmentFormValues = {
 function variantLabel(variant: InventoryVariant): string {
   return `${variant.producto.nombreProducto} / ${variant.talla ?? 'Unica'} / ${
     variant.color ?? 'Sin color'
-  } / ${variant.sku}`;
+  } / QR ${variant.codigoQr}`;
 }
 
 function handleMessage(error: unknown, fallback: string): string {
@@ -227,7 +227,7 @@ export function InventoryPage({ onSessionExpired }: { onSessionExpired: () => vo
           <input
             value={filters.buscar ?? ''}
             onChange={(event) => setFilters({ ...filters, buscar: event.target.value })}
-            placeholder="Buscar por producto, SKU o QR"
+            placeholder="Buscar por producto, talla, color o QR"
             className={inputClassName}
           />
           <select
@@ -309,7 +309,11 @@ export function InventoryPage({ onSessionExpired }: { onSessionExpired: () => vo
       )}
 
       {selected && (
-        <Modal title={`Inventario ${selected.sku}`} onClose={() => setSelected(null)} size="xl">
+        <Modal
+          title={`Inventario ${selected.codigoQr}`}
+          onClose={() => setSelected(null)}
+          size="xl"
+        >
           <InventoryDetail
             variant={selected}
             movements={variantMovements}
@@ -387,8 +391,8 @@ function InventoryTable({
                   <div className="min-w-0">
                     <p className="font-medium text-stone-950">{variant.producto.nombreProducto}</p>
                     <p className="text-xs text-stone-500">
-                      Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} / SKU{' '}
-                      {variant.sku}
+                      Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} / QR{' '}
+                      {variant.codigoQr}
                     </p>
                   </div>
                 </div>
@@ -440,7 +444,6 @@ function InventoryDetail({
         </div>
         <dl className="mt-4 space-y-3 text-sm">
           <Info label="Producto" value={variant.producto.nombreProducto} />
-          <Info label="SKU" value={variant.sku} />
           <Info label="Codigo QR" value={variant.codigoQr} />
           <Info label="Talla" value={variant.talla ?? 'Unica'} />
           <Info label="Color" value={variant.color ?? 'Sin color'} />
@@ -488,7 +491,7 @@ function MovementList({
                 <p className="text-xs text-stone-500">{movement.motivo ?? 'Sin motivo'}</p>
               </td>
               <td className="px-4 py-3 text-stone-600">
-                {movement.producto.nombreProducto} / {movement.variante.sku}
+                {movement.producto.nombreProducto} / {movement.variante.codigoQr}
               </td>
               <td className="px-4 py-3 text-stone-700">{movement.cantidad}</td>
               <td className="px-4 py-3 text-stone-700">

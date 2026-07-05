@@ -12,7 +12,6 @@ import type {
   VariantRecord,
 } from './variants.types';
 
-const SKU_PREFIX = 'NTV-SKU-';
 const QR_PREFIX = 'NTV-VAR-';
 
 function createVariantId(): string {
@@ -74,18 +73,6 @@ async function ensureCombinationIsAvailable(
   }
 }
 
-async function ensureSkuIsAvailable(
-  env: ApiEnv,
-  sku: string,
-  currentVariantId?: string,
-): Promise<void> {
-  const existingVariant = await variantsRepository.findVariantBySku(env, sku);
-
-  if (existingVariant && existingVariant.id_variante !== currentVariantId) {
-    throw new ApiError('VARIANT_SKU_ALREADY_EXISTS', 'Ya existe una variante con ese SKU.', 409);
-  }
-}
-
 async function generateUniqueCode(
   env: ApiEnv,
   prefix: string,
@@ -102,15 +89,6 @@ async function generateUniqueCode(
   }
 
   throw new ApiError('VARIANT_CODE_GENERATION_FAILED', 'No se pudo generar un codigo unico.', 500);
-}
-
-async function resolveSku(env: ApiEnv, requestedSku?: string): Promise<string> {
-  if (requestedSku) {
-    await ensureSkuIsAvailable(env, requestedSku);
-    return requestedSku;
-  }
-
-  return generateUniqueCode(env, SKU_PREFIX, variantsRepository.findVariantBySku);
 }
 
 function canReadVariant(auth: AuthContext, variant: VariantRecord): boolean {
@@ -198,7 +176,6 @@ export async function createVariant(
     input.colorNormalizado,
   );
 
-  const sku = await resolveSku(env, input.sku);
   const codigoQr = await generateUniqueCode(env, QR_PREFIX, variantsRepository.findVariantByQr);
 
   // El QR guarda solo codigo interno y se crea una vez por variante. No se
@@ -210,7 +187,6 @@ export async function createVariant(
       createVariantId(),
       idProducto,
       input,
-      sku,
       codigoQr,
       auth.user.id_usuario,
     ),
@@ -236,10 +212,6 @@ export async function updateVariant(
       colorNormalizado,
       idVariante,
     );
-  }
-
-  if (input.sku) {
-    await ensureSkuIsAvailable(env, input.sku, idVariante);
   }
 
   return toPublicVariant(

@@ -14,14 +14,12 @@ export interface VariantFilters {
   producto?: string;
   estado?: VariantStatus | '';
   codigoQr?: string;
-  sku?: string;
 }
 
 function toVariantBody(values: VariantFormValues) {
   return {
     talla: values.talla,
     color: values.color,
-    sku: values.sku,
     precio_venta: values.precio_venta,
     precio_compra_referencia: values.precio_compra_referencia,
     stock_minimo: values.stock_minimo,
@@ -35,7 +33,6 @@ export async function listVariants(token: string, filters: VariantFilters): Prom
   if (filters.producto?.trim()) params.set('producto', filters.producto.trim());
   if (filters.estado) params.set('estado', filters.estado);
   if (filters.codigoQr?.trim()) params.set('codigo_qr', filters.codigoQr.trim());
-  if (filters.sku?.trim()) params.set('sku', filters.sku.trim());
 
   const data = await apiRequest<ListVariantsResponse>(`/variantes?${params}`, { token });
 

@@ -52,7 +52,6 @@ const DETAIL_COLUMNS = `
   d.observaciones,
   d.creado_en,
   d.actualizado_en,
-  v.sku,
   v.codigo_qr,
   v.talla,
   v.color,

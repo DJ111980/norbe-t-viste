@@ -5,7 +5,6 @@ import type { InventoryMovementRecord, InventoryVariantRecord } from './inventor
 const variant: InventoryVariantRecord = {
   id_variante: 'var_1',
   id_producto: 'prd_1',
-  sku: 'SKU-1',
   codigo_qr: 'NTV-VAR-000001',
   talla: 'M',
   color: 'Azul',
@@ -32,7 +31,6 @@ const movement: InventoryMovementRecord = {
   referencia_id: 'lot_1',
   creado_por: 'usr_admin',
   creado_en: '2026-07-02',
-  sku: 'SKU-1',
   codigo_qr: 'NTV-VAR-000001',
   talla: 'M',
   color: 'Azul',

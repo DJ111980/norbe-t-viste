@@ -221,7 +221,6 @@ export interface Product {
   nombreProducto: string;
   descripcion: string | null;
   marca: string | null;
-  referencia: string | null;
   visibleCatalogo: boolean;
   estado: ProductStatus;
   categoria: {
@@ -237,7 +236,6 @@ export interface ProductFormValues {
   id_categoria: string;
   descripcion: string;
   marca: string;
-  referencia: string;
   visible_catalogo: boolean;
 }
 
@@ -248,7 +246,6 @@ export interface Variant {
     nombreProducto: string | null;
     estadoProducto: ProductStatus | null;
   };
-  sku: string;
   codigoQr: string;
   talla: string | null;
   color: string | null;
@@ -264,7 +261,6 @@ export interface VariantFormValues {
   id_producto: string;
   talla: string;
   color: string;
-  sku: string;
   precio_venta: number;
   precio_compra_referencia: number;
   stock_minimo: number;
@@ -303,7 +299,6 @@ export interface InventoryVariant {
       nombreCategoria: string | null;
     } | null;
   };
-  sku: string;
   codigoQr: string;
   talla: string | null;
   color: string | null;
@@ -329,7 +324,6 @@ export interface InventoryMovement {
   creadoEn: string;
   variante: {
     idVariante: string;
-    sku: string;
     codigoQr: string;
     talla: string | null;
     color: string | null;
@@ -376,7 +370,6 @@ export interface EntryLotDetail {
   idDetalleLote: string;
   variante: {
     idVariante: string;
-    sku: string;
     codigoQr: string;
     talla: string | null;
     color: string | null;
@@ -459,7 +452,6 @@ export interface SaleLine {
   idDetalle: string;
   idVariante: string;
   nombreProducto: string;
-  sku: string;
   codigoQr: string;
   talla: string | null;
   color: string | null;
@@ -588,7 +580,6 @@ export interface CreditLine {
   id_credito: string;
   id_variante: string | null;
   nombre_producto: string;
-  sku: string | null;
   talla: string | null;
   color: string | null;
   cantidad: number;
@@ -827,7 +818,6 @@ export interface InventoryReportRow {
   nombre_categoria: string | null;
   talla: string | null;
   color: string | null;
-  sku: string;
   codigo_qr: string;
   stock_actual: number;
   stock_minimo: number;
@@ -851,7 +841,6 @@ export interface InventoryMovementReportFilters extends ReportBaseFilters {
 export interface InventoryMovementReportRow {
   id_movimiento: string;
   id_variante: string;
-  sku: string;
   codigo_qr: string;
   tipo_movimiento: string;
   cantidad: number;

@@ -108,7 +108,7 @@ function handleMessage(error: unknown, fallback: string): string {
 function variantLabel(variant: Variant): string {
   return `${variant.producto.nombreProducto ?? 'Producto'} / ${variant.talla ?? 'Unica'} / ${
     variant.color ?? 'Sin color'
-  } / ${variant.sku}`;
+  } / QR ${variant.codigoQr}`;
 }
 
 function clientLabel(client: Client): string {
@@ -257,14 +257,7 @@ export function SalesPage({ onSessionExpired }: { onSessionExpired: () => void }
     return (
       variants.find((variant) => {
         const qr = variant.codigoQr.toLowerCase();
-        const sku = variant.sku.toLowerCase();
-        return (
-          variant.idVariante.toLowerCase() === query ||
-          qr === query ||
-          sku === query ||
-          qr.endsWith(query) ||
-          sku.endsWith(query)
-        );
+        return variant.idVariante.toLowerCase() === query || qr === query || qr.endsWith(query);
       }) ?? null
     );
   }
@@ -551,13 +544,7 @@ function SaleForm({
       const query = variantSearch.trim().toLowerCase();
       if (!query) return true;
 
-      return [
-        variant.producto.nombreProducto,
-        variant.talla,
-        variant.color,
-        variant.sku,
-        variant.codigoQr,
-      ]
+      return [variant.producto.nombreProducto, variant.talla, variant.color, variant.codigoQr]
         .filter(Boolean)
         .some((value) => value?.toLowerCase().includes(query));
     })
@@ -597,9 +584,7 @@ function SaleForm({
     }
 
     const exact = variants.find(
-      (variant) =>
-        variant.codigoQr.toLowerCase() === query.toLowerCase() ||
-        variant.sku.toLowerCase() === query.toLowerCase(),
+      (variant) => variant.codigoQr.toLowerCase() === query.toLowerCase(),
     );
 
     if (exact) {
@@ -726,7 +711,7 @@ function SaleForm({
                 value={variantSearch}
                 onChange={(event) => setVariantSearch(event.target.value)}
                 onKeyDown={handleVariantSearchKeyDown}
-                placeholder="Producto, talla, color, SKU o QR"
+                placeholder="Producto, talla, color o QR"
                 className={inputClassName}
               />
               <div className="max-h-48 overflow-y-auto rounded-md border border-stone-200 bg-white">
@@ -748,7 +733,7 @@ function SaleForm({
                         </span>
                         <span className="block truncate text-stone-500">
                           Talla {variant.talla ?? 'Unica'} / Color {variant.color ?? 'Sin color'} /
-                          SKU {variant.sku} / QR {variant.codigoQr}
+                          QR {variant.codigoQr}
                         </span>
                       </span>
                       <span className="shrink-0 text-right text-stone-600">
@@ -800,8 +785,8 @@ function SaleForm({
                 {selectedVariant.producto.nombreProducto}
               </p>
               <p className="mt-1 text-xs">
-                SKU {selectedVariant.sku} / QR {selectedVariant.codigoQr} / Talla{' '}
-                {selectedVariant.talla ?? 'Única'} / Color {selectedVariant.color ?? 'Sin color'}
+                QR {selectedVariant.codigoQr} / Talla {selectedVariant.talla ?? 'Unica'} / Color{' '}
+                {selectedVariant.color ?? 'Sin color'}
               </p>
               <p className="mt-2 text-xs font-semibold">
                 Stock disponible: {selectedVariant.stockActual}
@@ -1052,7 +1037,7 @@ function SaleDetailPanel({
                     <div className="min-w-0">
                       <p className="font-medium text-stone-950">{line.nombreProducto}</p>
                       <p className="text-xs text-stone-500">
-                        {line.sku} / {line.codigoQr} / Talla {line.talla ?? 'Unica'} / Color{' '}
+                        QR {line.codigoQr} / Talla {line.talla ?? 'Unica'} / Color{' '}
                         {line.color ?? 'Sin color'}
                       </p>
                     </div>

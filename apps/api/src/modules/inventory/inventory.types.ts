@@ -20,7 +20,6 @@ export type InventoryReferenceType =
 export interface InventoryVariantRecord {
   id_variante: string;
   id_producto: string;
-  sku: string;
   codigo_qr: string;
   talla: string | null;
   color: string | null;
@@ -47,7 +46,6 @@ export interface InventoryMovementRecord {
   referencia_id: string | null;
   creado_por: string;
   creado_en: string;
-  sku: string;
   codigo_qr: string;
   talla: string | null;
   color: string | null;
@@ -62,7 +60,6 @@ export interface ListInventoryVariantsFilters {
   categoria?: string;
   talla?: string;
   color?: string;
-  sku?: string;
   codigoQr?: string;
   stockBajo?: boolean;
   sinStock?: boolean;
@@ -150,7 +147,6 @@ export interface PublicInventoryVariant {
       nombreCategoria: string | null;
     } | null;
   };
-  sku: string;
   codigoQr: string;
   talla: string | null;
   color: string | null;
@@ -176,7 +172,6 @@ export interface PublicInventoryMovement {
   creadoEn: string;
   variante: {
     idVariante: string;
-    sku: string;
     codigoQr: string;
     talla: string | null;
     color: string | null;

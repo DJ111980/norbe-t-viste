@@ -6,7 +6,6 @@ function createVariantRecord(overrides: Partial<VariantRecord> = {}): VariantRec
   return {
     id_variante: 'var_1',
     id_producto: 'prd_1',
-    sku: 'NTV-SKU-000001',
     codigo_qr: 'NTV-VAR-000001',
     ruta_qr: null,
     talla: 'M',

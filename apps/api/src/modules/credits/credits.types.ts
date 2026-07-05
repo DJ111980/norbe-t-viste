@@ -53,7 +53,6 @@ export interface CreditDetailRecord {
   id_credito: string;
   id_variante: string | null;
   nombre_producto: string;
-  sku: string | null;
   talla: string | null;
   color: string | null;
   cantidad: number;

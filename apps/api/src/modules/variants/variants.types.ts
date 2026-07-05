@@ -3,7 +3,6 @@ export type VariantStatus = 'ACTIVA' | 'INACTIVA';
 export interface VariantRecord {
   id_variante: string;
   id_producto: string;
-  sku: string;
   codigo_qr: string;
   ruta_qr: string | null;
   talla: string | null;
@@ -34,7 +33,6 @@ export interface VariantProductSummary {
 export interface PublicVariant {
   idVariante: string;
   producto: VariantProductSummary;
-  sku: string;
   codigoQr: string;
   talla: string | null;
   color: string | null;
@@ -56,7 +54,6 @@ export interface CreateVariantInput {
   color: string | null;
   tallaNormalizada: string;
   colorNormalizado: string;
-  sku?: string;
   precioVenta: number;
   precioCompraReferencia: number;
   stockMinimo: number;
@@ -75,7 +72,6 @@ export interface ListVariantsFilters {
   talla?: string;
   color?: string;
   codigoQr?: string;
-  sku?: string;
   stockBajo?: boolean;
   limit: number;
   offset: number;

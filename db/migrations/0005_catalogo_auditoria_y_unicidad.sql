@@ -152,5 +152,5 @@ ON variantes_producto (stock_actual, stock_minimo);
 -- solo codigo_qr, un codigo interno tipo NTV-VAR-000001, nunca datos completos
 -- del producto, precio o stock. stock_actual sigue viviendo solo en la variante;
 -- no se agrega stock al producto base.
--- sku y codigo_qr ya son UNIQUE desde la migracion inicial, por eso no se crean
+-- codigo_qr ya es UNIQUE desde la migracion inicial, por eso no se crea
 -- indices unicos duplicados para esas columnas.
