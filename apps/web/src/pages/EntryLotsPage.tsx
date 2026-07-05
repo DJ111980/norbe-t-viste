@@ -756,8 +756,6 @@ function LotDetail({
   onEditDetail: (detail: EntryLotDetail) => void;
   onDeleteDetail: (detail: EntryLotDetail) => void;
 }) {
-  const [isCancelOpen, setIsCancelOpen] = useState(false);
-
   return (
     <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
       <div className="border-b border-stone-100 p-4">
@@ -925,6 +923,8 @@ function LotActions({
   onCancelLot: () => void;
   onOpenLabels: () => void;
 }) {
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+
   return (
     <div className="rounded-md border border-stone-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-stone-950">Acciones del lote</h2>
