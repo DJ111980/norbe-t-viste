@@ -242,6 +242,7 @@ export async function createEntryLotDetail(
     idLote,
     input,
     subtotal,
+    auth.user.id_usuario,
   );
 
   return toPublicEntryLotDetail(detail, { role: auth.user.rol });
@@ -267,6 +268,8 @@ export async function updateEntryLotDetail(
     idDetalle,
     input,
     subtotal,
+    currentDetail.id_variante,
+    auth.user.id_usuario,
   );
 
   return toPublicEntryLotDetail(detail, { role: auth.user.rol });

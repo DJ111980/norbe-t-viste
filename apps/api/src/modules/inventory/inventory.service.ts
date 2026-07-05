@@ -31,7 +31,7 @@ export async function listInventoryVariants(
     onlyVisibleToSeller(auth),
   );
 
-  return variants.map((variant) => toPublicInventoryVariant(variant, { role: auth.user.rol }));
+  return variants.map((variant) => toPublicInventoryVariant(variant));
 }
 
 export async function getInventoryVariant(
@@ -49,7 +49,7 @@ export async function getInventoryVariant(
     throw new ApiError('INVENTORY_VARIANT_NOT_FOUND', 'La variante no esta disponible.', 404);
   }
 
-  return toPublicInventoryVariant(variant, { role: auth.user.rol });
+  return toPublicInventoryVariant(variant);
 }
 
 export async function listInventoryMovements(

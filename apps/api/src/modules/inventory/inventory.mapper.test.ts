@@ -39,18 +39,12 @@ const movement: InventoryMovementRecord = {
 };
 
 describe('inventory mapper', () => {
-  it('calcula stock_bajo y oculta costo a VENDEDOR', () => {
-    const mapped = toPublicInventoryVariant(variant, { role: 'VENDEDOR' });
+  it('calcula stock_bajo y no expone costo de compra', () => {
+    const mapped = toPublicInventoryVariant(variant);
 
     expect(mapped.stockBajo).toBe(true);
     expect(mapped.sinStock).toBe(false);
     expect(mapped).not.toHaveProperty('precioCompraReferencia');
-  });
-
-  it('muestra costo a ADMINISTRADOR', () => {
-    expect(
-      toPublicInventoryVariant(variant, { role: 'ADMINISTRADOR' }).precioCompraReferencia,
-    ).toBe(5000);
   });
 
   it('mapea movimiento con variante y producto', () => {

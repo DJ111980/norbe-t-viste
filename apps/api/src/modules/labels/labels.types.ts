@@ -2,6 +2,7 @@ export interface LabelVariantRecord {
   id_variante: string;
   codigo_qr: string | null;
   talla: string | null;
+  precio_venta: number;
   estado: 'ACTIVA' | 'INACTIVA';
   estado_producto: 'ACTIVO' | 'INACTIVO';
 }
@@ -9,6 +10,7 @@ export interface LabelVariantRecord {
 export interface PrintableVariantLabel {
   codigoQr: string;
   talla: string;
+  precioVenta: number;
   qrSvg: string;
 }
 
@@ -30,6 +32,7 @@ export interface EntryLotDetailForLabelsRecord {
   variante_id_variante: string | null;
   codigo_qr: string | null;
   talla: string | null;
+  precio_venta: number | null;
   estado_variante: 'ACTIVA' | 'INACTIVA' | null;
   estado_producto: 'ACTIVO' | 'INACTIVO' | null;
 }

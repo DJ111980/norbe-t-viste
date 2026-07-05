@@ -12,6 +12,7 @@ import {
   StatusBadge,
 } from '../components/ui';
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
+import { formatMoney, formatNumber } from '../lib/formatters';
 import { canViewSensitiveReports } from '../permissions';
 import {
   getEntryLotsReport,
@@ -135,17 +136,8 @@ export function reportTabLabel(tab: ReportTab): string {
   return labels[tab];
 }
 
-function money(value: number | undefined): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(value ?? 0);
-}
-
-function number(value: number | undefined): string {
-  return new Intl.NumberFormat('es-CO').format(value ?? 0);
-}
+const money = formatMoney;
+const number = formatNumber;
 
 function handleMessage(error: unknown, fallback: string): string {
   if (isForbiddenError(error)) return 'No tienes permisos para esta accion.';

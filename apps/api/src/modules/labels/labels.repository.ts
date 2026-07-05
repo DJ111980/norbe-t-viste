@@ -15,6 +15,7 @@ export async function findLabelVariantById(
         v.id_variante,
         v.codigo_qr,
         v.talla,
+        v.precio_venta,
         v.estado,
         p.estado AS estado_producto
       FROM variantes_producto v
@@ -57,6 +58,7 @@ export async function findEntryLotDetailsForLabels(
         v.id_variante AS variante_id_variante,
         v.codigo_qr,
         v.talla,
+        v.precio_venta,
         v.estado AS estado_variante,
         p.estado AS estado_producto
       FROM detalle_lotes_entrada d

@@ -55,7 +55,7 @@ describe('entry lots validation', () => {
     expect(input.cantidadEtiquetasQr).toBe(3);
   });
 
-  it('rechaza cantidad invalida y costo negativo', () => {
+  it('rechaza cantidad invalida y costo obligatorio invalido', () => {
     expectErrorCode(
       () =>
         validateCreateEntryLotDetailInput({
@@ -71,7 +71,34 @@ describe('entry lots validation', () => {
         validateCreateEntryLotDetailInput({
           id_variante: 'var_1',
           cantidad: 1,
+        }),
+      'INVALID_ENTRY_LOT_DETAIL_COST',
+    );
+
+    expectErrorCode(
+      () =>
+        validateCreateEntryLotDetailInput({
+          id_variante: 'var_1',
+          cantidad: 1,
+          costo_unitario: 0,
+        }),
+      'INVALID_ENTRY_LOT_DETAIL_COST',
+    );
+
+    expectErrorCode(
+      () =>
+        validateCreateEntryLotDetailInput({
+          id_variante: 'var_1',
+          cantidad: 1,
           costo_unitario: -1,
+        }),
+      'INVALID_ENTRY_LOT_DETAIL_COST',
+    );
+
+    expectErrorCode(
+      () =>
+        validateUpdateEntryLotDetailInput({
+          costo_unitario: 0,
         }),
       'INVALID_ENTRY_LOT_DETAIL_COST',
     );

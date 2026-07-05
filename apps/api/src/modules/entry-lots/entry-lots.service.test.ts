@@ -20,6 +20,11 @@ const mocks = vi.hoisted(() => ({
     cantidad: number;
     motivo?: string;
   }>,
+  purchaseCostUpdates: [] as Array<{
+    idVariante: string;
+    costoUnitario: number;
+    userId: string;
+  }>,
 }));
 
 vi.mock('./entry-lots.repository', () => ({
@@ -78,7 +83,14 @@ vi.mock('./entry-lots.repository', () => ({
     },
   ),
   createEntryLotDetail: vi.fn(
-    async (_env: ApiEnv, idDetalle: string, idLote: string, input, subtotal: number) => {
+    async (
+      _env: ApiEnv,
+      idDetalle: string,
+      idLote: string,
+      input,
+      subtotal: number,
+      userId: string,
+    ) => {
       const detail = buildDetail({
         id_detalle_lote: idDetalle,
         id_lote: idLote,
@@ -89,11 +101,24 @@ vi.mock('./entry-lots.repository', () => ({
         cantidad_etiquetas_qr: input.cantidadEtiquetasQr ?? input.cantidad,
       });
       mocks.details.set(idDetalle, detail);
+      mocks.purchaseCostUpdates.push({
+        idVariante: input.idVariante,
+        costoUnitario: input.costoUnitario,
+        userId,
+      });
       return detail;
     },
   ),
   updateEntryLotDetail: vi.fn(
-    async (_env: ApiEnv, idLote: string, idDetalle: string, input, subtotal: number) => {
+    async (
+      _env: ApiEnv,
+      idLote: string,
+      idDetalle: string,
+      input,
+      subtotal: number,
+      idVariante: string,
+      userId: string,
+    ) => {
       const detail = mocks.details.get(idDetalle);
       if (!detail || detail.id_lote !== idLote) throw new Error('missing detail');
       const updatedDetail = {
@@ -106,6 +131,13 @@ vi.mock('./entry-lots.repository', () => ({
         subtotal,
       };
       mocks.details.set(idDetalle, updatedDetail);
+      if (input.costoUnitario !== undefined) {
+        mocks.purchaseCostUpdates.push({
+          idVariante,
+          costoUnitario: input.costoUnitario,
+          userId,
+        });
+      }
       return updatedDetail;
     },
   ),
@@ -291,6 +323,7 @@ describe('entry lots service', () => {
     ]);
     mocks.movementCalls = 0;
     mocks.movementInputs = [];
+    mocks.purchaseCostUpdates = [];
   });
 
   it('crea lote en BORRADOR con proveedor activo y sin proveedor', async () => {
@@ -372,6 +405,9 @@ describe('entry lots service', () => {
     expect(detail.cantidadEtiquetasQr).toBe(3);
     expect(mocks.variants.get('var_1')?.stock_actual).toBe(stockAntes);
     expect(mocks.movementCalls).toBe(0);
+    expect(mocks.purchaseCostUpdates).toEqual([
+      { idVariante: 'var_1', costoUnitario: 5000, userId: 'usr_admin' },
+    ]);
   });
 
   it('rechaza variante inexistente, variante inactiva y producto inactivo', async () => {
@@ -411,9 +447,13 @@ describe('entry lots service', () => {
 
     const updated = await updateEntryLotDetail(env, adminAuth, 'lot_1', 'det_1', {
       cantidad: 4,
+      costoUnitario: 7000,
     });
 
-    expect(updated.subtotal).toBe(20000);
+    expect(updated.subtotal).toBe(28000);
+    expect(mocks.purchaseCostUpdates).toEqual([
+      { idVariante: 'var_1', costoUnitario: 7000, userId: 'usr_admin' },
+    ]);
 
     await deleteEntryLotDetail(env, 'lot_1', 'det_1');
 

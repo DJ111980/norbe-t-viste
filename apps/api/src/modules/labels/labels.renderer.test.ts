@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatLabelPrice,
   normalizeLabelSize,
   renderLabelsPageHtml,
   renderVariantLabelHtml,
@@ -10,6 +11,7 @@ describe('labels html', () => {
     const html = renderVariantLabelHtml({
       codigoQr: 'NTV-VAR-000001',
       talla: 'TALLA M',
+      precioVenta: 120000,
       qrSvg: '<svg viewBox="0 0 21 21"><path d="M0 0h1v1H0z"/></svg>',
     });
 
@@ -28,23 +30,25 @@ describe('labels html', () => {
     expect(html).toContain('<svg viewBox="0 0 21 21">');
     expect(html).toContain('NTV-VAR-000001');
     expect(html).toContain('TALLA M');
+    expect(html).toContain('$ 120.000');
     expect(html).toContain('<header class="title">NORBE T VISTE</header>');
     expect(html).toContain('<section class="visuals"');
     expect(html).toContain('<section class="details"');
-    expect(html).toContain('grid-template-rows: 0.18in 0.76in 0.16in');
+    expect(html).toContain('grid-template-rows: 0.18in 0.7in 0.22in');
     expect(html).toContain('grid-template-columns: 1fr 1fr');
     expect(html).toContain('width: 0.72in');
     expect(html).not.toContain('Escanea para consultar la variante');
   });
 
-  it('no expone precio, stock, proveedor, descripcion ni datos de cliente', () => {
+  it('no expone costo, stock, proveedor, descripcion ni datos de cliente', () => {
     const html = renderVariantLabelHtml({
       codigoQr: 'NTV-VAR-000001',
       talla: 'TALLA UNICA',
+      precioVenta: 120000,
       qrSvg: '<svg></svg>',
     }).toLowerCase();
 
-    expect(html).not.toContain('precio');
+    expect(html).not.toContain('costo');
     expect(html).not.toContain('stock');
     expect(html).not.toContain('proveedor');
     expect(html).not.toContain('descripcion');
@@ -55,6 +59,7 @@ describe('labels html', () => {
     const html = renderVariantLabelHtml({
       codigoQr: '<script>alert(1)</script>',
       talla: 'TALLA "M"',
+      precioVenta: 120000,
       qrSvg: '<svg></svg>',
     });
 
@@ -67,6 +72,7 @@ describe('labels html', () => {
     expect(normalizeLabelSize('m')).toBe('TALLA M');
     expect(normalizeLabelSize('')).toBe('TALLA UNICA');
     expect(normalizeLabelSize(null)).toBe('TALLA UNICA');
+    expect(formatLabelPrice(1200000)).toBe('$ 1.200.000');
   });
 
   it('renderiza una pagina con varias etiquetas HTML imprimibles', () => {
@@ -74,11 +80,13 @@ describe('labels html', () => {
       {
         codigoQr: 'NTV-VAR-000001',
         talla: 'TALLA M',
+        precioVenta: 120000,
         qrSvg: '<svg data-code="NTV-VAR-000001"></svg>',
       },
       {
         codigoQr: 'NTV-VAR-000002',
         talla: 'TALLA L',
+        precioVenta: 135000,
         qrSvg: '<svg data-code="NTV-VAR-000002"></svg>',
       },
     ]);
@@ -101,6 +109,8 @@ describe('labels html', () => {
     expect(html).toContain('NTV-VAR-000002');
     expect(html).toContain('TALLA M');
     expect(html).toContain('TALLA L');
+    expect(html).toContain('$ 120.000');
+    expect(html).toContain('$ 135.000');
     expect(html).toContain('size: 2.25in 1.25in');
     expect(html).toContain('width: 2.25in');
     expect(html).toContain('height: 1.25in');
@@ -108,7 +118,7 @@ describe('labels html', () => {
     expect(html).toContain('page-break-after: always');
     expect(html).toContain('@media print');
     expect(html).not.toContain('Escanea para consultar la variante');
-    expect(html.toLowerCase()).not.toContain('precio');
+    expect(html.toLowerCase()).not.toContain('costo');
     expect(html.toLowerCase()).not.toContain('stock');
     expect(html.toLowerCase()).not.toContain('proveedor');
     expect(html.toLowerCase()).not.toContain('descripcion');

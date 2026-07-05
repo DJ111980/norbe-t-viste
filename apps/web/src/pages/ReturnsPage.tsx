@@ -16,6 +16,7 @@ import {
   textareaClassName,
 } from '../components/ui';
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
+import { formatMoney } from '../lib/formatters';
 import { canCreateSaleReturns } from '../permissions';
 import { listSales, getSale, type SaleFilters } from '../services/sales';
 import { createSaleReturn, listSaleReturns } from '../services/returns';
@@ -94,13 +95,7 @@ export function impactMessageForSaleType(type: SaleType): string {
   return 'La devolucion devuelve stock y puede reducir el saldo del credito. El pago inicial no se modifica automaticamente.';
 }
 
-function currency(value: number): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+const currency = formatMoney;
 
 function handleMessage(error: unknown, fallback: string): string {
   if (isForbiddenError(error)) return 'No tienes permisos para esta accion.';

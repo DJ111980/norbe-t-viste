@@ -10,20 +10,12 @@ import {
   secondaryButtonClassName,
 } from '../components/ui';
 import { ApiClientError, isUnauthorizedError } from '../lib/api';
+import { formatMoney, formatNumber } from '../lib/formatters';
 import { getDashboardSummary } from '../services/dashboard';
 import type { DashboardFilters, DashboardSummary } from '../types';
 
-function money(value: number | undefined): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(value ?? 0);
-}
-
-function number(value: number | undefined): string {
-  return new Intl.NumberFormat('es-CO').format(value ?? 0);
-}
+const money = formatMoney;
+const number = formatNumber;
 
 export function totalAlerts(summary: DashboardSummary): number {
   return (

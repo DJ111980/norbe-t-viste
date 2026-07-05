@@ -1,5 +1,3 @@
-import type { UserRole } from '../auth/auth.types';
-
 export type InventoryMovementType =
   | 'LOTE_ENTRADA'
   | 'INVENTARIO_INICIAL'
@@ -132,10 +130,6 @@ export interface ManualInventoryAdjustmentResult {
   movimiento_creado: boolean;
 }
 
-export interface InventoryMapperOptions {
-  role: UserRole;
-}
-
 export interface PublicInventoryVariant {
   idVariante: string;
   producto: {
@@ -150,7 +144,6 @@ export interface PublicInventoryVariant {
   codigoQr: string;
   talla: string | null;
   color: string | null;
-  precioCompraReferencia?: number;
   precioVenta: number;
   stockActual: number;
   stockMinimo: number;

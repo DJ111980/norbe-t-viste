@@ -210,7 +210,7 @@ export async function createCashSale(
             descuento,
             subtotal,
             creado_en
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `,
       ).bind(
         detail.idDetalleVenta,
@@ -415,7 +415,7 @@ export async function createCreditSale(
             descuento,
             subtotal,
             creado_en
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `,
       ).bind(
         detail.idDetalleVenta,
@@ -730,7 +730,7 @@ export async function createMixedSale(
             descuento,
             subtotal,
             creado_en
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `,
       ).bind(
         detail.idDetalleVenta,

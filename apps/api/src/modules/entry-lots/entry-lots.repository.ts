@@ -301,6 +301,7 @@ export async function createEntryLotDetail(
   idLote: string,
   input: CreateEntryLotDetailInput,
   subtotal: number,
+  userId: string,
 ): Promise<EntryLotDetailRecord> {
   await env.DB.prepare(
     `
@@ -332,6 +333,18 @@ export async function createEntryLotDetail(
     )
     .run();
 
+  await env.DB.prepare(
+    `
+      UPDATE variantes_producto
+      SET precio_compra = ?,
+          actualizado_por = ?,
+          actualizado_en = datetime('now')
+      WHERE id_variante = ?
+    `,
+  )
+    .bind(input.costoUnitario, userId, input.idVariante)
+    .run();
+
   return (await findEntryLotDetailById(env, idLote, idDetalle)) as EntryLotDetailRecord;
 }
 
@@ -341,6 +354,8 @@ export async function updateEntryLotDetail(
   idDetalle: string,
   input: UpdateEntryLotDetailInput,
   subtotal: number,
+  idVariante: string,
+  userId: string,
 ): Promise<EntryLotDetailRecord> {
   const assignments: string[] = [];
   const values: (string | number | null)[] = [];
@@ -379,6 +394,20 @@ export async function updateEntryLotDetail(
   )
     .bind(...values, idLote, idDetalle)
     .run();
+
+  if (input.costoUnitario !== undefined) {
+    await env.DB.prepare(
+      `
+        UPDATE variantes_producto
+        SET precio_compra = ?,
+            actualizado_por = ?,
+            actualizado_en = datetime('now')
+        WHERE id_variante = ?
+      `,
+    )
+      .bind(input.costoUnitario, userId, idVariante)
+      .run();
+  }
 
   return (await findEntryLotDetailById(env, idLote, idDetalle)) as EntryLotDetailRecord;
 }

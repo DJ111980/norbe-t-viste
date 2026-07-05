@@ -35,6 +35,7 @@ async function getPrintableLabel(env: ApiEnv, idVariante: string): Promise<Print
   return {
     codigoQr,
     talla: normalizeLabelSize(variant.talla),
+    precioVenta: variant.precio_venta,
     qrSvg: createQrSvg(codigoQr),
   };
 }
@@ -44,6 +45,7 @@ function expandBatchLabels(variant: LabelVariantRecord, cantidad: number): Print
   const label = {
     codigoQr,
     talla: normalizeLabelSize(variant.talla),
+    precioVenta: variant.precio_venta,
     qrSvg: createQrSvg(codigoQr),
   };
 
@@ -70,6 +72,7 @@ function createPrintableLabelFromEntryLotDetail(
   return {
     codigoQr,
     talla: normalizeLabelSize(detail.talla),
+    precioVenta: detail.precio_venta ?? 0,
     qrSvg: createQrSvg(codigoQr),
   };
 }

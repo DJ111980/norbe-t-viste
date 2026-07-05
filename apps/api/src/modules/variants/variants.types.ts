@@ -38,7 +38,6 @@ export interface PublicVariant {
   color: string | null;
   tallaNormalizada: string;
   colorNormalizada: string;
-  precioCompraReferencia: number;
   precioVenta: number;
   stockActual: number;
   stockMinimo: number;
@@ -55,7 +54,6 @@ export interface CreateVariantInput {
   tallaNormalizada: string;
   colorNormalizado: string;
   precioVenta: number;
-  precioCompraReferencia: number;
   stockMinimo: number;
 }
 

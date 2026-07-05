@@ -249,7 +249,6 @@ export interface Variant {
   codigoQr: string;
   talla: string | null;
   color: string | null;
-  precioCompraReferencia: number;
   precioVenta: number;
   stockActual: number;
   stockMinimo: number;
@@ -262,7 +261,6 @@ export interface VariantFormValues {
   talla: string;
   color: string;
   precio_venta: number;
-  precio_compra_referencia: number;
   stock_minimo: number;
 }
 
@@ -302,7 +300,6 @@ export interface InventoryVariant {
   codigoQr: string;
   talla: string | null;
   color: string | null;
-  precioCompraReferencia?: number;
   precioVenta: number;
   stockActual: number;
   stockMinimo: number;

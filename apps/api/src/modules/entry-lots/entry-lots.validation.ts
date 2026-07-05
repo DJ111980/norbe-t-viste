@@ -88,6 +88,14 @@ function normalizePositiveInteger(value: unknown, code: string, message: string)
   return parsed;
 }
 
+function normalizeRequiredPositiveInteger(value: unknown, code: string, message: string): number {
+  if (value === undefined || value === null || value === '') {
+    throw new ApiError(code, message, 400);
+  }
+
+  return normalizePositiveInteger(value, code, message);
+}
+
 function normalizeNonNegativeInteger(
   value: unknown,
   code: string,
@@ -171,10 +179,10 @@ export function validateCreateEntryLotDetailInput(body: unknown): CreateEntryLot
       'La variante del detalle es obligatoria.',
     ),
     cantidad,
-    costoUnitario: normalizeNonNegativeInteger(
+    costoUnitario: normalizeRequiredPositiveInteger(
       rawBody.costo_unitario,
       'INVALID_ENTRY_LOT_DETAIL_COST',
-      'El costo unitario no puede ser negativo.',
+      'El costo unitario es obligatorio y debe ser mayor que 0.',
     ),
     precioVentaSugerido: normalizeNonNegativeInteger(
       rawBody.precio_venta_sugerido,
@@ -225,10 +233,10 @@ export function validateUpdateEntryLotDetailInput(body: unknown): UpdateEntryLot
     );
   }
   if (rawBody.costo_unitario !== undefined) {
-    input.costoUnitario = normalizeNonNegativeInteger(
+    input.costoUnitario = normalizeRequiredPositiveInteger(
       rawBody.costo_unitario,
       'INVALID_ENTRY_LOT_DETAIL_COST',
-      'El costo unitario no puede ser negativo.',
+      'El costo unitario es obligatorio y debe ser mayor que 0.',
     );
   }
   if (rawBody.precio_venta_sugerido !== undefined) {

@@ -62,7 +62,7 @@ vi.mock('./variants.repository', () => ({
         color: input.color,
         talla_normalizada: input.tallaNormalizada,
         color_normalizado: input.colorNormalizado,
-        precio_compra: input.precioCompraReferencia,
+        precio_compra: 0,
         precio_venta: input.precioVenta,
         stock_actual: 0,
         stock_minimo: input.stockMinimo,
@@ -165,7 +165,6 @@ function createInput(overrides: Partial<CreateVariantInput> = {}): CreateVariant
     tallaNormalizada: 'm',
     colorNormalizado: 'rojo',
     precioVenta: 50000,
-    precioCompraReferencia: 20000,
     stockMinimo: 1,
     ...overrides,
   };
@@ -215,6 +214,7 @@ describe('variants service', () => {
     const variant = await createVariant(env, adminAuth, 'prd_1', createInput());
     expect(variant.codigoQr).toBe('NTV-VAR-000001');
     expect(variant.stockActual).toBe(0);
+    expect(variant).not.toHaveProperty('precioCompraReferencia');
     expect(variant.creadoPor).toBe('usr_admin');
     expect(variant.actualizadoPor).toBe('usr_admin');
   });

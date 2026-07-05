@@ -178,7 +178,7 @@ export function ProductsPage({ onSessionExpired }: { onSessionExpired: () => voi
     setSuccess(null);
 
     try {
-      const updated = await updateProductStatus(token, product.idProducto, nextStatus);
+      await updateProductStatus(token, product.idProducto, nextStatus);
       setSuccess('Estado del producto actualizado.');
       await loadData();
     } catch (statusError) {

@@ -39,6 +39,7 @@ function buildVariant(overrides: Partial<LabelVariantRecord> = {}): LabelVariant
     id_variante: 'var_1',
     codigo_qr: 'NTV-VAR-000001',
     talla: 'm',
+    precio_venta: 120000,
     estado: 'ACTIVA',
     estado_producto: 'ACTIVO',
     ...overrides,
@@ -64,6 +65,7 @@ function buildEntryLotDetail(
     variante_id_variante: 'var_1',
     codigo_qr: 'NTV-VAR-000001',
     talla: 'm',
+    precio_venta: 120000,
     estado_variante: 'ACTIVA',
     estado_producto: 'ACTIVO',
     ...overrides,
@@ -84,6 +86,7 @@ describe('labels service', () => {
 
     expect(html).toContain('NTV-VAR-000001');
     expect(html).toContain('TALLA M');
+    expect(html).toContain('$ 120.000');
     expect(mocks.qrCalls).toEqual(['NTV-VAR-000001']);
   });
 
@@ -128,6 +131,7 @@ describe('labels service', () => {
 
     expect(mocks.qrCalls).toEqual(['NTV-VAR-000777']);
     expect(mocks.qrCalls[0]).not.toContain('precio');
+    expect(mocks.qrCalls[0]).not.toContain('120000');
     expect(mocks.qrCalls[0]).not.toContain('stock');
   });
 

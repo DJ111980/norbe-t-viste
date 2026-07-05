@@ -17,6 +17,7 @@ import {
   textareaClassName,
 } from '../components/ui';
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
+import { formatMoney } from '../lib/formatters';
 import { canCancelSales } from '../permissions';
 import { listClients } from '../services/clients';
 import {
@@ -92,13 +93,7 @@ export function canShowCancelButton(
   return canCancelSales(role) && sale.estadoVenta !== 'ANULADA';
 }
 
-function currency(value: number): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+const currency = formatMoney;
 
 function handleMessage(error: unknown, fallback: string): string {
   if (isForbiddenError(error)) return 'No tienes permisos para esta acción.';

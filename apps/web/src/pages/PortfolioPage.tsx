@@ -16,6 +16,7 @@ import {
   textareaClassName,
 } from '../components/ui';
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
+import { formatMoney } from '../lib/formatters';
 import {
   canCancelCreditPayments,
   canCancelIndependentCredits,
@@ -113,13 +114,7 @@ export function isPositiveAmount(value: number): boolean {
   return Number.isFinite(value) && value > 0;
 }
 
-function currency(value: number): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+const currency = formatMoney;
 
 function handleMessage(error: unknown, fallback: string): string {
   if (isForbiddenError(error)) return 'No tienes permisos para esta acción.';

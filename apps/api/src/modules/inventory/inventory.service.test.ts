@@ -217,7 +217,7 @@ describe('inventory service', () => {
 
     expect(mocks.lastOnlyVisibleToSeller).toBe(false);
     expect(variants).toHaveLength(4);
-    expect(variants[0]).toHaveProperty('precioCompraReferencia');
+    expect(variants[0]).not.toHaveProperty('precioCompraReferencia');
   });
 
   it('VENDEDOR solo ve variantes activas de productos activos y no ve costos', async () => {

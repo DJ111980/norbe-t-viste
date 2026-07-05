@@ -16,9 +16,18 @@ export function normalizeLabelSize(talla: string | null): string {
   return normalizedSize ? `TALLA ${normalizedSize.toUpperCase()}` : 'TALLA UNICA';
 }
 
+export function formatLabelPrice(value: number): string {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 function renderVariantLabelMarkup(label: PrintableVariantLabel): string {
   const visibleCode = escapeHtml(label.codigoQr);
   const visibleSize = escapeHtml(label.talla);
+  const visiblePrice = escapeHtml(formatLabelPrice(label.precioVenta));
 
   return `<main class="label" aria-label="Etiqueta QR de variante">
     <header class="title">NORBE T VISTE</header>
@@ -31,6 +40,7 @@ function renderVariantLabelMarkup(label: PrintableVariantLabel): string {
     </section>
     <section class="details" aria-label="Datos visibles de variante">
       <div class="size">${visibleSize}</div>
+      <div class="price">${visiblePrice}</div>
       <div class="code">${visibleCode}</div>
     </section>
   </main>`;
@@ -83,8 +93,8 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
       padding: 0.08in;
       display: grid;
       grid-template-columns: 1fr;
-      grid-template-rows: 0.18in 0.76in 0.16in;
-      row-gap: 0.03in;
+      grid-template-rows: 0.18in 0.7in 0.22in;
+      row-gap: 0.025in;
       overflow: hidden;
       border: 0.2mm solid #111111;
       break-inside: avoid;
@@ -158,6 +168,7 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
       min-width: 0;
       display: grid;
       grid-template-columns: 1fr 1fr;
+      grid-template-rows: 0.1in 0.11in;
       column-gap: 0.08in;
       align-items: center;
       justify-items: center;
@@ -170,15 +181,31 @@ function renderLabelStyles(pageMode: 'single' | 'batch'): string {
       line-height: 1.1;
       text-align: center;
       overflow-wrap: anywhere;
+      grid-column: 2;
+      grid-row: 2;
     }
 
     .size {
+      max-width: 0.8in;
+      font-size: 5.5pt;
+      font-weight: 700;
+      line-height: 1;
+      text-align: center;
+      overflow-wrap: anywhere;
+      grid-column: 1;
+      grid-row: 1;
+      align-self: end;
+    }
+
+    .price {
       max-width: 0.8in;
       font-size: 6.5pt;
       font-weight: 700;
       line-height: 1.1;
       text-align: center;
       overflow-wrap: anywhere;
+      grid-column: 1;
+      grid-row: 2;
     }
 
     @media print {

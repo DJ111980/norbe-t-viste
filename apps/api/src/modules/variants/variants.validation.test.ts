@@ -15,7 +15,6 @@ describe('variants validation', () => {
         talla: ' M ',
         color: ' Rojo Vino ',
         precio_venta: 50000,
-        precio_compra_referencia: 25000,
         stock_minimo: 2,
       }),
     ).toEqual({
@@ -24,7 +23,6 @@ describe('variants validation', () => {
       tallaNormalizada: 'm',
       colorNormalizado: 'rojo vino',
       precioVenta: 50000,
-      precioCompraReferencia: 25000,
       stockMinimo: 2,
     });
   });
@@ -46,6 +44,7 @@ describe('variants validation', () => {
     expect(() => validateUpdateVariantInput({})).toThrow(ApiError);
     expect(() => validateUpdateVariantInput({ codigo_qr: 'NTV-VAR-000001' })).toThrow(ApiError);
     expect(() => validateUpdateVariantInput({ stock_actual: 5 })).toThrow(ApiError);
+    expect(() => validateUpdateVariantInput({ precio_compra_referencia: 25000 })).toThrow(ApiError);
   });
 
   it('editar variante recalcula talla y color normalizados', () => {

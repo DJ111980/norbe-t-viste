@@ -19,6 +19,7 @@ import {
   SuccessMessage,
 } from '../components/ui';
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
+import { formatMoney } from '../lib/formatters';
 import { canManageVariants } from '../permissions';
 import { getBatchVariantLabelPreview } from '../services/labels';
 import { listProducts } from '../services/products';
@@ -38,20 +39,13 @@ const emptyVariantForm: VariantFormValues = {
   talla: '',
   color: '',
   precio_venta: 0,
-  precio_compra_referencia: 0,
   stock_minimo: 0,
 };
 
 const compactActionButtonClassName =
   'h-8 rounded-md border border-stone-300 bg-white px-2 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50';
 
-function currency(value: number): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+const currency = formatMoney;
 
 function handleImageSaveMessage(error: unknown): string {
   if (isForbiddenError(error)) return 'No tienes permisos para subir la imagen.';
@@ -174,7 +168,6 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
       talla: variant.talla ?? '',
       color: variant.color ?? '',
       precio_venta: variant.precioVenta,
-      precio_compra_referencia: variant.precioCompraReferencia,
       stock_minimo: variant.stockMinimo,
     });
     setFormError(null);
@@ -234,7 +227,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
     setSuccess(null);
 
     try {
-      const updated = await updateVariantStatus(token, variant.idVariante, nextStatus);
+      await updateVariantStatus(token, variant.idVariante, nextStatus);
       setSuccess('Estado de la variante actualizado.');
       await loadData();
     } catch (statusError) {
@@ -284,7 +277,7 @@ export function VariantsPage({ onSessionExpired }: { onSessionExpired: () => voi
     <section className="space-y-6">
       <PageHeader
         title="Variantes"
-        description="Gestiona tallas, colores, precio de venta y costo de compra. El stock actual es solo consultivo."
+        description="Gestiona tallas, colores y precio de venta. El stock actual es solo consultivo."
         action={
           canManage && (
             <button
@@ -595,19 +588,6 @@ function VariantForm({
             step={1}
             value={form.precio_venta}
             onChange={(event) => onChange({ ...form, precio_venta: Number(event.target.value) })}
-            {...numberInputFocusProps}
-            className={inputClassName}
-          />
-        </Field>
-        <Field label="Costo de compra">
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={form.precio_compra_referencia}
-            onChange={(event) =>
-              onChange({ ...form, precio_compra_referencia: Number(event.target.value) })
-            }
             {...numberInputFocusProps}
             className={inputClassName}
           />

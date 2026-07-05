@@ -15,7 +15,6 @@ export function toPublicVariant(variant: VariantRecord): PublicVariant {
     color: variant.color,
     tallaNormalizada: variant.talla_normalizada,
     colorNormalizada: variant.color_normalizado,
-    precioCompraReferencia: variant.precio_compra,
     precioVenta: variant.precio_venta,
     stockActual: variant.stock_actual,
     stockMinimo: variant.stock_minimo,

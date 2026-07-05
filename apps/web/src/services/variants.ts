@@ -21,7 +21,6 @@ function toVariantBody(values: VariantFormValues) {
     talla: values.talla,
     color: values.color,
     precio_venta: values.precio_venta,
-    precio_compra_referencia: values.precio_compra_referencia,
     stock_minimo: values.stock_minimo,
   };
 }

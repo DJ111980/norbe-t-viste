@@ -16,6 +16,7 @@ import {
   textareaClassName,
 } from '../components/ui';
 import { ApiClientError, isForbiddenError, isUnauthorizedError } from '../lib/api';
+import { formatMoney } from '../lib/formatters';
 import { canManageEntryLots } from '../permissions';
 import { getEntryLotLabelPreview } from '../services/labels';
 import {
@@ -58,13 +59,7 @@ const emptyDetailForm: EntryLotDetailFormValues = {
   observaciones: '',
 };
 
-function currency(value: number | null | undefined): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(value ?? 0);
-}
+const currency = formatMoney;
 
 function handleMessage(error: unknown, fallback: string): string {
   if (isForbiddenError(error)) return 'No tienes permisos para esta accion.';
@@ -883,8 +878,9 @@ function DetailForm({
         </Field>
         <Field label="Costo de compra unitario">
           <input
+            required
             type="number"
-            min={0}
+            min={1}
             step={1}
             value={form.costo_unitario}
             onChange={(event) => onChange({ ...form, costo_unitario: Number(event.target.value) })}

@@ -16,6 +16,10 @@ function user(): UserAccount {
     debeCambiarContrasena: false,
     contrasenaActualizadaEn: null,
     creadoPor: null,
+    avatar: {
+      disponible: false,
+      contentType: null,
+    },
   };
 }
 

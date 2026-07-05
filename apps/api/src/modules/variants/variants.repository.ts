@@ -197,7 +197,7 @@ export async function createVariant(
         actualizado_por,
         creado_en,
         actualizado_en
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVA', ?, ?, datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, 'ACTIVA', ?, ?, datetime('now'), datetime('now'))
     `,
   )
     .bind(
@@ -209,7 +209,6 @@ export async function createVariant(
       input.color,
       input.tallaNormalizada,
       input.colorNormalizado,
-      input.precioCompraReferencia,
       input.precioVenta,
       input.stockMinimo,
       userId,
@@ -248,10 +247,6 @@ export async function updateVariant(
   if (input.precioVenta !== undefined) {
     assignments.push('precio_venta = ?');
     values.push(input.precioVenta);
-  }
-  if (input.precioCompraReferencia !== undefined) {
-    assignments.push('precio_compra = ?');
-    values.push(input.precioCompraReferencia);
   }
   if (input.stockMinimo !== undefined) {
     assignments.push('stock_minimo = ?');

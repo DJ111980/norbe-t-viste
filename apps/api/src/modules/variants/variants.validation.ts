@@ -10,15 +10,11 @@ import type {
 const VARIANT_STATUSES: VariantStatus[] = ['ACTIVA', 'INACTIVA'];
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
-const VARIANT_FIELDS = [
-  'talla',
-  'color',
-  'precio_venta',
-  'precio_compra_referencia',
-  'stock_minimo',
-];
+const VARIANT_FIELDS = ['talla', 'color', 'precio_venta', 'stock_minimo'];
 const FORBIDDEN_FIELDS = [
   'stock_actual',
+  'precio_compra',
+  'precio_compra_referencia',
   'codigo_qr',
   'ruta_qr',
   'estado',
@@ -31,6 +27,7 @@ interface RawVariantBody {
   talla?: unknown;
   color?: unknown;
   precio_venta?: unknown;
+  precio_compra?: unknown;
   precio_compra_referencia?: unknown;
   stock_minimo?: unknown;
   stock_actual?: unknown;
@@ -120,10 +117,6 @@ export function validateCreateVariantInput(body: unknown): CreateVariantInput {
     tallaNormalizada: normalizeVariantPart(rawBody?.talla, 'unica'),
     colorNormalizado: normalizeVariantPart(rawBody?.color, 'sin-color'),
     precioVenta: parseMoney(rawBody?.precio_venta, 'precio_venta'),
-    precioCompraReferencia: parseMoney(
-      rawBody?.precio_compra_referencia,
-      'precio_compra_referencia',
-    ),
     stockMinimo: parseMoney(rawBody?.stock_minimo, 'stock_minimo'),
   };
 }
@@ -152,12 +145,6 @@ export function validateUpdateVariantInput(body: unknown): UpdateVariantInput {
   }
   if (rawBody.precio_venta !== undefined) {
     input.precioVenta = parseMoney(rawBody.precio_venta, 'precio_venta');
-  }
-  if (rawBody.precio_compra_referencia !== undefined) {
-    input.precioCompraReferencia = parseMoney(
-      rawBody.precio_compra_referencia,
-      'precio_compra_referencia',
-    );
   }
   if (rawBody.stock_minimo !== undefined) {
     input.stockMinimo = parseMoney(rawBody.stock_minimo, 'stock_minimo');

@@ -1,16 +1,12 @@
 import type {
-  InventoryMapperOptions,
   InventoryMovementRecord,
   InventoryVariantRecord,
   PublicInventoryMovement,
   PublicInventoryVariant,
 } from './inventory.types';
 
-export function toPublicInventoryVariant(
-  variant: InventoryVariantRecord,
-  options: InventoryMapperOptions,
-): PublicInventoryVariant {
-  const publicVariant: PublicInventoryVariant = {
+export function toPublicInventoryVariant(variant: InventoryVariantRecord): PublicInventoryVariant {
+  return {
     idVariante: variant.id_variante,
     producto: {
       idProducto: variant.id_producto,
@@ -34,12 +30,6 @@ export function toPublicInventoryVariant(
     sinStock: variant.stock_actual <= 0,
     estado: variant.estado,
   };
-
-  if (options.role === 'ADMINISTRADOR') {
-    publicVariant.precioCompraReferencia = variant.precio_compra;
-  }
-
-  return publicVariant;
 }
 
 export function toPublicInventoryMovement(
