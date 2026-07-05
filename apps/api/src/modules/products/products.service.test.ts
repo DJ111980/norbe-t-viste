@@ -44,7 +44,6 @@ vi.mock('./products.repository', () => ({
         nombre_normalizado: input.nombreNormalizado,
         descripcion: input.descripcion,
         marca: input.marca,
-        referencia: input.referencia,
         mostrar_en_catalogo: input.visibleCatalogo ? 1 : 0,
         estado: 'ACTIVO',
         creado_por: userId,
@@ -118,7 +117,6 @@ function createProductRecord(overrides: Partial<ProductRecord> = {}): ProductRec
     nombre_producto: 'Blusa Roja',
     descripcion: null,
     marca: null,
-    referencia: null,
     imagen_principal: null,
     mostrar_en_catalogo: 0,
     estado: 'ACTIVO',
@@ -151,7 +149,6 @@ function createInput(overrides: Partial<CreateProductInput> = {}): CreateProduct
     idCategoria: 'cat_1',
     descripcion: null,
     marca: null,
-    referencia: null,
     visibleCatalogo: false,
     ...overrides,
   };

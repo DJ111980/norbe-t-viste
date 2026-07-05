@@ -201,6 +201,7 @@ export async function createCashSale(
             id_venta,
             id_variante,
             codigo_qr,
+            codigo_variante_legacy,
             nombre_producto,
             talla,
             color,
@@ -209,12 +210,13 @@ export async function createCashSale(
             descuento,
             subtotal,
             creado_en
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `,
       ).bind(
         detail.idDetalleVenta,
         input.idVenta,
         detail.idVariante,
+        detail.codigoQr,
         detail.codigoQr,
         detail.nombreProducto,
         detail.talla,
@@ -404,6 +406,7 @@ export async function createCreditSale(
             id_venta,
             id_variante,
             codigo_qr,
+            codigo_variante_legacy,
             nombre_producto,
             talla,
             color,
@@ -412,12 +415,13 @@ export async function createCreditSale(
             descuento,
             subtotal,
             creado_en
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `,
       ).bind(
         detail.idDetalleVenta,
         input.idVenta,
         detail.idVariante,
+        detail.codigoQr,
         detail.codigoQr,
         detail.nombreProducto,
         detail.talla,
@@ -717,6 +721,7 @@ export async function createMixedSale(
             id_venta,
             id_variante,
             codigo_qr,
+            codigo_variante_legacy,
             nombre_producto,
             talla,
             color,
@@ -725,12 +730,13 @@ export async function createMixedSale(
             descuento,
             subtotal,
             creado_en
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `,
       ).bind(
         detail.idDetalleVenta,
         input.idVenta,
         detail.idVariante,
+        detail.codigoQr,
         detail.codigoQr,
         detail.nombreProducto,
         detail.talla,

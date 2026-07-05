@@ -9,7 +9,6 @@ function createProductRecord(overrides: Partial<ProductRecord> = {}): ProductRec
     nombre_producto: 'Blusa Roja',
     descripcion: null,
     marca: null,
-    referencia: null,
     imagen_principal: null,
     mostrar_en_catalogo: 1,
     estado: 'ACTIVO',

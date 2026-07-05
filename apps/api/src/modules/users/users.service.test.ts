@@ -117,6 +117,8 @@ function createUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
     debe_cambiar_contrasena: 1,
     contrasena_actualizada_en: null,
     creado_por: null,
+    avatar_key: null,
+    avatar_content_type: null,
     ...overrides,
   };
 }

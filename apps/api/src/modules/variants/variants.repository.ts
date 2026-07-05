@@ -182,6 +182,7 @@ export async function createVariant(
       INSERT INTO variantes_producto (
         id_variante,
         id_producto,
+        codigo_variante_legacy,
         codigo_qr,
         talla,
         color,
@@ -196,12 +197,13 @@ export async function createVariant(
         actualizado_por,
         creado_en,
         actualizado_en
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVA', ?, ?, datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVA', ?, ?, datetime('now'), datetime('now'))
     `,
   )
     .bind(
       idVariante,
       idProducto,
+      codigoQr,
       codigoQr,
       input.talla,
       input.color,
