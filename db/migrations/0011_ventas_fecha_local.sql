@@ -1,7 +1,5 @@
 -- NORBE T VISTE - Fecha comercial local para ventas.
-
-ALTER TABLE ventas
-ADD COLUMN fecha_venta TEXT;
+-- El esquema inicial ya contiene fecha_venta; se conserva el backfill y el indice.
 
 UPDATE ventas
 SET fecha_venta = COALESCE(fecha_venta, creado_en)

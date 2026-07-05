@@ -18,3 +18,21 @@ migrations_dir = "../../db/migrations"
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "norbe-t-viste-dev-assets"
+
+[env.staging]
+name = "norbe-t-viste-api-staging"
+
+[env.staging.vars]
+APP_ENV = "staging"
+BUSINESS_TIMEZONE = "America/Bogota"
+CORS_ORIGINS = "https://norbe-t-viste-web-staging.pages.dev"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "norbe-t-viste-staging-db"
+database_id = "49198e3b-9fa0-4b48-89d2-97e789db0416"
+migrations_dir = "../../db/migrations"
+
+[[env.staging.r2_buckets]]
+binding = "BUCKET"
+bucket_name = "norbe-t-viste-staging-assets"

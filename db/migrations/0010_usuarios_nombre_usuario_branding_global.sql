@@ -1,7 +1,6 @@
 -- NORBE T VISTE - Login por usuario y branding global simple.
-
-ALTER TABLE usuarios
-ADD COLUMN nombre_usuario TEXT;
+-- El esquema inicial ya contiene nombre_usuario y los campos globales de branding.
+-- Esta migracion conserva la normalizacion de datos e indices para bases previas.
 
 UPDATE usuarios
 SET nombre_usuario = 'admin'
@@ -55,12 +54,6 @@ WHERE nombre_usuario IS NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_nombre_usuario
 ON usuarios (nombre_usuario);
-
-ALTER TABLE configuracion_negocio
-ADD COLUMN eslogan TEXT NOT NULL DEFAULT 'Gestion comercial';
-
-ALTER TABLE configuracion_negocio
-ADD COLUMN descripcion_login TEXT NOT NULL DEFAULT 'Gestion comercial lista para operar desde el navegador.';
 
 UPDATE configuracion_negocio
 SET color_principal = COALESCE(NULLIF(TRIM(color_principal), ''), '#b0181b'),
