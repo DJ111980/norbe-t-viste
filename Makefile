@@ -34,11 +34,20 @@ db-migrate-remote:
 db-migrate-staging:
 	npm run db:migrate:staging
 
+db-migrate-production:
+	npm run db:migrate:production
+
 deploy-api-staging:
 	npm run deploy:api:staging
 
+deploy-api-production:
+	npm run deploy:api:production
+
 deploy-web-staging:
 	npm run deploy:web:staging
+
+deploy-web-production:
+	npm run deploy:web:production
 
 db-seed:
 	npm run db:seed
